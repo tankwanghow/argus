@@ -714,7 +714,7 @@ end
 
 - [ ] **Step 2: Implement `update_obligation/4`** — only active obligations; manager/admin; log each changed field.
 
-- [ ] **Step 3: `edit_note/4`** — 15-minute window for author; manager/admin override; log change.
+- [ ] **Step 3: `edit_note/4`** — 48-hour window for author; manager/admin override; log change.
 
 - [ ] **Step 4: Commit**
 

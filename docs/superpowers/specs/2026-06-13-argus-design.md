@@ -257,7 +257,7 @@ Lock after Done/cancelled. Edits while cycle is active.
 
 | Rule | Detail |
 |------|--------|
-| Author | Edit own event note within 15 minutes (typo fixes) |
+| Author | Edit own event note within 48 hours (typo fixes) |
 | Override | manager/admin anytime before Done |
 | After Done / cancelled | locked |
 
