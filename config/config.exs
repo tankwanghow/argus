@@ -7,6 +7,19 @@
 # General application configuration
 import Config
 
+config :argus, :scopes,
+  user: [
+    default: true,
+    module: Argus.Accounts.Scope,
+    assign_key: :current_scope,
+    access_path: [:user, :id],
+    schema_key: :user_id,
+    schema_type: :binary_id,
+    schema_table: :users,
+    test_data_fixture: Argus.AccountsFixtures,
+    test_setup_helper: :register_and_log_in_user
+  ]
+
 workspace_assets_config = Path.expand("../../shared_config/assets.exs", __DIR__)
 
 if File.exists?(workspace_assets_config) do
