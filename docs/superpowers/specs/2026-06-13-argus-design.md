@@ -77,29 +77,29 @@ System presets (`entity_id` null) + per-entity custom types (clone/edit/create).
 | `complete_note_required` | boolean | Enforced on Done only |
 | `complete_documents` | string | Comma-delimited slot names, e.g. `"statutory_form,payment_receipt"` — one file per name required on Done |
 | `reminder_offsets` | string | Comma-delimited days before due, e.g. `"30,7,1"` |
-| `suggest_next_due` | boolean | Pre-fill next due date from interval when prompting on Done |
 
 #### Recurring intervals
 
-Stored as snake_case atoms/strings in code. User-facing labels via Gettext.
+Stored as snake_case atoms/strings in code. User-facing labels via Gettext. The interval alone controls recurrence and next-due pre-fill on Done — no separate flag needed.
 
-| Code value | Display label | Suggested next due (when `suggest_next_due`) |
-|------------|---------------|-----------------------------------------------|
-| `none` | One-off | — (no next obligation spawned) |
-| `weekly` | Weekly | current `due_by` + 1 week |
-| `every_two_weeks` | Every 2 weeks | current `due_by` + 2 weeks |
-| `monthly` | Monthly | current `due_by` + 1 month |
-| `quarterly` | Quarterly | current `due_by` + 3 months |
-| `semiannual` | Every 6 months | current `due_by` + 6 months |
-| `annual` | Yearly | current `due_by` + 1 year |
-| `custom` | Custom | — (always prompt; user picks a specific date) |
+| Code value | Display label | On Done |
+|------------|---------------|---------|
+| `none` | One-off | No next obligation spawned |
+| `weekly` | Weekly | Prompt; pre-fill `due_by` + 1 week |
+| `every_two_weeks` | Every 2 weeks | Prompt; pre-fill `due_by` + 2 weeks |
+| `monthly` | Monthly | Prompt; pre-fill `due_by` + 1 month |
+| `quarterly` | Quarterly | Prompt; pre-fill `due_by` + 3 months |
+| `semiannual` | Every 6 months | Prompt; pre-fill `due_by` + 6 months |
+| `annual` | Yearly | Prompt; pre-fill `due_by` + 1 year |
+| `custom` | Custom | Prompt; blank date picker (user picks specific date) |
 
 **Naming notes:**
 
 - **`every_two_weeks`** not `bi_weekly` / `biweekly` — "bi-weekly" is ambiguous (every 2 weeks vs twice per week).
 - **`semiannual`** not `half_year` / `biannual` — means once every 6 months; "biannual" is often confused with every 2 years.
 - **`annual`** not `annually` — enum values read better as adjectives (`:monthly`, `:annual`); labels use full words ("Yearly").
-- **`custom`** — recurring, but no fixed formula. On Done the system always shows a date picker with no pre-fill; `suggest_next_due` is ignored when interval is `custom`.
+- **`custom`** — recurring, but no fixed formula; always blank date picker.
+- **`none`** — implies one-off; no prompt for next due date.
 
 ### Obligation
 
@@ -208,7 +208,7 @@ Note and document requirements on type are **not** enforced until Done — only 
 3. Create `ObligationEvent` (`status: done`) + `ObligationEventDocument`
 4. If `recurring_interval` is not `none` **and** `series_ended_at IS NULL`:
    - Prompt: "Next due date?"
-   - Pre-fill only when `suggest_next_due` is true **and** interval is not `custom` (otherwise blank date picker)
+   - Pre-fill from interval formula for fixed intervals (`weekly` … `annual`); blank picker for `custom`
    - Create **new** `Obligation` (same `series_id`, type, title, assignees, collaborators, new `due_by`)
    - Create `ObligationEvent` (`status: open`) on new obligation
 5. Completed obligation remains unchanged (historical record)

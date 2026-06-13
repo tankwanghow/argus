@@ -421,14 +421,19 @@ defmodule Argus.Obligations.RecurrenceTest do
   alias Argus.Obligations.Recurrence
   alias Argus.Obligations.Type
 
-  test "suggest_next_due monthly adds one month" do
-    type = %Type{recurring_interval: "monthly", suggest_next_due: true}
-    assert Recurrence.suggest_next_due(type, ~D[2026-01-15]) == ~D[2026-02-15]
+  test "next_due_suggestion monthly adds one month" do
+    type = %Type{recurring_interval: "monthly"}
+    assert Recurrence.next_due_suggestion(type, ~D[2026-01-15]) == ~D[2026-02-15]
   end
 
   test "custom interval returns nil" do
-    type = %Type{recurring_interval: "custom", suggest_next_due: true}
-    assert Recurrence.suggest_next_due(type, ~D[2026-01-15]) == nil
+    type = %Type{recurring_interval: "custom"}
+    assert Recurrence.next_due_suggestion(type, ~D[2026-01-15]) == nil
+  end
+
+  test "none interval returns nil" do
+    type = %Type{recurring_interval: "none"}
+    assert Recurrence.next_due_suggestion(type, ~D[2026-01-15]) == nil
   end
 
   test "none is not recurring" do
@@ -451,9 +456,9 @@ defmodule Argus.Obligations.Recurrence do
   def recurring?(%Type{recurring_interval: "none"}), do: false
   def recurring?(%Type{}), do: true
 
-  def suggest_next_due(%Type{recurring_interval: "custom"}, _due_by), do: nil
-  def suggest_next_due(%Type{suggest_next_due: false}, _due_by), do: nil
-  def suggest_next_due(%Type{recurring_interval: interval}, due_by) do
+  def next_due_suggestion(%Type{recurring_interval: "none"}, _due_by), do: nil
+  def next_due_suggestion(%Type{recurring_interval: "custom"}, _due_by), do: nil
+  def next_due_suggestion(%Type{recurring_interval: interval}, due_by) do
     case interval do
       "weekly" -> Date.add(due_by, 7)
       "every_two_weeks" -> Date.add(due_by, 14)
@@ -826,7 +831,7 @@ end
 - [ ] **Step 3: Done modal**
 
 - If recurring: show date input
-- Pre-fill via `Recurrence.suggest_next_due/2` unless `custom` or `suggest_next_due: false`
+- Pre-fill via `Recurrence.next_due_suggestion/2` for fixed intervals; blank for `custom`
 - Enforce note/doc fields per type on submit
 
 - [ ] **Step 4: LiveView tests** for create, start_progress, complete with spawn
