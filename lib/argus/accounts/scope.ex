@@ -20,8 +20,12 @@ defmodule Argus.Accounts.Scope do
   Attaches an entity + membership to the scope. Membership role becomes `role`.
   """
   def put_entity(%__MODULE__{} = scope, %Entity{} = entity, %Membership{} = membership) do
-    %{scope | entity: entity, membership: membership, role: String.to_existing_atom(membership.role)}
+    %{scope | entity: entity, membership: membership, role: role_atom!(membership.role)}
   end
+
+  defp role_atom!("admin"), do: :admin
+  defp role_atom!("manager"), do: :manager
+  defp role_atom!("member"), do: :member
 
   @doc "True if the scope carries an accepted membership in an entity."
   def member?(%__MODULE__{membership: %Membership{accepted_at: %DateTime{}}}), do: true
