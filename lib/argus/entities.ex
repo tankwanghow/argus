@@ -11,6 +11,10 @@ defmodule Argus.Entities do
 
   @invitation_validity_days 7
 
+  def change_entity(%Entity{} = entity, attrs \\ %{}) do
+    Entity.changeset(entity, attrs)
+  end
+
   def create_entity(%Scope{user: %User{} = user}, attrs) do
     now = DateTime.utc_now(:second)
 
@@ -39,6 +43,15 @@ defmodule Argus.Entities do
     |> join(:inner, [e], m in Membership, on: m.entity_id == e.id)
     |> where([e, m], m.user_id == ^user.id and is_nil(e.deleted_at))
     |> order_by([e], asc: e.name)
+    |> Repo.all()
+  end
+
+  def list_entity_memberships(%User{} = user) do
+    Membership
+    |> join(:inner, [m], e in Entity, on: e.id == m.entity_id)
+    |> where([m, e], m.user_id == ^user.id and is_nil(e.deleted_at))
+    |> order_by([m, e], asc: e.name)
+    |> select([m, e], {e, m})
     |> Repo.all()
   end
 

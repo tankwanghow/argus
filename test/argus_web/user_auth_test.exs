@@ -74,13 +74,13 @@ defmodule ArgusWeb.UserAuthTest do
       assert max_age == @remember_me_cookie_max_age
     end
 
-    test "redirects to settings when user is already logged in", %{conn: conn, user: user} do
+    test "redirects to entities when user is already logged in", %{conn: conn, user: user} do
       conn =
         conn
         |> assign(:current_scope, Scope.for_user(user))
         |> UserAuth.log_in_user(user)
 
-      assert redirected_to(conn) == ~p"/users/settings"
+      assert redirected_to(conn) == ~p"/entities"
     end
 
     test "writes a cookie if remember_me was set in previous session", %{conn: conn, user: user} do
@@ -279,6 +279,55 @@ defmodule ArgusWeb.UserAuthTest do
 
       {:halt, updated_socket} = UserAuth.on_mount(:require_authenticated, %{}, session, socket)
       assert updated_socket.assigns.current_scope == nil
+    end
+  end
+
+  describe "on_mount :require_entity" do
+    import Argus.EntitiesFixtures
+
+    test "assigns entity and role to current_scope", %{conn: conn, user: user} do
+      scope = Scope.for_user(user)
+      entity = entity_fixture(scope)
+      membership = Argus.Entities.get_membership!(user, entity)
+      user_token = Accounts.generate_user_session_token(user)
+      session = conn |> put_session(:user_token, user_token) |> get_session()
+
+      socket = %LiveView.Socket{
+        endpoint: ArgusWeb.Endpoint,
+        assigns: %{
+          __changed__: %{},
+          flash: %{},
+          current_scope: scope
+        }
+      }
+
+      {:cont, updated_socket} =
+        UserAuth.on_mount(:require_entity, %{"entity_slug" => entity.slug}, session, socket)
+
+      assert updated_socket.assigns.current_scope.entity.id == entity.id
+      assert updated_socket.assigns.current_scope.role == :admin
+      assert updated_socket.assigns.current_scope.membership.id == membership.id
+    end
+
+    test "redirects when user is not a member", %{conn: conn, user: user} do
+      other_scope = Scope.for_user(user_fixture())
+      entity = entity_fixture(other_scope)
+      user_token = Accounts.generate_user_session_token(user)
+      session = conn |> put_session(:user_token, user_token) |> get_session()
+
+      socket = %LiveView.Socket{
+        endpoint: ArgusWeb.Endpoint,
+        assigns: %{
+          __changed__: %{},
+          flash: %{},
+          current_scope: Scope.for_user(user)
+        }
+      }
+
+      {:halt, updated_socket} =
+        UserAuth.on_mount(:require_entity, %{"entity_slug" => entity.slug}, session, socket)
+
+      assert {:redirect, %{to: "/entities"}} = updated_socket.redirected
     end
   end
 

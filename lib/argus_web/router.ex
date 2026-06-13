@@ -30,7 +30,6 @@ defmodule ArgusWeb.Router do
 
   # Enable Swoosh mailbox preview in development
   if Application.compile_env(:argus, :dev_routes) do
-
     scope "/dev" do
       pipe_through :browser
 
@@ -41,12 +40,27 @@ defmodule ArgusWeb.Router do
   ## Authentication routes
 
   scope "/", ArgusWeb do
-    pipe_through [:browser, :require_authenticated_user]
+    pipe_through [:browser, :require_authenticated_user, ArgusWeb.Plugs.AutoRouteByDevice]
 
     live_session :require_authenticated_user,
       on_mount: [{ArgusWeb.UserAuth, :require_authenticated}] do
       live "/users/settings", UserLive.Settings, :edit
       live "/users/settings/confirm-email/:token", UserLive.Settings, :confirm_email
+      live "/entities", EntityLive.Select, :index
+    end
+
+    live_session :entity_scoped,
+      on_mount: [{ArgusWeb.UserAuth, :require_authenticated}, {ArgusWeb.UserAuth, :require_entity}] do
+      live "/entities/:entity_slug", DashboardLive.Index, :index
+      live "/entities/:entity_slug/obligations", ObligationLive.Index, :index
+      live "/entities/:entity_slug/obligations/new", ObligationLive.Form, :new
+      live "/entities/:entity_slug/obligations/:id", ObligationLive.Show, :show
+      live "/entities/:entity_slug/obligation-types", ObligationTypeLive.Index, :index
+      live "/entities/:entity_slug/members", MembershipLive.Index, :index
+
+      live "/m/:entity_slug", MobileLive.Dashboard, :show
+      live "/m/:entity_slug/obligations", MobileLive.Obligations, :index
+      live "/m/:entity_slug/obligations/:id", MobileLive.ObligationShow, :show
     end
 
     post "/users/update-password", UserSessionController, :update_password

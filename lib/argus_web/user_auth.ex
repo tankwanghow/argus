@@ -6,6 +6,7 @@ defmodule ArgusWeb.UserAuth do
 
   alias Argus.Accounts
   alias Argus.Accounts.Scope
+  alias Argus.Entities
 
   # Make the remember me cookie valid for 14 days. This should match
   # the session validity setting in UserToken.
@@ -230,6 +231,24 @@ defmodule ArgusWeb.UserAuth do
     end
   end
 
+  def on_mount(:require_entity, %{"entity_slug" => slug}, _session, socket) do
+    scope = socket.assigns.current_scope
+
+    try do
+      entity = Entities.get_entity_by_slug_for_user!(slug, scope.user)
+      membership = Entities.get_membership!(scope.user, entity)
+      {:cont, Phoenix.Component.assign(socket, :current_scope, Scope.put_entity(scope, entity, membership))}
+    rescue
+      Ecto.NoResultsError ->
+        socket =
+          socket
+          |> Phoenix.LiveView.put_flash(:error, "Entity not found.")
+          |> Phoenix.LiveView.redirect(to: ~p"/entities")
+
+        {:halt, socket}
+    end
+  end
+
   def on_mount(:require_sudo_mode, _params, session, socket) do
     socket = mount_current_scope(socket, session)
 
@@ -259,7 +278,7 @@ defmodule ArgusWeb.UserAuth do
   @doc "Returns the path to redirect to after log in."
   # the user was already logged in, redirect to settings
   def signed_in_path(%Plug.Conn{assigns: %{current_scope: %Scope{user: %Accounts.User{}}}}) do
-    ~p"/users/settings"
+    ~p"/entities"
   end
 
   def signed_in_path(_), do: ~p"/"
