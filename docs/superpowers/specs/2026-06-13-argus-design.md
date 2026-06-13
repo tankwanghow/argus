@@ -127,7 +127,7 @@ Unique `(obligation_id, user_id)`.
 
 ### ObligationEvent
 
-One row per workflow step — append-only audit trail. Grouped by `obligation_id` (one obligation row per cycle; no `due_by` duplicate needed on events).
+One row per workflow step. Grouped by `obligation_id` (one obligation row per cycle).
 
 | Field | Type | Notes |
 |-------|------|-------|
@@ -137,7 +137,14 @@ One row per workflow step — append-only audit trail. Grouped by `obligation_id
 | `note` | text nullable | Step note — open context, done comment, cancel reason; enforced on Done when `complete_note_required` |
 | `inserted_at` | utc_datetime | |
 
-Event rows are never edited or deleted. Note edits while active → `ObligationAuditLog`.
+**Append-only status steps** — new statuses are new rows (`open` → `in_progress` → `done`); event rows are not deleted and status is not rewritten.
+
+**Content is correctable** while the obligation cycle is active (see [Corrections Model](#corrections-model)):
+
+- **Notes** — `note` can be edited (typo fixes); changes logged in `ObligationAuditLog`
+- **Files** — add new `ObligationEventDocument` rows anytime; wrong files **voided** (not deleted), then re-uploaded
+
+After Done or cancelled, event notes and documents are locked (admin-only void with reason).
 
 ### ObligationEventDocument
 
@@ -187,7 +194,7 @@ Field-level before/after for corrections.
 1. Manager fills: title, type, primary assignee, optional collaborators, due_by
 2. Optional "Notes" on form → saved as `note` on Open event (serves as description/context)
 3. System creates `Obligation` (`status: active`, new `series_id`)
-4. System creates `ObligationEvent` (`status: open`, `due_by` snapshot)
+4. System creates `ObligationEvent` (`status: open`, optional `note`)
 
 ### Work (optional)
 
@@ -246,26 +253,29 @@ Lock after Done/cancelled. Edits while cycle is active.
 
 → Logged in `ObligationAuditLog`.
 
-### Notes
+### Event notes (`ObligationEvent.note`)
 
 | Rule | Detail |
 |------|--------|
-| Author | Edit own note within 15 minutes |
+| Author | Edit own event note within 15 minutes (typo fixes) |
 | Override | manager/admin anytime before Done |
-| After Done | locked |
+| After Done / cancelled | locked |
 
-→ Logged in `ObligationAuditLog`.
+→ Each edit logged in `ObligationAuditLog` (before/after).
 
-### Documents
+### Documents (`ObligationEventDocument`)
 
-- **Void + re-upload** — never hard-delete
-- Uploader can void own doc before Done; manager/admin can void any doc before Done
-- Admin can void after Done with required reason
-- Replacement = new `ObligationEventDocument` row
+Users can **add**, **void**, and **re-upload** files while the cycle is active:
 
-### Events
+- **Add** — new document row on `open` or `in_progress` event
+- **Remove (void)** — uploader voids own file before Done; manager/admin voids any file before Done; row kept for audit (`voided_at`, `voided_by_id`)
+- **Replace** — void wrong file, upload new row (same `document_slot` if applicable)
 
-Append-only. Wrong status → corrective note on `in_progress` event or cancel obligation.
+After Done / cancelled: locked (admin-only void with required reason).
+
+### Status steps
+
+Status transitions only move forward (`open` → `in_progress` → `done`). Event rows are not deleted. A wrong status cannot be undone — manager/admin **cancel obligation** instead.
 
 ## Dashboard (v1)
 
@@ -283,9 +293,9 @@ Filter: `Obligation.status = active`.
 Three layers:
 
 1. **Obligation rows** — one per cycle; `series_id` links recurrence history
-2. **ObligationEvent** — append-only workflow steps with `status_by` and timestamps
-3. **ObligationEventDocument** — incremental notes/files (including voided)
-4. **ObligationAuditLog** — field-level corrections
+2. **ObligationEvent** — forward-only status steps (`status_by`, timestamps); notes editable while active
+3. **ObligationEventDocument** — file uploads; voided rows retained for audit
+4. **ObligationAuditLog** — note edits and obligation field corrections
 
 Query full series history: `WHERE series_id = ?` ordered by `due_by`.
 
