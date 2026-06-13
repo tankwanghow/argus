@@ -47,6 +47,60 @@ defmodule Argus.ObligationsTest do
     end
   end
 
+  describe "start_progress/2" do
+    test "creates in_progress event" do
+      {scope, obligation} = assigned_member_scope_fixture()
+      assert {:ok, event} = Obligations.start_progress(scope, obligation)
+      assert event.status == "in_progress"
+    end
+
+    test "is idempotent — rejected if already in_progress" do
+      {scope, obligation} = assigned_member_scope_fixture()
+      assert {:ok, _} = Obligations.start_progress(scope, obligation)
+      assert {:error, :not_open} = Obligations.start_progress(scope, obligation)
+    end
+  end
+
+  describe "complete/3" do
+    test "marks done, stamps completed_at, and spawns next when recurring" do
+      {scope, obligation} = recurring_primary_scope_fixture(interval: "monthly")
+
+      assert {:ok, done_obligation, new_obligation} =
+               Obligations.complete(scope, obligation, %{next_due_by: ~D[2026-02-15]})
+
+      assert done_obligation.completed_at
+      done_event = Obligations.latest_event(done_obligation)
+      assert done_event.status == "done"
+      assert new_obligation.due_by == ~D[2026-02-15]
+      assert new_obligation.series_id == obligation.series_id
+    end
+
+    test "requires next_due_by for a recurring, not-ended series" do
+      {scope, obligation} = recurring_primary_scope_fixture(interval: "monthly")
+      assert {:error, :next_due_required} = Obligations.complete(scope, obligation, %{})
+    end
+
+    test "is idempotent — a second Done on the same cycle is rejected" do
+      {scope, obligation} = recurring_primary_scope_fixture(interval: "monthly")
+
+      assert {:ok, done_obligation, _} =
+               Obligations.complete(scope, obligation, %{next_due_by: ~D[2026-02-15]})
+
+      assert {:error, :not_live} =
+               Obligations.complete(scope, done_obligation, %{next_due_by: ~D[2026-03-15]})
+    end
+  end
+
+  describe "end_series/3" do
+    test "cancels the current cycle so it can never be completed/spawn" do
+      {scope, obligation} = recurring_manager_scope_fixture(interval: "monthly")
+      assert {:ok, ended} = Obligations.end_series(scope, obligation, %{})
+      assert ended.status == "cancelled"
+      assert ended.series_ended_at
+      assert {:error, :not_live} = Obligations.complete(scope, ended, %{})
+    end
+  end
+
   describe "live/1" do
     test "includes active incomplete obligations only" do
       {_scope, obligation} = obligation_fixture(manager_scope_fixture())
