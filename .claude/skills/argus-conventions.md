@@ -13,7 +13,7 @@ rules apply to Argus too.
 
 ## Stack
 
-- Elixir 1.19 / OTP 28, Phoenix 1.8.5, LiveView 1.1, Ecto 3.13, PostgreSQL (citext).
+- Elixir 1.19 / OTP 28, Phoenix 1.8.5, LiveView 1.2.1, Ecto 3.13, PostgreSQL (citext).
 - **Tailwind v4 + daisyUI 5.** No `tailwind.config.js`; use `@import "tailwindcss"` + `@source`
   directives in `app.css`. Never `@apply`. Build UI from daisyUI classes (`btn`, `card`, `badge`,
   `modal`, `navbar`, `alert`, `input`, `fieldset`, …) and the shared `core_components.ex` /
@@ -46,19 +46,24 @@ rules apply to Argus too.
 
 ## Authentication, scope & onboarding (peggy model)
 
-Argus uses Phoenix 1.8 `phx.gen.auth` **magic-link / passwordless-first** onboarding, exactly like
-peggy — not a password form. (A password can still be added later in settings; the *primary*
-onboarding path is email + login link.)
+Argus uses Phoenix 1.8 `phx.gen.auth` **magic-link-first** onboarding, exactly like peggy, **with
+password as a fallback** login method. Registration is email-only (no password) and the emailed
+login link is the primary path; a user may *optionally* set a password later (settings) and then
+log in with it as an alternative. This is the stock `phx.gen.auth` 1.8 behavior — keep both, do
+not remove the password path.
 
 - **Onboarding flow:**
   1. Register with **email only** (`UserLive.Registration` collects just email; `<.input
-     type="email">`).
+     type="email">`). No password at registration.
   2. `Accounts.register_user/1` then `Accounts.deliver_login_instructions(user, &url(~p"/users/log-in/#{&1}"))`
      emails a login link.
   3. `UserLive.Confirmation` (the `/users/log-in/:token` view) confirms the account and logs in
      ("Confirm and stay logged in" vs "only this time" → remember-me).
   4. After sign-in, user lands on entity selection / creation; first entity they create becomes
      their default membership (admin).
+- **Login (`UserLive.Login`)** offers **both**: request a magic link by email (primary), and — for
+  users who have set one — an email + password form (fallback). `hashed_password` stays nullable.
+  `UserLive.Settings` is where a password is added/changed (sudo-mode reauth).
 - **Scope struct** — `Argus.Accounts.Scope` (mirror `Peggy.Accounts.Scope`):
   `defstruct user: nil, entity: nil, membership: nil, role: nil`, with `for_user/1`,
   `put_entity/3` (sets `role` from membership), `member?/1`. Contexts take `scope` (or

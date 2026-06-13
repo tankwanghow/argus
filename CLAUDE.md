@@ -31,9 +31,11 @@ applies here too. Headlines:
 
 - **Tailwind v4 + daisyUI 5** (no `tailwind.config.js`; daisyUI component classes). App is
   generated **with assets and mailer** — not `--no-assets`/`--no-mailer`.
-- **Magic-link, passwordless-first onboarding** (peggy): register with email → emailed login link
-  → confirm → land on entity create/select. A `%Argus.Accounts.Scope{user, entity, membership,
-  role}` struct flows as `@current_scope`; never `@current_user`/`@current_role` in templates.
+- **Magic-link-first onboarding, password fallback** (peggy / `phx.gen.auth` 1.8): register with
+  email → emailed login link → confirm → land on entity create/select. Login also accepts an
+  email+password (fallback) once a user sets a password in settings; `hashed_password` stays
+  nullable. A `%Argus.Accounts.Scope{user, entity, membership, role}` struct flows as
+  `@current_scope`; never `@current_user`/`@current_role` in templates.
 - **Dual UI:** Desktop `/entities/:entity_slug/...`, Mobile `/m/:entity_slug/...`, with an
   `AutoRouteByDevice` plug + a `argus_view` cookie override. Separate LiveViews + layouts
   (`Layouts.app/1` navbar, `Layouts.mobile_app/1` bottom-nav shell).

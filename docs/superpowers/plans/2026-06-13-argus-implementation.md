@@ -15,7 +15,7 @@ uploads for v1 documents.
 **Conventions:** Follow the sibling Phoenix apps in `~/Projects/elixir` — **peggy** (UI,
 magic-link onboarding, scope, Desktop/Mobile) and **full_circle** (contexts, authorization). The
 authoritative guide is the **`argus-conventions` skill** (`.claude/skills/argus-conventions.md`);
-peggy's `AGENTS.md` ruleset applies. Magic-link passwordless-first auth, Tailwind v4 + daisyUI 5,
+peggy's `AGENTS.md` ruleset applies. Magic-link-first auth (password fallback), Tailwind v4 + daisyUI 5,
 `to_form`/`<.input>`, streams, `<.icon>`; unauthorized context calls return `:not_authorise`.
 
 **Tech Stack:** Elixir 1.19, OTP 28, Phoenix 1.8.5, LiveView 1.1, Ecto 3.13, PostgreSQL (citext),
@@ -182,10 +182,10 @@ git commit -m "chore: add Argus.Schema and citext extension"
 
 ## Task 3: Users, magic-link auth, and Scope (peggy onboarding)
 
-Argus uses Phoenix 1.8 **`phx.gen.auth` magic-link / passwordless-first** auth, exactly like
-peggy — register with email, get an emailed login link, confirm, sign in. Generate it rather than
-hand-rolling; then customize. Mirror `peggy/lib/peggy_web/live/user_live/*` and
-`peggy/lib/peggy/accounts/scope.ex`.
+Argus uses Phoenix 1.8 **`phx.gen.auth` magic-link-first** auth, exactly like peggy — register
+with email, get an emailed login link, confirm, sign in — **with email+password as a fallback
+login** for users who opt to set one. Generate it rather than hand-rolling; then customize. Mirror
+`peggy/lib/peggy_web/live/user_live/*` and `peggy/lib/peggy/accounts/scope.ex`.
 
 **Files:**
 - Generate: `mix phx.gen.auth Accounts User users` (creates `accounts.ex`, `accounts/user.ex`,
@@ -198,8 +198,10 @@ hand-rolling; then customize. Mirror `peggy/lib/peggy_web/live/user_live/*` and
 - [ ] **Step 1: Generate auth, accept the magic-link flow**
 
 Run `mix phx.gen.auth Accounts User users`, `mix deps.get`, `mix ecto.migrate`. The generated
-flow is email-first: `register_user/1`, `deliver_login_instructions/2`, login-by-token. **Keep it
-passwordless-first** (do not switch the registration LiveView to a password form).
+flow is email-first: `register_user/1`, `deliver_login_instructions/2`, login-by-token, **plus a
+password login form on `UserLive.Login` and password set/change in `UserLive.Settings`**. Keep
+**both**: magic-link is the primary/registration path (don't add a password field to
+registration), email+password is the fallback. `hashed_password` stays nullable.
 
 - [ ] **Step 2: Write failing tests** for the Argus-specific bits
 
@@ -1088,7 +1090,7 @@ end
 | Dashboard urgency badges | Task 14, 15 |
 | Dashboard split view | Task 15 |
 | Lock after Done | Task 12 |
-| Magic-link passwordless onboarding (peggy) | Task 3 |
+| Magic-link-first onboarding, password fallback (peggy) | Task 3 |
 | Scope struct (`@current_scope`) | Task 3, 5 |
 | Dual Desktop/Mobile UI + device auto-route | Task 5, 20, 21 |
 | daisyUI 5 layouts (app + mobile_app) | Task 20 |

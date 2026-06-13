@@ -21,11 +21,13 @@ Argus is a multi-tenant web application for tracking obligations — regulatory 
 ## Tenancy & Authentication
 
 **Auth & onboarding follow the sibling app *peggy*:** Phoenix 1.8 `phx.gen.auth`
-**magic-link / passwordless-first** flow — register with email, receive an emailed login link,
-confirm, then create/select an entity. A password is optional (settings), not required to
-onboard. Request state flows through an `Argus.Accounts.Scope` struct (`user`, `entity`,
-`membership`, `role`) exposed as `@current_scope`. The UI is a **dual Desktop/Mobile interface**
-(`/entities/:slug` and `/m/:slug`, device auto-routed). See the `argus-conventions` skill.
+**magic-link-first** flow — register with email, receive an emailed login link, confirm, then
+create/select an entity. **Password is a fallback**, not the primary path: a user may optionally
+set one in settings and then log in with email+password as an alternative to the magic link
+(`hashed_password` nullable). Request state flows through an `Argus.Accounts.Scope` struct
+(`user`, `entity`, `membership`, `role`) exposed as `@current_scope`. The UI is a **dual
+Desktop/Mobile interface** (`/entities/:slug` and `/m/:slug`, device auto-routed). See the
+`argus-conventions` skill.
 
 ### Users
 
