@@ -8,7 +8,7 @@ Argus is **greenfield**: the only files committed so far are the design spec and
 implementation plan under `docs/superpowers/`. The Phoenix app has **not been generated yet**.
 
 - **Spec:** `docs/superpowers/specs/2026-06-13-argus-design.md` — authoritative for data model, roles, and workflows.
-- **Plan:** `docs/superpowers/plans/2026-06-13-argus-implementation.md` — 19 phased, TDD, commit-per-task steps.
+- **Plan:** `docs/superpowers/plans/2026-06-13-argus-implementation.md` — 21 phased, TDD, commit-per-task steps.
 
 Execute the plan with `superpowers:subagent-driven-development` (or `executing-plans`).
 Task 1 bootstraps the app with:
@@ -61,7 +61,7 @@ same setup every sibling project uses. `config/config.exs` imports `shared_confi
 `mix.exs` resolves heroicons through `WorkspaceAssets`; both fall back to standalone installs if
 the workspace dirs are absent. Toolchain versions come from `~/Projects/elixir/mise.toml`.
 
-Tech stack: Elixir 1.19 / OTP 28, Phoenix 1.8.5, LiveView 1.1, Ecto 3.13, PostgreSQL (citext), Tailwind v4 + daisyUI 5, Swoosh mailer (magic-link login), Req.
+Tech stack: Elixir 1.19 / OTP 28, Phoenix 1.8.5, LiveView 1.2.1, Ecto 3.13, PostgreSQL (citext), Tailwind v4 + daisyUI 5, Swoosh mailer (magic-link login), Req.
 
 ## Architecture
 
@@ -80,8 +80,8 @@ assigns). Contexts take `scope`/`current_scope` as their first argument; authori
 
 - `Argus.Accounts` — users (email + **magic-link login tokens**; optional password; locale;
   **no timezone on users**), `Scope` struct, `register_user/1`, `deliver_login_instructions/2`.
-- `Argus.Entities` — entities, memberships `(user_id, entity_id, role)`, invitations. One default entity per user (partial unique index). `create_entity/2` also inserts the creator's `admin` membership.
-- `Argus.Authorization` — `can?(user, action, entity)` / `can?(user, action, entity, obligation)`. Single source of truth for role rules; see the role table below. Unauthorized mutations return `:not_authorise`.
+- `Argus.Entities` — entities (soft-deleted via `deleted_at`; all lookups filter `deleted_at IS NULL`), memberships `(user_id, entity_id, role)`, invitations. One default entity per user (partial unique index). `create_entity/2` also inserts the creator's `admin` membership. `seat_limit` is enforced via a single `seats_available?/1` gate on invite **and** accept **and** direct add.
+- `Argus.Authorization` — **scope-first**: `can?(scope, action)` / `can?(scope, action, obligation)`. Keys off the pre-resolved `scope.role` (no per-call DB lookup). Single source of truth for role rules; see the role table below. Unauthorized mutations return `:not_authorise`.
 
 ### Roles
 
@@ -99,17 +99,24 @@ Collaborators (join table) can move an obligation to `in_progress` and add notes
 The single most important design decision: **one `Obligation` row per cycle**, not a standing
 series with a rolling `due_by`. A recurrence chain is linked by a shared `series_id` (UUID).
 
-- `Argus.Obligations.Obligation` — one cycle. `status` is `active | cancelled`; **done-ness is a separate `completed_at` timestamp**, not a status value (a completed cycle keeps `status = active`). A cycle is **live** while `status = active AND completed_at IS NULL` — that's the set dashboards show and that can be worked/completed/cancelled. A partial unique index on `series_id` (where live) enforces **one live cycle per series**. `series_ended_at` (when set) blocks future spawning for the whole series.
-- `Argus.Obligations.Event` (`obligation_events`) — **append-only forward-only** status steps: `open → in_progress → done | cancelled`. New status = new row; rows are never deleted and status is never rewritten. The step `note` lives here (open context, done comment, cancel reason).
-- `Argus.Obligations.EventDocument` — file uploads attached to an event. Wrong files are **voided** (`voided_at`/`voided_by_id`/`void_reason`), never deleted. `document_slot` matches a name in the type's `complete_documents` for Done validation.
+- `Argus.Obligations.Obligation` — one cycle. `status` is `active | cancelled`; **done-ness is a separate `completed_at` timestamp**, not a status value (a completed cycle keeps `status = active`). A cycle is **live** while `status = active AND completed_at IS NULL` — that's the set dashboards show and that can be worked/completed/cancelled. This predicate is defined **once** as `Obligations.live/1` (a composable query builder) and every list/dashboard/report composes it — never hand-write it. A partial unique index on `series_id` (where live) enforces **one live cycle per series**. `series_ended_at` (when set) blocks future spawning. The row also **snapshots** `complete_note_required`/`complete_documents` from the type at creation (see rule 1).
+- `Argus.Obligations.Event` (`obligation_events`) — **append-only forward-only** status steps: `open → in_progress → done | cancelled`. New status = new row; rows are never deleted and status is never rewritten. The step `note` lives here (open context, done comment, cancel reason). `start_progress` is guarded — it only steps an `open` cycle forward, so double-clicks can't create duplicate `in_progress` rows.
+- `Argus.Obligations.EventDocument` — file uploads attached to an event; the per-file column is **`file`** (a `%{filename, original, path}` map), not `documents`. Wrong files are **voided** (`voided_at`/`voided_by_id`/`void_reason`), never deleted. `document_slot` matches a name in the obligation's snapshotted `complete_documents` for Done validation.
 - `Argus.Obligations.AuditLog` — field-level before/after for **corrections** (title, due_by, assignee, note edits).
 - `Argus.Obligations.Type` — system presets (`entity_id` NULL) + per-entity custom types.
 
 ### Three rules that are easy to get wrong
 
-1. **Done validation is enforced only on Done**, never earlier. `complete_note_required` →
-   note present on the Done event; `complete_documents` (comma-delimited slot names) → one
-   **non-voided** document per named slot. See `Obligations.Completion`.
+1. **Done validation is enforced only on Done**, never earlier, and against the obligation's
+   **snapshot** of `complete_note_required`/`complete_documents` (copied from the type at
+   creation), **not the live type** — editing a type must not retroactively move the bar for a
+   live cycle (type-definition audit is out of scope). `complete_note_required` → note present on
+   the Done event; `complete_documents` (comma-delimited slot names) → one **non-voided** document
+   per named slot, counted across **all events in the cycle** (open/in_progress/done), so
+   incremental uploads count. Each spawned cycle re-snapshots from the type. See
+   `Obligations.Completion`. **Only the completion contract is frozen** — `reminder_offsets`
+   (display) and `recurring_interval` (shape of the next cycle) are read **live** from the type by
+   design; see the snapshot-vs-live note in the spec.
 
 2. **Recurrence on Done.** Done is a **guarded close**: a conditional `update_all` stamps
    `completed_at` only `WHERE completed_at IS NULL` — 0 rows updated ⇒ `{:error, :not_live}`,
@@ -154,4 +161,7 @@ Oban reminder jobs, REST API/mobile, billing beyond `plan`/`seat_limit` fields.
 - **TDD per the plan:** write the failing test, watch it fail, implement, watch it pass, commit. One commit per task.
 - **Context modules own domain logic.** LiveViews call `Argus.Obligations`, `Argus.Entities`, `Argus.Accounts` — not Repo directly.
 - **Multi-step writes use `Ecto.Multi`/transactions** (create obligation + open event; Done + spawn next; cancel + event).
-- File uploads (v1) go to the local filesystem under `priv/uploads/:entity_id/:obligation_id/`.
+- File uploads (v1) go to the local filesystem under a **configurable** `:uploads_dir`
+  (`config :argus, :uploads_dir`), laid out `:entity_id/:obligation_id/`; it defaults to the priv
+  path in dev but must point at a persistent volume in prod (`:code.priv_dir` is not writable in a
+  release). Reads are served by a scope-gated controller, never a static route.

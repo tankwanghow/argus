@@ -18,7 +18,7 @@ authoritative guide is the **`argus-conventions` skill** (`.claude/skills/argus-
 peggy's `AGENTS.md` ruleset applies. Magic-link-first auth (password fallback), Tailwind v4 + daisyUI 5,
 `to_form`/`<.input>`, streams, `<.icon>`; unauthorized context calls return `:not_authorise`.
 
-**Tech Stack:** Elixir 1.19, OTP 28, Phoenix 1.8.5, LiveView 1.1, Ecto 3.13, PostgreSQL (citext),
+**Tech Stack:** Elixir 1.19, OTP 28, Phoenix 1.8.5, LiveView 1.2.1, Ecto 3.13, PostgreSQL (citext),
 Tailwind v4 + daisyUI 5, Swoosh mailer (magic-link), Req
 
 **Spec:** `docs/superpowers/specs/2026-06-13-argus-design.md`
@@ -50,7 +50,7 @@ lib/argus/
   obligations/completion.ex          # Done validation
   obligations/series.ex              # series_ended?/end_series
   obligations/urgency.ex             # overdue / due_soon badges from reminder_offsets
-  authorization.ex                   # can?(user, action, entity)
+  authorization.ex                   # can?(scope, action[, obligation])
   uploads.ex                         # local file storage
 
 lib/argus_web/
@@ -299,10 +299,10 @@ git commit -am "feat: magic-link auth (phx.gen.auth) + Scope with locale"
 
 ```elixir
 test "create_entity/2 creates entity and admin membership" do
-  user = user_fixture()
-  {:ok, entity} = Entities.create_entity(user, %{slug: "acme", name: "Acme Sdn Bhd"})
+  scope = Scope.for_user(user_fixture())        # scope carries only the user pre-selection
+  {:ok, entity} = Entities.create_entity(scope, %{slug: "acme", name: "Acme Sdn Bhd"})
   assert entity.slug == "acme"
-  membership = Entities.get_membership!(user, entity)
+  membership = Entities.get_membership!(scope.user, entity)
   assert membership.role == "admin"
 end
 ```
@@ -313,11 +313,17 @@ end
 
 Key functions:
 - `create_entity/2` — insert entity + admin membership
-- `list_user_entities/1`
-- `get_entity_by_slug_for_user!/2` — slug lookup scoped to the user's memberships (used by the entity-scoped `on_mount` in Task 5)
+- `list_user_entities/1` — **filters `deleted_at IS NULL`** (soft-deleted entities never appear)
+- `get_entity_by_slug_for_user!/2` — slug lookup scoped to the user's memberships **and
+  `deleted_at IS NULL`** (used by the entity-scoped `on_mount` in Task 5, so a soft-deleted
+  entity's routes become unreachable). Add a test that a soft-deleted entity is not resolved.
 - `get_membership!/2`
-- `invite_member/4` — manager/admin only (authorization added later)
-- `accept_invitation/2`
+- `seats_available?/1` — `count(active memberships) < entity.seat_limit`; the **single gate** for
+  every path that adds a member
+- `invite_member/4` — manager/admin only (authorization added later); rejects when
+  `not seats_available?/1` → `{:error, :seat_limit_reached}`
+- `accept_invitation/2` — **re-checks `seats_available?/1`** at accept time (seats may have filled
+  since the invite) → `{:error, :seat_limit_reached}`. Add a test for the invite-then-fill race.
 
 - [ ] **Step 4: Run tests — PASS**
 
@@ -355,6 +361,16 @@ Reads `params["entity_slug"]`, loads the entity scoped to the user's memberships
 Redirects `/entities/<slug>/…` → `/m/<slug>/…` for mobile UAs and back for desktop, honoring an
 `argus_view=mobile|desktop` cookie set by explicit toggle links. Only redirects when the
 counterpart route exists (whitelist of mobile-capable tails) so single-UI pages never 404.
+
+**Mobile scope is decided (not full parity):** mobile covers the field-work surface only —
+dashboard, obligation list, and obligation show/workflow (Task 21). **Management flows
+(obligation create/edit, type management, members/settings) are Desktop-only by design.** The
+`mobile_capable_tails` whitelist therefore lists exactly the three mobile tails (`""`,
+`"obligations"`, `"obligations/<id>"`); a mobile UA on a desktop-only path (e.g.
+`/entities/:slug/obligations/new`, `/obligation-types`, `/members`) is **not** redirected to a
+non-existent `/m/...` route — it renders the desktop LiveView (which the "More" sheet's Desktop
+toggle reaches). Add a test asserting a desktop-only tail is absent from the whitelist and is not
+redirected for a mobile UA.
 
 - [ ] **Step 3: Router — auth, desktop, and mobile scopes**
 
@@ -412,29 +428,36 @@ git commit -am "feat: scope on_mount, dual-UI routing, device auto-route"
 
 ```elixir
 test "manager can create obligation" do
-  {user, entity} = manager_fixture()
-  assert Authorization.can?(user, :create_obligation, entity)
+  scope = manager_scope_fixture()                  # %Scope{entity, role: :manager, ...}
+  assert Authorization.can?(scope, :create_obligation)
 end
 
 test "member cannot cancel obligation" do
-  {user, entity} = member_fixture()
-  refute Authorization.can?(user, :cancel_obligation, entity)
+  scope = member_scope_fixture()
+  refute Authorization.can?(scope, :cancel_obligation)
 end
 
 test "collaborator cannot mark done" do
-  {user, entity, obligation} = collaborator_fixture()
-  refute Authorization.can?(user, :mark_done, entity, obligation)
+  {scope, obligation} = collaborator_scope_fixture()
+  refute Authorization.can?(scope, :mark_done, obligation)
 end
 ```
 
-- [ ] **Step 2: Implement `can?/3` and `can?/4`**
+- [ ] **Step 2: Implement `can?/2` and `can?/3`** (scope-first, per `argus-conventions`)
+
+Signatures: `can?(%Scope{}, action)` for entity-level actions and `can?(%Scope{}, action,
+%Obligation{})` for obligation-scoped ones. The scope already carries `entity`, `role`, and
+`user` (resolved by the `on_mount`), so authorization never re-queries the DB for the role —
+unlike full_circle, which re-fetches on every call. Pattern-match on `scope.role` with an
+`allow_roles(scope, ~w(admin manager)a)` helper.
 
 Actions: `:manage_entity`, `:manage_types`, `:create_obligation`, `:edit_obligation`, `:mark_done`, `:cancel_obligation`, `:end_series`, `:void_document`, `:start_progress`
 
-Rules per spec:
+Rules per spec (keyed off `scope.role`):
 - admin → all
 - manager → create, edit, mark_done (any), cancel, end_series
-- member → start_progress if primary or collaborator; mark_done if primary only
+- member → start_progress if primary or collaborator; mark_done if primary only (the 3-arity
+  clause compares `obligation.primary_assignee_id`/collaborators against `scope.user.id`)
 
 - [ ] **Step 3: Run tests — PASS**
 
@@ -553,20 +576,22 @@ Add a failing changeset test for each before implementing.
 
 > **Fixture caveat (carries through Tasks 9–12, 14):** `obligation_fixture/*` and
 > `recurring_obligation_fixture/*` must build their `ObligationType` with
-> `complete_note_required: false` and `complete_documents: ""` (no required slots) **by default**.
-> Otherwise the Task 9 `complete/4` tests for `next_due_required`, idempotency (`not_live`), and
-> plain spawn would fail on the note/document validations *before* reaching the behavior under
-> test. Tests that specifically exercise completion rules should opt **in** to those requirements
-> via fixture options (e.g. `type_fixture(entity, complete_note_required: true)`), not rely on the
-> default.
+> `complete_note_required: false` and `complete_documents: ""` (no required slots) **by default** —
+> these values are snapshotted onto the obligation at creation, so the obligation inherits "no
+> requirements." Otherwise the Task 9 `complete/3` tests for `next_due_required`, idempotency
+> (`not_live`), and plain spawn would fail on the note/document validations *before* reaching the
+> behavior under test. Tests that specifically exercise completion rules should opt **in** via
+> fixture options (e.g. `type_fixture(entity, complete_note_required: true)`), not rely on the
+> default. Fixtures return a `%Scope{}` for the actor (e.g. `manager_scope_fixture/0`,
+> `assigned_member_scope_fixture/0`) so context calls match the scope-first signatures.
 
 - [ ] **Step 1: Write failing create test**
 
 ```elixir
-test "create_obligation/3 creates obligation, open event, and optional open note" do
-  {manager, entity} = manager_fixture()
-  type = type_fixture(entity)
-  assignee = member_fixture(entity)
+test "create_obligation/2 creates obligation, open event, snapshots type rules, and optional open note" do
+  scope = manager_scope_fixture()                       # %Scope{entity, role: :manager, user}
+  type = type_fixture(scope.entity, complete_note_required: true, complete_documents: "receipt")
+  assignee = member_fixture(scope.entity)
 
   attrs = %{
     title: "EPF Jan",
@@ -576,13 +601,16 @@ test "create_obligation/3 creates obligation, open event, and optional open note
     open_note: "Submit by 15th"
   }
 
-  {:ok, obligation} = Obligations.create_obligation(entity, manager, attrs)
+  {:ok, obligation} = Obligations.create_obligation(scope, attrs)
   assert obligation.series_id
   assert obligation.status == "active"
+  # completion rules are SNAPSHOTTED from the type at creation (a later type edit must not move
+  # the bar for this live cycle)
+  assert obligation.complete_note_required == true
+  assert obligation.complete_documents == "receipt"
 
   events = Obligations.list_events(obligation)
   assert hd(events).status == "open"
-
   assert hd(events).note == "Submit by 15th"
 end
 ```
@@ -591,7 +619,9 @@ end
 
 Tables: `obligations`, `obligation_collaborators`, `obligation_events`.
 
-`obligations` columns include `completed_at :utc_datetime` (nullable) and `series_ended_at :utc_datetime` (nullable).
+`obligations` columns include `completed_at :utc_datetime` (nullable), `series_ended_at
+:utc_datetime` (nullable), and the **snapshotted completion rules** copied from the type at
+creation: `complete_note_required :boolean` and `complete_documents :string`.
 
 Use `due_by` as `:date`. Index `(entity_id, status)`, `(series_id)`, `(primary_assignee_id)`.
 
@@ -606,12 +636,36 @@ create unique_index(:obligations, [:series_id],
 
 This is what makes concurrent Done calls safe — the second spawn of the same series hits the index and fails.
 
-- [ ] **Step 3: Implement `create_obligation/3` in transaction**
+**Support `Series.ended?/1`** with a partial index so the "is this series ended?" existence check
+never scans the chain:
 
-1. Generate `series_id` with `Ecto.UUID.generate()`
-2. Insert obligation
-3. Insert collaborators if provided
-4. Insert open event with optional `note` (from `open_note` attr)
+```elixir
+create index(:obligations, [:series_id],
+  where: "series_ended_at IS NOT NULL",
+  name: :obligations_series_ended)
+```
+
+- [ ] **Step 2b: Define `Obligations.live/1` — the single live-cycle query**
+
+The live-cycle predicate (`status = "active" AND completed_at IS NULL`) is the most error-prone
+query in the app; define it **once** as a composable builder and route every list/dashboard/report
+through it — never hand-write the predicate at a call site:
+
+```elixir
+import Ecto.Query
+def live(query \\ Obligation), do: from(o in query, where: o.status == "active" and is_nil(o.completed_at))
+```
+
+- [ ] **Step 3: Implement `create_obligation/2` in transaction** (`create_obligation(scope, attrs)`)
+
+1. Authorize: `Authorization.can?(scope, :create_obligation)` else `:not_authorise`
+2. Generate a **new** `series_id` with `Ecto.UUID.generate()` — `create_obligation/2` always starts
+   a fresh series. (Continuing an existing series is `spawn_next_cycle/2`, Task 9 — never this path.)
+3. Insert obligation — set `entity_id` from `scope.entity` (never from attrs/cast), and
+   **snapshot** `complete_note_required` + `complete_documents` from the chosen `ObligationType`
+   onto the obligation row (so later type edits don't move the bar for this cycle)
+4. Insert collaborators if provided
+5. Insert open event with optional `note` (from `open_note` attr), `status_by_id: scope.user.id`
 
 - [ ] **Step 4: Run tests — PASS**
 
@@ -629,16 +683,23 @@ This is what makes concurrent Done calls safe — the second spawn of the same s
 - [ ] **Step 1: Write failing tests**
 
 ```elixir
-test "start_progress/3 creates in_progress event" do
-  {member, entity, obligation} = assigned_member_fixture()
-  {:ok, event} = Obligations.start_progress(entity, member, obligation)
+test "start_progress/2 creates in_progress event" do
+  {scope, obligation} = assigned_member_scope_fixture()
+  {:ok, event} = Obligations.start_progress(scope, obligation)
   assert event.status == "in_progress"
 end
 
-test "complete/4 marks done, stamps completed_at, and spawns next when recurring" do
-  {primary, entity, obligation} = recurring_obligation_fixture(interval: "monthly")
+test "start_progress/2 is idempotent — rejected if already in_progress or terminal" do
+  {scope, obligation} = assigned_member_scope_fixture()
+  {:ok, _} = Obligations.start_progress(scope, obligation)
+  # latest event is already in_progress → no duplicate forward step
+  assert {:error, :not_open} = Obligations.start_progress(scope, obligation)
+end
+
+test "complete/3 marks done, stamps completed_at, and spawns next when recurring" do
+  {scope, obligation} = recurring_primary_scope_fixture(interval: "monthly")
   {:ok, done_obligation, new_obligation} =
-    Obligations.complete(entity, primary, obligation, %{next_due_by: ~D[2026-02-15]})
+    Obligations.complete(scope, obligation, %{next_due_by: ~D[2026-02-15]})
 
   assert done_obligation.completed_at                     # terminal marker set
   assert done_event = Obligations.latest_event(done_obligation)
@@ -647,50 +708,59 @@ test "complete/4 marks done, stamps completed_at, and spawns next when recurring
   assert new_obligation.series_id == obligation.series_id
 end
 
-test "complete/4 requires next_due_by for a recurring, not-ended series" do
-  {primary, entity, obligation} = recurring_obligation_fixture(interval: "monthly")
+test "complete/3 requires next_due_by for a recurring, not-ended series" do
+  {scope, obligation} = recurring_primary_scope_fixture(interval: "monthly")
   # Omitting next_due_by would leave the series with no successor cycle → rejected
-  assert {:error, :next_due_required} = Obligations.complete(entity, primary, obligation, %{})
+  assert {:error, :next_due_required} = Obligations.complete(scope, obligation, %{})
 end
 
-test "complete/4 is idempotent — a second Done on the same cycle is rejected" do
-  {primary, entity, obligation} = recurring_obligation_fixture(interval: "monthly")
+test "complete/3 is idempotent — a second Done on the same cycle is rejected" do
+  {scope, obligation} = recurring_primary_scope_fixture(interval: "monthly")
   {:ok, done_obligation, _} =
-    Obligations.complete(entity, primary, obligation, %{next_due_by: ~D[2026-02-15]})
+    Obligations.complete(scope, obligation, %{next_due_by: ~D[2026-02-15]})
   # The cycle is no longer live (completed_at set) — re-completing fails
-  assert {:error, :not_live} = Obligations.complete(entity, primary, done_obligation, %{next_due_by: ~D[2026-03-15]})
+  assert {:error, :not_live} = Obligations.complete(scope, done_obligation, %{next_due_by: ~D[2026-03-15]})
 end
 
 test "end_series cancels the current cycle, so it can never be completed/spawn" do
-  {manager, entity, obligation} = recurring_obligation_fixture(interval: "monthly")
-  {:ok, ended} = Obligations.end_series(entity, manager, obligation, %{})
+  {scope, obligation} = recurring_manager_scope_fixture(interval: "monthly")
+  {:ok, ended} = Obligations.end_series(scope, obligation, %{})
   # End series == cancel current obligation + stamp series_ended_at (semantics A)
   assert ended.status == "cancelled"
   assert ended.series_ended_at
   # A non-live (cancelled) cycle cannot be completed — no next obligation is ever spawned
-  assert {:error, :not_live} = Obligations.complete(entity, manager, ended, %{})
+  assert {:error, :not_live} = Obligations.complete(scope, ended, %{})
 end
 ```
 
 - [ ] **Step 2: Implement Completion validation**
 
+Validation reads the **obligation's snapshotted rules** (`obligation.complete_note_required` /
+`obligation.complete_documents`), **never the live type** — so a type edited mid-cycle can't
+change this cycle's bar (fix #13). `cycle_documents` is **every non-voided
+`ObligationEventDocument` across all events in the cycle** (open / in_progress / done), not just
+Done-event uploads — so incremental uploads count (fix #6).
+
 ```elixir
 defmodule Argus.Obligations.Completion do
-  def validate_done_requirements(type, done_attrs, documents) do
-    with :ok <- validate_note(type, done_attrs[:note]),
-         :ok <- validate_document_slots(type, documents) do
+  alias Argus.Obligations.Obligation
+
+  # `obligation` carries the snapshot; `cycle_documents` spans all events in the cycle.
+  def validate_done_requirements(%Obligation{} = obligation, done_attrs, cycle_documents) do
+    with :ok <- validate_note(obligation, done_attrs[:note]),
+         :ok <- validate_document_slots(obligation, cycle_documents) do
       :ok
     end
   end
 
-  defp validate_note(%{complete_note_required: true}, note) when note in [nil, ""],
+  defp validate_note(%Obligation{complete_note_required: true}, note) when note in [nil, ""],
     do: {:error, :note_required}
 
   defp validate_note(_, _), do: :ok
 
-  defp validate_document_slots(type, documents) do
-    required = type.complete_documents |> parse_csv()
-    slots = documents |> Enum.reject(& &1.voided_at) |> Map.new(&{&1.document_slot, true})
+  defp validate_document_slots(%Obligation{complete_documents: complete_documents}, cycle_documents) do
+    required = complete_documents |> parse_csv()
+    slots = cycle_documents |> Enum.reject(& &1.voided_at) |> Map.new(&{&1.document_slot, true})
 
     case Enum.find(required, &(not Map.has_key?(slots, &1))) do
       nil -> :ok
@@ -700,27 +770,55 @@ defmodule Argus.Obligations.Completion do
 end
 ```
 
-- [ ] **Step 3: Implement `complete/4`**
+- [ ] **Step 3: Implement `complete/3`** (`complete(scope, obligation, attrs)`)
 
 In `Ecto.Multi`:
-1. Validate authorization (`mark_done`)
-2. Validate completion requirements
+1. Validate authorization (`Authorization.can?(scope, :mark_done, obligation)`) else `:not_authorise`
+2. Validate completion requirements against the **obligation snapshot** + **all non-voided
+   documents across the cycle's events** (`Completion.validate_done_requirements/3`)
 3. **Recurrence guard:** if `Recurrence.recurring?(type)` and not `Series.ended?(series_id)` → `next_due_by` is **required**; missing/blank → `{:error, :next_due_required}`. (This guarantees no series ever loses its successor cycle — fix 5.)
 4. **Guarded close (concurrency + idempotency):** stamp `completed_at` with a conditional update —
-   `from(o in Obligation, where: o.id == ^id and is_nil(o.completed_at) and o.status == "active")
-   |> Repo.update_all(set: [completed_at: now])`. If `0` rows are updated, abort the Multi with
-   `{:error, :not_live}` (someone already completed/cancelled it). This is the single source of
-   truth for "is this cycle still live", replacing any in-memory `status` check.
-5. Insert `done` event + document
-6. If recurring and not ended → `create_obligation` with same `series_id`, copy assignees/collaborators (the partial unique index on `series_id` is the backstop against a duplicate spawn)
+   `Obligation |> Obligations.live() |> where([o], o.id == ^id) |> Repo.update_all(set: [completed_at: now])`.
+   If `0` rows are updated, abort the Multi with `{:error, :not_live}` (someone already
+   completed/cancelled it). This is the single source of truth for "is this cycle still live",
+   replacing any in-memory `status` check.
+5. Insert `done` event (`status_by_id: scope.user.id`) + any Done document
+6. If recurring and not ended → call the **private** `spawn_next_cycle/2` (below). **Do not reuse
+   `create_obligation/2`** — that function always mints a *new* `series_id` and runs the
+   user-facing create path (authorize-as-create, open-note handling); the spawn is a system
+   action that must carry the *existing* `series_id`. Overloading one function for both is exactly
+   the API ambiguity to avoid.
 
 Return `{:ok, completed, new_obligation | nil}`
 
-- [ ] **Step 4: Implement `Series.ended?/1`** — `Repo.exists?` where `series_id` and `series_ended_at` not nil. Under semantics A, End series cancels the current cycle, so a *live* obligation in an ended series can't exist — this guard is defensive only.
+- [ ] **Step 3b: Implement private `spawn_next_cycle(done_obligation, next_due_by)`** (called only
+  from inside the `complete/3` Multi):
 
-- [ ] **Step 5: Run tests — PASS**
+  1. Build a new `Obligation` carrying the **same `series_id`** as `done_obligation`, copying
+     `entity_id`, `obligation_type_id`, `title`, and `primary_assignee_id`.
+  2. **Re-snapshot** `complete_note_required`/`complete_documents` from the *current* type (a type
+     edit takes effect on the next cycle — see the snapshot-vs-live note in Task 8) and set the new
+     `due_by` to `next_due_by`.
+  3. Copy the `obligation_collaborators` rows.
+  4. Insert with `unique_constraint(:series_id, name: :obligations_one_live_cycle_per_series)`;
+     translate a constraint failure to `{:error, :not_live}` so a lost spawn race surfaces as a
+     clean domain error, never a raw `Ecto` exception (fix #8).
+  5. Insert the new cycle's `open` event.
 
-- [ ] **Step 6: Commit**
+  `create_obligation/2` mints a fresh `series_id` and is the **only** entry point that starts a new
+  series; `spawn_next_cycle/2` is the **only** one that continues an existing series.
+
+- [ ] **Step 4: Implement `start_progress/2`** (`start_progress(scope, obligation)`) — authorize
+  `:start_progress` (primary or collaborator), then **guard against duplicate forward steps**:
+  only insert an `in_progress` event when the cycle is live **and** its latest event status is
+  `open`; if the latest event is already `in_progress` or terminal (`done`/`cancelled`), return
+  `{:error, :not_open}`. Keeps the append-only log strictly one-step-forward under double-clicks.
+
+- [ ] **Step 5: Implement `Series.ended?/1`** — `Repo.exists?` where `series_id` and `series_ended_at` not nil (backed by the `obligations_series_ended` partial index). Under semantics A, End series cancels the current cycle, so a *live* obligation in an ended series can't exist — this guard is defensive only.
+
+- [ ] **Step 6: Run tests — PASS**
+
+- [ ] **Step 7: Commit**
 
 ---
 
@@ -734,20 +832,24 @@ Return `{:ok, completed, new_obligation | nil}`
 
 ```elixir
 test "cancel_obligation/3 sets status cancelled and logs event" do
-  {manager, entity, obligation} = obligation_fixture()
-  {:ok, cancelled} = Obligations.cancel_obligation(entity, manager, obligation, %{})
+  {scope, obligation} = manager_obligation_scope_fixture()
+  {:ok, cancelled} = Obligations.cancel_obligation(scope, obligation, %{})
   assert cancelled.status == "cancelled"
 end
 
 test "end_series cancels current obligation and sets series_ended_at" do
-  {manager, entity, obligation} = recurring_obligation_fixture()
-  {:ok, ended} = Obligations.end_series(entity, manager, obligation, %{})
+  {scope, obligation} = recurring_manager_scope_fixture()
+  {:ok, ended} = Obligations.end_series(scope, obligation, %{})
   assert ended.status == "cancelled"
   assert ended.series_ended_at
 end
 ```
 
-- [ ] **Step 2: Implement** — manager/admin only; insert `cancelled` event and set `status: "cancelled"`. `end_series` does the same **plus** sets `series_ended_at` on the current obligation (semantics A: ending a series cancels the in-flight cycle).
+- [ ] **Step 2: Implement** (`cancel_obligation(scope, obligation, attrs)` /
+  `end_series(scope, obligation, attrs)`) — authorize `:cancel_obligation` / `:end_series`
+  (manager/admin) else `:not_authorise`; insert `cancelled` event (`status_by_id: scope.user.id`)
+  and set `status: "cancelled"`. `end_series` does the same **plus** sets `series_ended_at` on the
+  current (now-cancelled) obligation row (semantics A — authoritative per spec).
 
 - [ ] **Step 3: Run tests — PASS**
 
@@ -763,13 +865,20 @@ end
 - Create: `lib/argus/uploads.ex`
 - Modify: `lib/argus/obligations.ex`
 
-- [ ] **Step 1: Migration** for `obligation_event_documents` per spec (void fields included).
+- [ ] **Step 1: Migration** for `obligation_event_documents` per spec (void fields included). The
+  per-file column is **`file`** (a map `%{filename, original, path}`), **not `documents`** — one
+  row is one document, and `documents` collides with the type's `complete_documents` slot list.
 
-- [ ] **Step 2: Uploads module** — store under `priv/uploads/:entity_id/:obligation_id/`; save original filename in DB JSON/map field `documents`.
+- [ ] **Step 2: Uploads module** — store under a **configurable base dir**, not a hardcoded
+  `priv/` path. `:code.priv_dir` is not writable/persistent inside a release, so the destination
+  comes from `config :argus, :uploads_dir` (defaults to the priv path in dev; a persistent volume
+  in prod). Save the file map in the DB `file` column.
 
 ```elixir
+defp base_dir, do: Application.get_env(:argus, :uploads_dir, Path.join(:code.priv_dir(:argus), "uploads"))
+
 def store(%Plug.Upload{} = upload, entity_id, obligation_id) do
-  dest_dir = Path.join([:code.priv_dir(:argus), "uploads", entity_id, obligation_id])
+  dest_dir = Path.join([base_dir(), entity_id, obligation_id])
   File.mkdir_p!(dest_dir)
   filename = "#{Ecto.UUID.generate()}_#{upload.filename}"
   dest = Path.join(dest_dir, filename)
@@ -778,11 +887,18 @@ def store(%Plug.Upload{} = upload, entity_id, obligation_id) do
 end
 ```
 
-- [ ] **Step 3: `add_document/5` and `void_document/4`** with authorization rules.
+- [ ] **Step 3: `add_document/5` and `void_document/4`** (scope-first) with authorization rules.
+  `document_slot` is nullable in general, but the upload UI (Tasks 16/21) **requires** a slot when
+  the obligation's snapshot lists `complete_documents`, so required-slot files are never orphaned
+  (see #10).
 
-- [ ] **Step 4: Tests for void excluding from completion validation**
+- [ ] **Step 4: Scope-gated serving** — a controller/plug streams a stored file **only** after
+  verifying the requester's scope/membership owns the obligation's entity. Never expose uploads
+  via a static route.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Tests for void excluding from completion validation**
+
+- [ ] **Step 6: Commit**
 
 ---
 
@@ -797,22 +913,58 @@ end
 - [ ] **Step 1: Tests**
 
 ```elixir
-test "update_obligation/4 logs title change" do
-  {manager, entity, obligation} = obligation_fixture()
-  {:ok, updated} = Obligations.update_obligation(entity, manager, obligation, %{title: "New"})
+test "update_obligation/3 logs title change" do
+  {scope, obligation} = manager_obligation_scope_fixture()
+  {:ok, _updated} = Obligations.update_obligation(scope, obligation, %{title: "New"})
   logs = Obligations.list_audit_logs(obligation)
   assert Enum.any?(logs, &(&1.field == "title"))
 end
 
-test "member cannot update title" do
-  {member, entity, obligation} = assigned_member_fixture()
-  assert :not_authorise = Obligations.update_obligation(entity, member, obligation, %{title: "X"})
+test "update_obligation/3 logs due_by and primary_assignee changes" do
+  {scope, obligation} = manager_obligation_scope_fixture()
+  new_assignee = member_fixture(scope.entity)
+  {:ok, _} =
+    Obligations.update_obligation(scope, obligation, %{
+      due_by: ~D[2026-03-01],
+      primary_assignee_id: new_assignee.id
+    })
+  fields = Obligations.list_audit_logs(obligation) |> Enum.map(& &1.field)
+  assert "due_by" in fields
+  assert "primary_assignee" in fields
+end
+
+test "update_collaborators/3 adds and removes, logging each change" do
+  {scope, obligation} = manager_obligation_scope_fixture()
+  collab = member_fixture(scope.entity)
+  {:ok, _} = Obligations.update_collaborators(scope, obligation, [collab.id])
+  {:ok, _} = Obligations.update_collaborators(scope, obligation, [])
+  fields = Obligations.list_audit_logs(obligation) |> Enum.map(& &1.field)
+  assert "collaborators" in fields                       # add + remove both audited
+end
+
+test "member cannot update obligation fields" do
+  {scope, obligation} = assigned_member_scope_fixture()
+  assert :not_authorise = Obligations.update_obligation(scope, obligation, %{title: "X"})
 end
 ```
 
-- [ ] **Step 2: Implement `update_obligation/4`** — only active obligations; manager/admin; log each changed field.
+- [ ] **Step 2: Implement `update_obligation/3`** (`update_obligation(scope, obligation, attrs)`) —
+  only **live** obligations; manager/admin (`:edit_obligation` else `:not_authorise`). Editable
+  fields per spec: `title`, `due_by`, `primary_assignee_id`. **Log every changed field** to
+  `AuditLog` (`old_value`/`new_value`); the assignee change logs under field `primary_assignee`
+  (store the user reference, not a raw UUID, for a readable trail).
 
-- [ ] **Step 3: `edit_note/4`** — 48-hour window for author; manager/admin override; log change.
+- [ ] **Step 2b: Implement `update_collaborators/3`** (`update_collaborators(scope, obligation,
+  user_ids)`) — manager/admin, live cycles only; diff against current `obligation_collaborators`,
+  insert/delete the difference in one transaction, and log additions and removals under field
+  `collaborators`. (Collaborators are a join table, not an obligation column, so they need their
+  own path — `update_obligation/3` does not touch them.)
+
+- [ ] **Step 3: `edit_note/3`** (`edit_note(scope, event, attrs)`) — author may edit own note
+  within a **48-hour window measured on the event's UTC `inserted_at`** (`DateTime.diff/2` ≤
+  48*3600 — elapsed wall-clock, no timezone involved); manager/admin override anytime before
+  Done; log change. Add a test for the window boundary (e.g. an event `inserted_at` 49h ago is
+  locked for its author).
 
 - [ ] **Step 4: Commit**
 
@@ -868,6 +1020,13 @@ defmodule Argus.Obligations.UrgencyTest do
   test "ok when outside reminder offsets" do
     type = %Type{reminder_offsets: "7,1"}
     assert Urgency.classify(type, ~D[2026-07-01], @today) == :ok
+  end
+
+  # Decided boundary (spec): due *today* is amber (due_soon), NOT red (overdue);
+  # overdue means strictly past the deadline.
+  test "due today is due_soon, not overdue" do
+    type = %Type{reminder_offsets: "7,1"}
+    assert Urgency.classify(type, @today, @today) == :due_soon
   end
 end
 ```
@@ -948,28 +1107,33 @@ Member default tab: `my_work`. Manager default: `team`.
 
 - [ ] **Step 2: Queries**
 
-Filter is **live cycles only** — `status == "active" AND is_nil(completed_at)`. Filtering on
-`status` alone would leak completed obligations onto the dashboard forever (they keep
-`status = "active"`).
+Filter is **live cycles only**, composed via `Obligations.live/1` (the single definition of
+`status == "active" AND is_nil(completed_at)` from Task 8) — never hand-write the predicate, or a
+`status`-only query will leak completed obligations onto the dashboard forever. Both queries take
+the scope and filter by `scope.entity`/`scope.user`:
 
 ```elixir
-def list_my_work(entity, user) do
-  from o in Obligation,
-    where: o.entity_id == ^entity.id and o.status == "active" and is_nil(o.completed_at),
-    where: o.primary_assignee_id == ^user.id or o.id in subquery(collaborator_ids(user)),
-    order_by: [asc: o.due_by]
+def list_my_work(%Scope{entity: entity, user: user}) do
+  Obligation
+  |> live()
+  |> where([o], o.entity_id == ^entity.id)
+  |> where([o], o.primary_assignee_id == ^user.id or o.id in subquery(collaborator_ids(user)))
+  |> order_by([o], asc: o.due_by)
 end
 
-def list_team_overview(entity) do
-  from o in Obligation,
-    where: o.entity_id == ^entity.id and o.status == "active" and is_nil(o.completed_at),
-    order_by: [asc: o.due_by]
+def list_team_overview(%Scope{entity: entity}) do
+  Obligation
+  |> live()
+  |> where([o], o.entity_id == ^entity.id)
+  |> order_by([o], asc: o.due_by)
 end
 ```
 
 - [ ] **Step 3: UI** — table with title, type, assignee, due_by, `<.urgency_badge>`. Compute
   `today = Urgency.today_for(entity.timezone)` **once** in `mount` and pass it to every
-  `classify/3` call (fix 3). Sort overdue first, then due_soon, then `due_by` asc.
+  `classify/3` call (fix 3). **Sort in Elixir, not SQL:** the query's `order_by: due_by` is only a
+  pre-sort — urgency is not a column, so after `classify/3` re-sort overdue → due_soon → `due_by`
+  asc in the LiveView. Don't rely on the SQL `order_by` alone for the urgency tiers.
 
 - [ ] **Step 4: Commit**
 
@@ -994,12 +1158,20 @@ end
 
 - [ ] **Step 3: Done modal**
 
+- "Recurring?" is read from the **live `recurring_interval` on the type** (`Recurrence.recurring?/1`),
+  **not** the obligation snapshot — this must match `complete/3`'s guard exactly, or after a
+  mid-cycle type edit the modal and backend disagree (modal asks for a date the backend won't
+  require, or vice-versa). Completion *rules* use the snapshot; the recurrence *decision* uses the
+  live type (see the snapshot-vs-live note in Task 8 / spec).
 - If recurring **and series not ended**: show a date input that is **required** — the modal
   cannot be submitted without a next due date (mirrors the `{:error, :next_due_required}` guard
-  in `complete/4`, fix 5). To finish a recurring obligation *without* a successor, the user picks
+  in `complete/3`, fix 5). To finish a recurring obligation *without* a successor, the user picks
   **End series** instead, not blank-submit.
 - Pre-fill via `Recurrence.next_due_suggestion/2` for fixed intervals; blank for `custom` (user must pick)
-- Enforce note/doc fields per type on submit
+- Enforce note/doc fields against the **obligation's snapshot** on submit (not the live type —
+  matches `Completion` in Task 9). When the snapshot lists `complete_documents` slots, the upload
+  UI must **require a slot selection** so a slotless early upload can't cause a mystifying Done
+  failure (see #10); the Done error names any still-missing slots.
 
 - [ ] **Step 4: LiveView tests** for create, start_progress, complete with spawn, and that the
   Done modal blocks submit when a recurring obligation has no next due date
@@ -1016,7 +1188,13 @@ end
 
 - [ ] **Step 1: Index** — list system presets (read-only) + entity custom types
 
-- [ ] **Step 2: Form** — manager/admin clone or create; fields per Type schema including interval select with all 8 values.
+- [ ] **Step 2: Form** — manager/admin clone or create; fields per Type schema including interval
+  select with all 8 values. Because `recurring_interval` is read **live**, switching a type to
+  **One-off (`none`)** stops the chain for **every** live obligation of that type after its next
+  Done (no successor spawns) — without setting `series_ended_at`. Surface a one-line hint on the
+  interval field (e.g. "Switching to one-off stops recurrence for all open obligations of this
+  type after their next Done") so this isn't surprising; it differs from **End series**, which
+  cancels a single in-flight cycle.
 
 - [ ] **Step 3: Commit**
 
@@ -1029,7 +1207,10 @@ end
 
 - [ ] **Step 1: List members, invite form (email + role), pending invitations**
 
-- [ ] **Step 2: Admin can change roles; seat_limit check on invite**
+- [ ] **Step 2: Admin can change roles. `seat_limit` is enforced through the single
+  `Entities.seats_available?/1` gate on every path that adds an active member — invite **and**
+  invitation acceptance (re-checked at accept time) **and** any direct membership creation — not
+  just the invite form (fix #15). Role changes don't add a seat, so they're exempt.
 
 - [ ] **Step 3: Commit**
 
@@ -1106,6 +1287,14 @@ end
 | series_id linking | Task 8, 9, 19 |
 | Cancel + end series | Task 10 |
 | Completion rules on Done | Task 9 |
+| Completion rules snapshotted at creation (type edits don't move the bar) | Task 8, 9 |
+| Done docs counted across all cycle events (incremental uploads) | Task 9, 11 |
+| start_progress idempotent (one-step-forward) | Task 9 |
+| Spawn race → clean `:not_live` (no raw Ecto error) | Task 9 |
+| Entity soft-delete filtered from lookups/resolver | Task 4, 5 |
+| seat_limit enforced on invite + accept + direct add | Task 4, 18 |
+| Mobile = field-work only; management Desktop-only (whitelist) | Task 5, 21 |
+| Live-cycle predicate defined once (`Obligations.live/1`) | Task 8, 15 |
 | Terminal `completed_at` (dashboards exclude done cycles) | Task 8, 9, 15 |
 | One live cycle per series (partial unique index) | Task 8, 9 |
 | Idempotent / concurrency-safe Done | Task 9 |

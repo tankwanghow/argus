@@ -38,12 +38,21 @@ Desktop/Mobile interface** (`/entities/:slug` and `/m/:slug`, device auto-routed
 ### Entities (tenants)
 
 - `slug` (citext), `name`, `timezone`, `plan` (default `"free"`), `seat_limit` (default 5)
-- Soft delete: `deleted_at`, `deleted_by_id`
+- Soft delete: `deleted_at`, `deleted_by_id`. **All entity lookups filter `deleted_at IS NULL`:**
+  `list_user_entities/1` and the entity slug resolver
+  (`get_entity_by_slug_for_user!/2`, used by the entity-scoped `on_mount`) exclude soft-deleted
+  entities, so a deleted entity's routes become unreachable and its obligations drop off every
+  dashboard without per-obligation changes. Obligations under a deleted entity are left intact
+  (recoverable on restore); hard-delete/cascade is out of scope for v1.
 
 ### Memberships
 
 - `user_id`, `entity_id`, `role`, `invited_by_id`, `accepted_at`, `is_default`
 - Unique `(user_id, entity_id)`; one default entity per user
+- **`seat_limit` is enforced on every path that adds an active member**, not just invite:
+  `invite_member` (reject when seats are full) **and** `accept_invitation` (re-check at accept
+  time, since seats may have filled between invite and accept) **and** any direct membership
+  creation. A single `Entities.seats_available?/1` predicate is the one gate all paths call.
 
 ### Entity Invitations
 
@@ -69,7 +78,7 @@ Desktop/Mobile interface** (`/entities/:slug` and `/m/:slug`, device auto-routed
 | Action | Effect |
 |--------|--------|
 | **Cancel obligation** | Current obligation `status → cancelled`; `cancelled` event logged; removed from active dashboards |
-| **End series** | Cancel current obligation + set `series_ended_at` on series; blocks future recurrence spawn |
+| **End series** | Cancel current obligation + set `series_ended_at` on that (now-cancelled) row; blocks future recurrence spawn |
 
 ## Data Model
 
@@ -120,14 +129,40 @@ One row **per cycle** (not a standing series with rolling `due_by`).
 | `series_id` | UUID | Shared across all cycles in a recurrence chain |
 | `title` | string | Required short label (e.g. "HQ License Renewal") |
 | `primary_assignee_id` | FK → users | Required |
-| `due_by` | date/datetime | Current cycle due date |
+| `due_by` | date | Current cycle due date (`:date` — day-granular; "today" computed in the entity timezone) |
 | `status` | enum | `active`, `cancelled` |
 | `completed_at` | utc_datetime nullable | Set when the Done event is recorded — terminal "closed" marker (the `Obligation.status` stays `active`; "done-ness" is this timestamp, not a status value) |
 | `series_ended_at` | utc_datetime nullable | Set by "End series" — blocks future spawn |
+| `complete_note_required` | boolean | **Snapshot** of the type's value at creation (see below) |
+| `complete_documents` | string | **Snapshot** of the type's comma-delimited slot names at creation (see below) |
+
+**Completion requirements are snapshotted, not read live.** `complete_note_required` and
+`complete_documents` are copied from the `ObligationType` onto the obligation when the cycle is
+created, and Done validates against the obligation's snapshot — never the current type. This is
+deliberate: a manager editing a type later must not retroactively change the bar for obligations
+already in flight (type-definition audit is out of scope, so such a change would otherwise be
+silent and unauditable). Each spawned cycle re-snapshots from the type at spawn time, so a type
+edit takes effect on the *next* cycle, not the live one.
+
+**Snapshot vs. live reads — deliberate split.** Only the *completion contract* is frozen.
+`reminder_offsets` and `recurring_interval` are read **live from the type**, by design:
+
+- `reminder_offsets` is a **display preference** — tightening an entity's reminder schedule
+  *should* re-color every live obligation immediately, so urgency reads the current type.
+- `recurring_interval` governs **the shape of the next cycle** — changing monthly→quarterly means
+  the successor spawned on Done should be quarterly, and switching to `none` is a legitimate
+  "stop recurring after this" gesture (Done then just closes the cycle). So spawn reads the
+  current type too.
+- `complete_note_required`/`complete_documents` are the **bar for *this* cycle's Done** — a
+  contract that must not move under work already in flight, hence the snapshot.
 
 A cycle is **live** while `completed_at IS NULL AND status = "active"` — this is the set that
 appears on dashboards and can be worked, completed, edited, or cancelled. `completed_at` and
 `cancelled` are the two terminal states; both lock the cycle (see [Corrections Model](#corrections-model)).
+This compound predicate is the **single most error-prone query in the system** (a `status`-only
+filter leaks completed cycles forever, since they keep `status = "active"`); it is defined **once**
+as a composable `Obligations.live/1` query builder that every list, dashboard, and report routes
+through — call sites never hand-write the predicate.
 
 **One live cycle per series** is enforced by a partial unique index on `series_id` where the
 cycle is live — preventing concurrent Done calls from spawning duplicate next cycles.
@@ -169,8 +204,8 @@ Multiple per event — incremental file uploads during open / in_progress.
 | Field | Type | Notes |
 |-------|------|-------|
 | `obligation_event_id` | FK | |
-| `documents` | attachment ref | File storage TBD (e.g. filesystem, S3) |
-| `document_slot` | string nullable | Matches `complete_documents` name on Done validation |
+| `file` | attachment ref | One file per row (map: `%{filename, original, path}`); local filesystem in v1 (see [Open Implementation Details](#open-implementation-details)). Named `file`, not `documents` — one row is one document, and the plural collides with the type's `complete_documents` slot list |
+| `document_slot` | string nullable | Matches a `complete_documents` slot name on Done validation |
 | `user_id` | FK | Who uploaded/wrote |
 | `voided_at` | utc_datetime nullable | Wrong upload voided, not deleted |
 | `voided_by_id` | FK nullable | |
@@ -207,7 +242,7 @@ Field-level before/after for corrections.
 While cycle is active (not yet `done`):
 
 - Transition to `in_progress` (one event per cycle)
-- Add documents incrementally on the `open` or `in_progress` event (multiple `ObligationEventDocument` rows over time)
+- Add documents incrementally on the `open` or `in_progress` event (multiple `ObligationEventDocument` rows over time). When the obligation's snapshotted `complete_documents` lists slots, the upload UI **requires the user to pick a `document_slot`** — a slotless early upload does not satisfy any required slot, and forcing the choice avoids a confusing "missing document" rejection at Done.
 - Step-level notes live on `ObligationEvent.note` (open context, done comment, cancel reason)
 
 Note and document requirements on type are **not** enforced until Done — only on Done.
@@ -217,9 +252,12 @@ Note and document requirements on type are **not** enforced until Done — only 
 1. User (primary or manager) triggers Done — only allowed while the cycle is **live**
    (`completed_at IS NULL AND status = "active"`); a guarded transition sets `completed_at`,
    so a second concurrent Done finds no live row and is rejected (idempotent)
-2. Enforce `ObligationType` rules:
-   - `complete_note_required` → `note` present on Done event
-   - `complete_documents` → one non-voided file per named slot
+2. Enforce the obligation's **snapshotted** completion rules (not the live type):
+   - `complete_note_required` → `note` present on the Done event
+   - `complete_documents` → one non-voided file per named slot, counting **all non-voided
+     `ObligationEventDocument` rows across every event in the cycle** (`open`, `in_progress`,
+     and the Done event) — not just files attached to the Done event. Incremental uploads made
+     earlier therefore satisfy the requirement.
    - **Recurring & series not ended** (`recurring_interval ≠ none AND series_ended_at IS NULL`)
      → `next_due_by` is **required**. Done is rejected without it. This is what guarantees a
      recurring series always has a successor cycle and never lands in a "no live cycle, not
@@ -244,8 +282,12 @@ Note and document requirements on type are **not** enforced until Done — only 
 **End series** (manager/admin):
 
 - Same as cancel obligation
-- Set `series_ended_at` on the obligation (or series record keyed by `series_id`)
-- Future Done on any obligation in series does not spawn next cycle
+- **Semantics A (authoritative):** set `series_ended_at` on the current (now-cancelled)
+  obligation row. There is no separate series record — series state is carried on its rows and
+  `series_id` links the chain. "Is this series ended?" is therefore
+  `EXISTS (obligation WHERE series_id = ? AND series_ended_at IS NOT NULL)`, backed by a partial
+  index on `(series_id)` where `series_ended_at IS NOT NULL`.
+- Future Done on any obligation in the series does not spawn the next cycle
 
 ## Corrections Model
 
@@ -264,7 +306,7 @@ Lock after Done/cancelled. Edits while cycle is active.
 
 | Rule | Detail |
 |------|--------|
-| Author | Edit own event note within 48 hours (typo fixes) |
+| Author | Edit own event note within 48 hours of the event's `inserted_at` (typo fixes). The window is **48 hours of elapsed time** measured on the UTC `inserted_at` timestamp (`DateTime.diff/2`), so it carries no timezone ambiguity — unlike urgency, which is date-bucketed and must use the entity timezone |
 | Override | manager/admin anytime before Done |
 | After Done / cancelled | locked |
 
@@ -293,9 +335,9 @@ Split view with role-aware default tab. **No separate notification system** — 
 | **My work** | Obligations where user is primary or collaborator; active only; sorted by due date | member |
 | **Team overview** | All active upcoming/overdue obligations in entity | manager, admin |
 
-Filter: **live cycles only** — `Obligation.status = active AND completed_at IS NULL`. (Filtering
-on `status` alone is insufficient: completed cycles keep `status = active`, so they must be
-excluded via `completed_at IS NULL` or they linger on dashboards forever.)
+Filter: **live cycles only** — both tabs compose `Obligations.live/1` (the single definition of
+`status = active AND completed_at IS NULL`) rather than hand-writing the predicate. (A `status`-only
+filter would leak completed cycles onto the dashboard forever, since they keep `status = active`.)
 
 ### Urgency badges (from `reminder_offsets`)
 
@@ -310,11 +352,15 @@ non-UTC tenants (e.g. Malaysia, UTC+8).
 | **Due soon** | `today <= due_by <= today + offset` for any offset in type's `reminder_offsets` — amber badge |
 | **OK** | otherwise — no badge or subtle styling |
 
+**Due-today boundary (decided):** an item due *today* (`due_by == today`) is **due-soon (amber)**,
+not overdue — overdue means strictly past the deadline. This is intentional and test-pinned; if a
+deployment wants "due today = red" it flips a single comparator in `Urgency.classify/3`.
+
 Sort: overdue first, then due-soon, then by `due_by` ascending.
 
 ## Audit Trail
 
-Three layers:
+Four layers:
 
 1. **Obligation rows** — one per cycle; `series_id` links recurrence history
 2. **ObligationEvent** — forward-only status steps (`status_by`, timestamps); notes editable while active
@@ -346,8 +392,37 @@ Explicit `series_id` (not title+type matching) avoids collisions from duplicate 
 - Billing integration beyond `plan` / `seat_limit` fields on entity
 - Field-level audit for obligation type definition changes
 
-## Open Implementation Details
+## Resolved Implementation Details
 
-- File storage backend for `documents`
-- `due_by` type: date vs utc_datetime (entity timezone handling)
-- System preset seed data for Malaysia regulatory types
+- **File storage backend** → local filesystem in v1, under `priv/uploads/:entity_id/:obligation_id/`
+  via a **configurable `:uploads_dir`** (defaults to the priv path in dev; set a persistent volume
+  path in prod — `:code.priv_dir` is not writable/persistent inside a release). Reads are served by
+  a scope-gated controller/plug, never a static route.
+- **`due_by` type** → `:date` (day-granular filings; "today" computed in the entity timezone).
+
+## Open / pending
+
+- System preset seed data for Malaysia regulatory types.
+
+## Known v1 limitations (deliberately deferred)
+
+These are conscious trade-offs, not oversights — recorded so they are not "rediscovered" as bugs:
+
+- **No pause / snooze / skip-cycle.** A recurring series can only be stopped via **End series**
+  (which cancels the in-flight cycle) or carried forward via Done + `next_due_by`. There is no
+  "let this cycle finish, then stop" or "skip one occurrence" path. Acceptable for v1; a likely
+  early follow-up.
+- **No proactive reminders.** Urgency is render-time only (no email/SMS/bell/Oban). For
+  regulatory deadlines this means a user who never opens the app is never warned — an accepted v1
+  product risk, flagged for re-evaluation.
+- **Structured config stored as CSV strings.** `reminder_offsets` and `complete_documents` are
+  comma-delimited (validated/normalized at write time). They cannot be queried or indexed by
+  offset/slot, and renaming a slot name does not update historical obligations. Fine at v1 scale.
+- **Tenant isolation is app-layer only** (scope-filtered queries), no Postgres RLS; direct DB
+  access bypasses entity scope. No upload AV scanning, no multi-node upload story.
+- **No entity restore workflow.** Soft-deleted entities drop out of all lookups and their
+  obligations are left intact (so they're *recoverable in principle*), but no UI/flow to restore
+  one ships in v1.
+- **Invitation email must match.** Acceptance assumes the invitee signs in with the *invited*
+  email; an invite sent to an address that differs from the user's registered email is not
+  reconciled in v1 (the user would register/sign in with the invited address).

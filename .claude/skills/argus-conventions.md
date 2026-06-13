@@ -5,7 +5,7 @@ description: House conventions for building Argus — use whenever implementing 
 
 # Argus House Conventions
 
-Argus follows the conventions of the user's other Phoenix 1.8 / LiveView 1.1 apps in
+Argus follows the conventions of the user's other Phoenix 1.8 / LiveView 1.2 apps in
 `~/Projects/elixir`. **peggy** is the primary reference for UI, onboarding, and request scope;
 **full_circle** for context/authorization shape. When in doubt, open the corresponding peggy file
 and match it. Peggy's full Phoenix 1.8 ruleset lives in `~/Projects/elixir/peggy/AGENTS.md` — its
@@ -68,8 +68,9 @@ Argus must wire into it the same way (mirror peggy's `mix.exs` + `config/config.
   throughout) — this is the one intentional divergence from full_circle's naive default.
 - Domain logic lives in context modules (`Argus.Accounts`, `Argus.Entities`, `Argus.Obligations`).
   LiveViews call contexts, never `Repo` directly.
-- **Bespoke context functions** (decided): `create_obligation/3`, `complete/4`, etc. — Argus does
-  NOT adopt full_circle's generic `StdInterface`.
+- **Bespoke context functions** (decided), all **scope-first**: `create_obligation/2`,
+  `complete/3`, `cancel_obligation/3`, `start_progress/2`, etc. (scope replaces the old
+  entity+actor args) — Argus does NOT adopt full_circle's generic `StdInterface`.
 - Multi-step writes use `Ecto.Multi`/transactions.
 - **Return conventions (house style):**
   - success → `{:ok, struct}`
@@ -114,9 +115,12 @@ not remove the password path.
   `require_authenticated`) for authed pages; and an entity-scoped `live_session` whose on_mount
   resolves the `:entity_slug` to `scope.entity` + membership (replacing the old standalone
   `SetActiveEntity` plug). State which `live_session`/pipeline a route goes in and why.
-- Authorization is `Argus.Authorization.can?(user_or_scope, :action, entity)` — pattern-matched
-  clauses (mirror `FullCircle.Authorization`) with an `allow_roles(~w(admin manager), entity, user)`
-  helper. Roles: `admin | manager | member`.
+- Authorization is **scope-first**: `Argus.Authorization.can?(%Scope{}, :action)` (entity-level)
+  and `can?(%Scope{}, :action, %Obligation{})` (obligation-scoped). Pattern-matched clauses
+  (mirroring `FullCircle.Authorization`'s shape) keyed off the **pre-resolved `scope.role`**, with
+  an `allow_roles(scope, ~w(admin manager)a)` helper — Argus does **not** re-query the role from
+  the DB on every call the way full_circle does, because the `on_mount` already put it on the
+  scope. Roles: `admin | manager | member`. Contexts return `:not_authorise` on denial.
 
 ## Dual interface — Desktop + Mobile (peggy model)
 
