@@ -15,9 +15,31 @@ Task 1 bootstraps the app with:
 
 ```bash
 cd /home/tankwanghow/Projects/elixir
-mix phx.new argus --binary-id --no-mailer --no-dashboard --no-assets
+mix phx.new argus --binary-id --no-dashboard
+# keep the mailer (magic-link login emails) and assets (Tailwind v4 + daisyUI)
 # answer Y when it warns the argus/ dir already exists (it holds docs/)
 ```
+
+## House conventions (read first)
+
+Argus follows the conventions of the sibling Phoenix apps in `~/Projects/elixir` — primarily
+**peggy** (UI, magic-link onboarding, request scope, Desktop/Mobile dual interface) and
+**full_circle** (context & authorization shape). The authoritative, detailed convention guide is
+the **`argus-conventions` skill** (`.claude/skills/argus-conventions.md`) — consult it before
+writing non-trivial code. Peggy's full Phoenix 1.8 ruleset (`~/Projects/elixir/peggy/AGENTS.md`)
+applies here too. Headlines:
+
+- **Tailwind v4 + daisyUI 5** (no `tailwind.config.js`; daisyUI component classes). App is
+  generated **with assets and mailer** — not `--no-assets`/`--no-mailer`.
+- **Magic-link, passwordless-first onboarding** (peggy): register with email → emailed login link
+  → confirm → land on entity create/select. A `%Argus.Accounts.Scope{user, entity, membership,
+  role}` struct flows as `@current_scope`; never `@current_user`/`@current_role` in templates.
+- **Dual UI:** Desktop `/entities/:entity_slug/...`, Mobile `/m/:entity_slug/...`, with an
+  `AutoRouteByDevice` plug + a `argus_view` cookie override. Separate LiveViews + layouts
+  (`Layouts.app/1` navbar, `Layouts.mobile_app/1` bottom-nav shell).
+- LiveView: `to_form` + `<.form>`/`<.input>`, `<.icon name="hero-...">`, streams (never append),
+  colocated hooks. Unauthorized context calls return **`:not_authorise`**.
+- Run `mix precommit` before declaring work done.
 
 ## Commands (post-bootstrap)
 
@@ -31,7 +53,7 @@ mix test test/argus/obligations_test.exs            # single file
 mix test test/argus/obligations_test.exs:42         # single test by line
 ```
 
-Tech stack: Elixir 1.19 / OTP 28, Phoenix 1.8, LiveView 1.1, Ecto 3.13, PostgreSQL (citext), Tailwind, bcrypt.
+Tech stack: Elixir 1.19 / OTP 28, Phoenix 1.8.5, LiveView 1.1, Ecto 3.13, PostgreSQL (citext), Tailwind v4 + daisyUI 5, Swoosh mailer (magic-link login), Req.
 
 ## Architecture
 
@@ -39,16 +61,19 @@ Phoenix LiveView monolith, PostgreSQL, **binary_id (UUID) primary keys everywher
 `Argus.Schema` macro (`use Argus.Schema`). No background jobs, no REST API, no notification
 system in v1.
 
-### Multi-tenancy
+### Multi-tenancy & scope
 
-Tenants are **entities**. All app routes are scoped: `/entities/:entity_slug/...`. The
-`SetActiveEntity` plug resolves the slug, verifies the user's membership, and assigns
-`active_entity` + `membership` (with role) for the request. Authorization keys off the
-membership role, never a global user attribute.
+Tenants are **entities**. Desktop routes are scoped `/entities/:entity_slug/...`, mobile
+`/m/:entity_slug/...`. An entity-scoped `live_session` `on_mount` resolves the slug, verifies the
+user's membership, and builds a `%Argus.Accounts.Scope{user, entity, membership, role}` exposed as
+`@current_scope` (peggy pattern — replaces a standalone plug + ad-hoc `active_entity`/`membership`
+assigns). Contexts take `scope`/`current_scope` as their first argument; authorization keys off
+`scope.role`, never a global user attribute.
 
-- `Argus.Accounts` — users (email/password, locale; **no timezone on users**), session tokens.
+- `Argus.Accounts` — users (email + **magic-link login tokens**; optional password; locale;
+  **no timezone on users**), `Scope` struct, `register_user/1`, `deliver_login_instructions/2`.
 - `Argus.Entities` — entities, memberships `(user_id, entity_id, role)`, invitations. One default entity per user (partial unique index). `create_entity/2` also inserts the creator's `admin` membership.
-- `Argus.Authorization` — `can?(user, action, entity)` / `can?(user, action, entity, obligation)`. Single source of truth for role rules; see the role table below.
+- `Argus.Authorization` — `can?(user, action, entity)` / `can?(user, action, entity, obligation)`. Single source of truth for role rules; see the role table below. Unauthorized mutations return `:not_authorise`.
 
 ### Roles
 

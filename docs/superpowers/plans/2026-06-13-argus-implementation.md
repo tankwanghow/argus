@@ -4,9 +4,22 @@
 
 **Goal:** Build Argus — a multi-tenant Phoenix LiveView app for tracking obligations with event-based audit trails, recurrence via `series_id`, and dashboard urgency badges.
 
-**Architecture:** Phoenix 1.8 LiveView monolith with PostgreSQL. Multi-tenancy via `entities` scoped routes (`/entities/:slug/...`). Domain logic in context modules (`Argus.Obligations`, `Argus.Entities`, `Argus.Accounts`). Dashboard computes overdue/due-soon from `due_by` and type `reminder_offsets` — no background jobs. Local filesystem uploads for v1 documents.
+**Architecture:** Phoenix 1.8 LiveView monolith with PostgreSQL. Multi-tenancy via `entities`
+scoped routes — **dual interface**: Desktop `/entities/:entity_slug/...` and Mobile
+`/m/:entity_slug/...` (peggy model), auto-routed by `AutoRouteByDevice`. Domain logic in context
+modules (`Argus.Obligations`, `Argus.Entities`, `Argus.Accounts`). Request state flows through a
+`%Argus.Accounts.Scope{user, entity, membership, role}` as `@current_scope`. Dashboard computes
+overdue/due-soon from `due_by` and type `reminder_offsets` — no background jobs. Local filesystem
+uploads for v1 documents.
 
-**Tech Stack:** Elixir 1.19, OTP 28, Phoenix 1.8, LiveView 1.1, Ecto 3.13, PostgreSQL (citext), Tailwind, bcrypt
+**Conventions:** Follow the sibling Phoenix apps in `~/Projects/elixir` — **peggy** (UI,
+magic-link onboarding, scope, Desktop/Mobile) and **full_circle** (contexts, authorization). The
+authoritative guide is the **`argus-conventions` skill** (`.claude/skills/argus-conventions.md`);
+peggy's `AGENTS.md` ruleset applies. Magic-link passwordless-first auth, Tailwind v4 + daisyUI 5,
+`to_form`/`<.input>`, streams, `<.icon>`; unauthorized context calls return `:not_authorise`.
+
+**Tech Stack:** Elixir 1.19, OTP 28, Phoenix 1.8.5, LiveView 1.1, Ecto 3.13, PostgreSQL (citext),
+Tailwind v4 + daisyUI 5, Swoosh mailer (magic-link), Req
 
 **Spec:** `docs/superpowers/specs/2026-06-13-argus-design.md`
 
@@ -19,9 +32,10 @@ lib/argus/
   schema.ex                          # use Argus.Schema — binary_id PKs
   repo.ex
   application.ex
-  accounts.ex                        # users, tokens, registration, login
+  accounts.ex                        # users, magic-link tokens, registration
   accounts/user.ex
   accounts/user_token.ex
+  accounts/scope.ex                  # %Scope{user, entity, membership, role} (peggy)
   entities.ex                        # entities, memberships, invitations
   entities/entity.ex
   entities/membership.ex
@@ -41,9 +55,17 @@ lib/argus/
 
 lib/argus_web/
   router.ex
-  plugs/set_active_entity.ex
+  user_auth.ex                       # phx.gen.auth: scope plugs + on_mount hooks
+  plugs/auto_route_by_device.ex      # Desktop ⇄ Mobile redirect (peggy), argus_view cookie
   plugs/require_role.ex
-  live/entity_live/select.ex
+  components/layouts.ex              # app/1 (desktop navbar) + mobile_app/1 (bottom nav)
+  components/core_components.ex      # daisyUI-based inputs, buttons, modal, icon
+  components/urgency_badge.ex
+  live/user_live/registration.ex     # email-only register → deliver login link
+  live/user_live/login.ex
+  live/user_live/confirmation.ex     # /users/log-in/:token magic-link confirm
+  live/entity_live/select.ex         # pick/create entity after sign-in
+  # Desktop UI (/entities/:entity_slug/...)
   live/dashboard_live/index.ex
   live/obligation_live/index.ex
   live/obligation_live/show.ex       # workflow: open → in_progress → done
@@ -51,8 +73,10 @@ lib/argus_web/
   live/obligation_type_live/index.ex
   live/obligation_type_live/form.ex
   live/membership_live/index.ex
-  components/layouts/
-  components/urgency_badge.ex
+  # Mobile UI (/m/:entity_slug/...) — own LiveViews, mobile_app layout
+  live/mobile_live/dashboard.ex
+  live/mobile_live/obligations.ex
+  live/mobile_live/obligation_show.ex
 
 priv/repo/migrations/              # one migration per table group
 priv/repo/seeds.exs                # system obligation type presets
@@ -67,11 +91,11 @@ test/argus_web/live/               # LiveView tests
 **Files:**
 - Create: entire project via `mix phx.new`
 
-- [ ] **Step 1: Generate app**
+- [ ] **Step 1: Generate app** (keep mailer + assets — magic-link email and daisyUI UI need them)
 
 ```bash
 cd /home/tankwanghow/Projects/elixir
-mix phx.new argus --binary-id --no-mailer --no-dashboard --no-assets
+mix phx.new argus --binary-id --no-dashboard
 ```
 
 When prompted for `argus` directory already exists (has `docs/`), answer **Y** to continue.
@@ -81,22 +105,28 @@ When prompted for `argus` directory already exists (has `docs/`), answer **Y** t
 Modify `mix.exs` deps list — add:
 
 ```elixir
-{:bcrypt_elixir, "~> 3.0"},
-{:tzdata, "~> 1.1"}
+{:bcrypt_elixir, "~> 3.0"},   # optional password auth alongside magic-link
+{:tzdata, "~> 1.1"}            # entity-timezone urgency
 ```
 
 Run: `mix deps.get`
 
-- [ ] **Step 3: Verify boot**
+- [ ] **Step 3: Set up Tailwind v4 + daisyUI 5** (match peggy)
+
+Follow peggy's `assets/css/app.css`: `@import "tailwindcss"` + `@source` directives (no
+`tailwind.config.js`), and load **daisyUI 5** via the CSS plugin. No `@apply`. Confirm
+`mix assets.build` succeeds. Copy peggy's `assets/css/app.css` header as the starting point.
+
+- [ ] **Step 4: Verify boot**
 
 Run: `mix test`  
 Expected: PASS (0 failures, generated scaffold tests)
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add -A
-git commit -m "chore: bootstrap Phoenix app"
+git commit -m "chore: bootstrap Phoenix app (assets + daisyUI, mailer for magic-link)"
 ```
 
 ---
@@ -150,99 +180,78 @@ git commit -m "chore: add Argus.Schema and citext extension"
 
 ---
 
-## Task 3: Users and auth tokens
+## Task 3: Users, magic-link auth, and Scope (peggy onboarding)
+
+Argus uses Phoenix 1.8 **`phx.gen.auth` magic-link / passwordless-first** auth, exactly like
+peggy — register with email, get an emailed login link, confirm, sign in. Generate it rather than
+hand-rolling; then customize. Mirror `peggy/lib/peggy_web/live/user_live/*` and
+`peggy/lib/peggy/accounts/scope.ex`.
 
 **Files:**
-- Create: `priv/repo/migrations/20260613000002_create_users.exs`
-- Create: `lib/argus/accounts/user.ex`
-- Create: `lib/argus/accounts/user_token.ex`
-- Create: `lib/argus/accounts.ex`
-- Create: `test/argus/accounts_test.exs`
-- Create: `test/support/fixtures/accounts_fixtures.ex`
+- Generate: `mix phx.gen.auth Accounts User users` (creates `accounts.ex`, `accounts/user.ex`,
+  `accounts/user_token.ex`, `accounts/scope.ex`, `argus_web/user_auth.ex`,
+  `live/user_live/{registration,login,confirmation,settings}.ex`, migration, fixtures)
+- Customize: `lib/argus/accounts/user.ex` (add `locale`, citext email), `lib/argus/accounts/scope.ex`
+  (add `entity`, `membership`, `role` + `put_entity/3`, `member?/1`)
+- Edit: `test/argus/accounts_test.exs`, `test/support/fixtures/accounts_fixtures.ex`
 
-- [ ] **Step 1: Write failing test**
+- [ ] **Step 1: Generate auth, accept the magic-link flow**
+
+Run `mix phx.gen.auth Accounts User users`, `mix deps.get`, `mix ecto.migrate`. The generated
+flow is email-first: `register_user/1`, `deliver_login_instructions/2`, login-by-token. **Keep it
+passwordless-first** (do not switch the registration LiveView to a password form).
+
+- [ ] **Step 2: Write failing tests** for the Argus-specific bits
 
 ```elixir
-# test/argus/accounts_test.exs
-defmodule Argus.AccountsTest do
-  use Argus.DataCase, async: true
-  alias Argus.Accounts
-  import Argus.AccountsFixtures
+# test/argus/accounts_test.exs (additions)
+test "register_user/1 registers with email and defaults locale to en" do
+  {:ok, user} = Accounts.register_user(%{email: "a@b.com"})
+  assert user.email == "a@b.com"
+  assert user.locale == "en"
+end
 
-  describe "register_user/1" do
-    test "registers with email and password" do
-      {:ok, user} = Accounts.register_user(%{email: "a@b.com", password: "password123456"})
-      assert user.email == "a@b.com"
-      assert user.locale == "en"
-      refute user.hashed_password == "password123456"
-    end
-  end
-
-  describe "authenticate_user/2" do
-    test "returns user on valid credentials" do
-      user = user_fixture()
-      assert {:ok, ^user} = Accounts.authenticate_user(user.email, "password123456")
-    end
-  end
+# test/argus/accounts/scope_test.exs
+test "put_entity/3 sets entity, membership and role" do
+  scope = Scope.for_user(user_fixture())
+  scope = Scope.put_entity(scope, entity, %Membership{role: "admin"})
+  assert scope.entity == entity
+  assert scope.role == :admin
 end
 ```
 
-- [ ] **Step 2: Run test — expect FAIL**
+Run: `mix test` → FAIL (locale/Scope.put_entity not present yet).
 
-Run: `mix test test/argus/accounts_test.exs`  
-Expected: FAIL — modules not defined
+- [ ] **Step 3: Customize the generated schema** — add a `locale` column
 
-- [ ] **Step 3: Migration**
-
-```elixir
-defmodule Argus.Repo.Migrations.CreateUsers do
-  use Ecto.Migration
-
-  def change do
-    create table(:users, primary_key: false) do
-      add :id, :binary_id, primary_key: true
-      add :email, :citext, null: false
-      add :hashed_password, :string
-      add :confirmed_at, :utc_datetime
-      add :locale, :string, null: false, default: "en"
-      timestamps(type: :utc_datetime)
-    end
-
-    create unique_index(:users, [:email])
-
-    create table(:users_tokens, primary_key: false) do
-      add :id, :binary_id, primary_key: true
-      add :user_id, references(:users, type: :binary_id, on_delete: :delete_all), null: false
-      add :token, :binary, null: false
-      add :context, :string, null: false
-      add :sent_to, :string
-      add :authenticated_at, :utc_datetime
-      timestamps(type: :utc_datetime, updated_at: false)
-    end
-
-    create index(:users_tokens, [:user_id])
-    create unique_index(:users_tokens, [:context, :token])
-  end
-end
+```bash
+mix ecto.gen.migration add_locale_to_users
 ```
 
-- [ ] **Step 4: Implement User, UserToken, Accounts**
+Add `add :locale, :string, null: false, default: "en"` to `users`. (The generator already makes
+`email` citext, `hashed_password` **nullable**, `confirmed_at`, and the `users_tokens` table with
+`authenticated_at` — leave those.) Cast `:locale` in the User registration changeset; **never**
+cast `entity_id`/programmatic fields.
 
-`User` changeset: cast `email`, `locale`; validate email format; `hash_password` with bcrypt.
+- [ ] **Step 4: Extend `Accounts.Scope`** (mirror peggy)
 
-`Accounts.register_user/1`, `Accounts.authenticate_user/2`, `Accounts.get_user!/1`.
+```elixir
+defstruct user: nil, entity: nil, membership: nil, role: nil
+def for_user(%User{} = user), do: %__MODULE__{user: user}
+def put_entity(%__MODULE__{} = scope, %Entity{} = entity, %Membership{} = m),
+  do: %{scope | entity: entity, membership: m, role: String.to_existing_atom(m.role)}
+def member?(%__MODULE__{membership: %Membership{accepted_at: %DateTime{}}}), do: true
+def member?(_), do: false
+```
 
-Follow Phoenix 1.8 generated auth patterns (session tokens, `users_tokens`).
+(`entity`/`membership` are populated later by the entity-scoped `on_mount` in Task 5.)
 
-- [ ] **Step 5: Run tests**
-
-Run: `mix test test/argus/accounts_test.exs`  
-Expected: PASS
+- [ ] **Step 5: Run tests** → `mix test` PASS
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git commit -am "feat: users and authentication"
+git commit -am "feat: magic-link auth (phx.gen.auth) + Scope with locale"
 ```
 
 ---
@@ -276,7 +285,7 @@ end
 Key functions:
 - `create_entity/2` — insert entity + admin membership
 - `list_user_entities/1`
-- `get_entity_by_slug_for_user!/2` — slug lookup scoped to the user's memberships (used by `SetActiveEntity`)
+- `get_entity_by_slug_for_user!/2` — slug lookup scoped to the user's memberships (used by the entity-scoped `on_mount` in Task 5)
 - `get_membership!/2`
 - `invite_member/4` — manager/admin only (authorization added later)
 - `accept_invitation/2`
@@ -291,60 +300,75 @@ git commit -am "feat: entities, memberships, invitations"
 
 ---
 
-## Task 5: Active entity plug and scoped router
+## Task 5: Entity-scoped `live_session`, dual-UI routing, device auto-route
+
+Replace the standalone "set active entity" plug with peggy's **scope `on_mount`** model. The
+`:entity_slug` is resolved in an `on_mount` hook that verifies membership and calls
+`Scope.put_entity/3`, so `@current_scope.entity`/`.role` are available in every entity-scoped
+LiveView. Mirror `peggy/lib/peggy_web/router.ex` and `auto_route_by_device.ex`.
 
 **Files:**
-- Create: `lib/argus_web/plugs/set_active_entity.ex`
+- Modify: `lib/argus_web/user_auth.ex` (add `on_mount(:require_entity, ...)`)
 - Modify: `lib/argus_web/router.ex`
-- Create: `test/argus_web/plugs/set_active_entity_test.exs`
+- Create: `lib/argus_web/plugs/auto_route_by_device.ex`
+- Create: `lib/argus_web/device.ex` (UA sniff helper)
+- Create: `test/argus_web/user_auth_test.exs` (entity on_mount), `.../auto_route_by_device_test.exs`
 
-- [ ] **Step 1: Plug stores `active_entity_id` in session after membership check**
+- [ ] **Step 1: `on_mount(:require_entity, ...)`** in `UserAuth`
+
+Reads `params["entity_slug"]`, loads the entity scoped to the user's memberships
+(`Entities.get_entity_by_slug_for_user!/2`) + membership, and assigns
+`current_scope = Scope.put_entity(socket.assigns.current_scope, entity, membership)`. Halts
+(redirect to `/entities`) if the user is not a member.
+
+- [ ] **Step 2: `AutoRouteByDevice` plug** (peggy) in the authed browser pipeline
+
+Redirects `/entities/<slug>/…` → `/m/<slug>/…` for mobile UAs and back for desktop, honoring an
+`argus_view=mobile|desktop` cookie set by explicit toggle links. Only redirects when the
+counterpart route exists (whitelist of mobile-capable tails) so single-UI pages never 404.
+
+- [ ] **Step 3: Router — auth, desktop, and mobile scopes**
 
 ```elixir
-defmodule ArgusWeb.Plugs.SetActiveEntity do
-  import Plug.Conn
-  alias Argus.Entities
+# with-or-without auth (registration, login, confirmation) — peggy phx.gen.auth blocks
+live_session :current_user, on_mount: [{ArgusWeb.UserAuth, :mount_current_scope}] do
+  # users/register, users/log-in, users/log-in/:token
+end
 
-  def init(opts), do: opts
+scope "/", ArgusWeb do
+  pipe_through [:browser, :require_authenticated_user, ArgusWeb.Plugs.AutoRouteByDevice]
 
-  def call(conn, _opts) do
-    user = conn.assigns.current_user
-    slug = conn.params["entity_slug"] || conn.params["slug"]
+  live_session :require_authenticated_user,
+    on_mount: [{ArgusWeb.UserAuth, :require_authenticated}] do
+    live "/entities", EntityLive.Select, :index            # pick/create entity
+  end
 
-    entity = Entities.get_entity_by_slug_for_user!(user, slug)
-    membership = Entities.get_membership!(user, entity)
-
-    conn
-    |> assign(:active_entity, entity)
-    |> assign(:membership, membership)
-    |> put_session(:active_entity_id, entity.id)
+  live_session :entity_scoped,
+    on_mount: [{ArgusWeb.UserAuth, :require_authenticated}, {ArgusWeb.UserAuth, :require_entity}] do
+    # Desktop UI
+    live "/entities/:entity_slug", DashboardLive.Index, :index
+    live "/entities/:entity_slug/obligations", ObligationLive.Index, :index
+    live "/entities/:entity_slug/obligations/new", ObligationLive.Form, :new
+    live "/entities/:entity_slug/obligations/:id", ObligationLive.Show, :show
+    live "/entities/:entity_slug/obligation-types", ObligationTypeLive.Index, :index
+    live "/entities/:entity_slug/members", MembershipLive.Index, :index
+    # Mobile UI (own LiveViews, mobile_app layout)
+    live "/m/:entity_slug", MobileLive.Dashboard, :show
+    live "/m/:entity_slug/obligations", MobileLive.Obligations, :index
+    live "/m/:entity_slug/obligations/:id", MobileLive.ObligationShow, :show
   end
 end
 ```
 
-- [ ] **Step 2: Router scope**
+State in the implementation which `live_session`/pipeline each route uses and why (peggy rule).
 
-```elixir
-scope "/entities/:entity_slug", ArgusWeb do
-  pipe_through [:browser, :require_authenticated_user, :set_active_entity]
+- [ ] **Step 4: `EntityLive.Select`** at `/entities` — list memberships, create-entity form; first
+  entity becomes the user's default. Redirects straight in if the user has exactly one entity.
 
-  live_session :entity, on_mount: [{ArgusWeb.UserAuth, :ensure_authenticated}] do
-    live "/", DashboardLive.Index, :index
-    live "/obligations", ObligationLive.Index, :index
-    live "/obligations/new", ObligationLive.Form, :new
-    live "/obligations/:id", ObligationLive.Show, :show
-    live "/obligation-types", ObligationTypeLive.Index, :index
-    live "/members", MembershipLive.Index, :index
-  end
-end
-```
-
-- [ ] **Step 3: Entity picker LiveView** at `/entities` for users with multiple memberships.
-
-- [ ] **Step 4: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
-git commit -am "feat: entity-scoped routing and active entity plug"
+git commit -am "feat: scope on_mount, dual-UI routing, device auto-route"
 ```
 
 ---
@@ -753,7 +777,7 @@ end
 
 test "member cannot update title" do
   {member, entity, obligation} = assigned_member_fixture()
-  assert {:error, :unauthorized} = Obligations.update_obligation(entity, member, obligation, %{title: "X"})
+  assert :not_authorise = Obligations.update_obligation(entity, member, obligation, %{title: "X"})
 end
 ```
 
@@ -995,6 +1019,48 @@ end
 
 ---
 
+## Task 20: Desktop & Mobile layouts (daisyUI, peggy)
+
+> All Desktop LiveViews (Tasks 15–19) wrap content in
+> `<Layouts.app flash={@flash} current_scope={@current_scope}>`; the generated shell works from
+> Task 1, so those tasks need no layout of their own — this task **refines** the shells. Build with
+> daisyUI classes; never `@apply`. Mirror `peggy/lib/peggy_web/components/layouts.ex`.
+
+**Files:**
+- Modify: `lib/argus_web/components/layouts.ex`
+- Modify: `lib/argus_web/components/core_components.ex` (daisyUI inputs/buttons/modal/icon — generated)
+
+- [ ] **Step 1: `Layouts.app/1`** — top `navbar`: app logo, active entity name + slug, entity
+  switcher, locale switcher, **Mobile** toggle link (sets `argus_view=mobile`), settings, log out.
+  `<.flash_group>` lives only here. Content wrapper `mx-auto max-w-5xl space-y-4`, responsive
+  padding `px-4 sm:px-6 lg:px-8`.
+- [ ] **Step 2: `Layouts.mobile_app/1`** — `min-h-screen bg-base-100 pb-20`, fixed
+  `mobile_bottom_nav` (grid of tabs: Dashboard / Obligations / More, `hero-*` icons,
+  `pb-[env(safe-area-inset-bottom)]`), and a "More" sheet (theme, switch entity, **Desktop**
+  toggle, log out). Large touch targets.
+- [ ] **Step 3: Commit**
+
+---
+
+## Task 21: Mobile UI LiveViews (/m/:entity_slug)
+
+**Files:**
+- Create: `lib/argus_web/live/mobile_live/{dashboard,obligations,obligation_show}.ex`
+- Create: `test/argus_web/live/mobile_live_test.exs`
+
+- [ ] **Step 1: `MobileLive.Dashboard`** — same `Obligations.list_my_work/list_team_overview`
+  queries and `today_for(entity.timezone)` urgency as the desktop dashboard, rendered in
+  `Layouts.mobile_app` with `active={:home}`: a single scrollable list of live cycles, big
+  urgency badges, sticky search header. Reuse the context — no new queries.
+- [ ] **Step 2: `MobileLive.Obligations` / `ObligationShow`** — touch-friendly list + the same
+  open → in_progress → done workflow actions (role-gated via `@current_scope.role`); Done modal
+  requires next_due_by for recurring (same rule as Task 16).
+- [ ] **Step 3: LiveView tests** — mobile dashboard renders; device auto-route redirect
+  (`AutoRouteByDevice`) sends a mobile UA from `/entities/:slug` to `/m/:slug`.
+- [ ] **Step 4: Commit**
+
+---
+
 ## Spec coverage checklist
 
 | Spec requirement | Task |
@@ -1022,6 +1088,10 @@ end
 | Dashboard urgency badges | Task 14, 15 |
 | Dashboard split view | Task 15 |
 | Lock after Done | Task 12 |
+| Magic-link passwordless onboarding (peggy) | Task 3 |
+| Scope struct (`@current_scope`) | Task 3, 5 |
+| Dual Desktop/Mobile UI + device auto-route | Task 5, 20, 21 |
+| daisyUI 5 layouts (app + mobile_app) | Task 20 |
 
 ## Deferred (spec open items)
 
@@ -1033,9 +1103,12 @@ end
 
 ## Final verification
 
-- [ ] Run full suite: `mix test`
+- [ ] `mix precommit` (compile --warnings-as-errors, deps.unlock --unused, format, test) — peggy convention
 - [ ] Run credo: `mix credo` (add if desired)
-- [ ] Manual smoke: register → create entity → create type → create obligation → progress → done → verify spawn → verify dashboard urgency badges
+- [ ] Manual smoke (Desktop): register (email) → click magic link in mailbox → create entity →
+  create type → create obligation → progress → done → verify spawn → verify dashboard urgency badges
+- [ ] Manual smoke (Mobile): visit `/m/:entity_slug` (or load on a phone UA) → bottom-nav dashboard,
+  obligation workflow, Desktop toggle round-trips via `argus_view` cookie
 
 ```bash
 mix phx.server
