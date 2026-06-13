@@ -5,10 +5,11 @@ defmodule Argus.Obligations do
 
   import Ecto.Query, warn: false
 
-  alias Argus.Accounts.Scope
+  alias Argus.Accounts.{Scope, User}
   alias Argus.Authorization
 
   alias Argus.Obligations.{
+    AuditLog,
     Collaborator,
     Completion,
     Event,
@@ -100,6 +101,119 @@ defmodule Argus.Obligations do
     else
       false -> :not_authorise
       {:error, _} = error -> error
+    end
+  end
+
+  def list_audit_logs(%Obligation{} = obligation) do
+    AuditLog
+    |> where([l], l.obligation_id == ^obligation.id)
+    |> order_by([l], asc: l.inserted_at)
+    |> Repo.all()
+  end
+
+  def update_obligation(%Scope{} = scope, %Obligation{} = obligation, attrs) do
+    with true <- Authorization.can?(scope, :edit_obligation),
+         true <- live_cycle?(obligation) do
+      changeset = Obligation.changeset(obligation, attrs)
+
+      cond do
+        not changeset.valid? -> {:error, changeset}
+        changeset.changes == %{} -> {:ok, obligation}
+        true -> apply_obligation_update(scope, obligation, changeset)
+      end
+    else
+      false -> :not_authorise
+    end
+  end
+
+  def update_collaborators(%Scope{} = scope, %Obligation{} = obligation, user_ids) do
+    with true <- Authorization.can?(scope, :edit_obligation),
+         true <- live_cycle?(obligation) do
+      current =
+        Collaborator
+        |> where([c], c.obligation_id == ^obligation.id)
+        |> Repo.all()
+
+      current_ids = MapSet.new(current, & &1.user_id)
+      new_ids = MapSet.new(user_ids)
+      to_add = MapSet.difference(new_ids, current_ids) |> MapSet.to_list()
+      to_remove = MapSet.difference(current_ids, new_ids) |> MapSet.to_list()
+
+      Ecto.Multi.new()
+      |> Ecto.Multi.run(:audit, fn repo, _ ->
+        Enum.each(to_add, fn user_id ->
+          insert_audit_log!(
+            repo,
+            scope,
+            obligation,
+            "collaborators",
+            nil,
+            assignee_label(user_id)
+          )
+        end)
+
+        Enum.each(to_remove, fn user_id ->
+          insert_audit_log!(
+            repo,
+            scope,
+            obligation,
+            "collaborators",
+            assignee_label(user_id),
+            nil
+          )
+        end)
+
+        {:ok, :logged}
+      end)
+      |> Ecto.Multi.insert_all(:added, Collaborator, fn _ ->
+        now = DateTime.utc_now(:second)
+
+        Enum.map(to_add, fn user_id ->
+          %{
+            id: Ecto.UUID.generate(),
+            obligation_id: obligation.id,
+            user_id: user_id,
+            inserted_at: now
+          }
+        end)
+      end)
+      |> Ecto.Multi.delete_all(:removed, fn _ ->
+        from c in Collaborator,
+          where: c.obligation_id == ^obligation.id and c.user_id in ^to_remove
+      end)
+      |> Repo.transaction()
+      |> case do
+        {:ok, _} -> {:ok, Repo.preload(obligation, :collaborators, force: true)}
+        {:error, _, reason, _} -> {:error, reason}
+      end
+    else
+      false -> :not_authorise
+    end
+  end
+
+  def edit_note(%Scope{} = scope, %Event{} = event, attrs) do
+    obligation = Repo.get!(Obligation, event.obligation_id)
+    note = Map.get(attrs, :note) || Map.get(attrs, "note")
+
+    with true <- can_edit_note?(scope, event, obligation) do
+      old_note = event.note
+
+      Ecto.Multi.new()
+      |> Ecto.Multi.update(:event, Event.changeset(event, %{note: note}))
+      |> Ecto.Multi.run(:audit, fn repo, %{event: updated} ->
+        if old_note != updated.note do
+          insert_audit_log!(repo, scope, obligation, "note", old_note, updated.note, updated)
+        end
+
+        {:ok, :logged}
+      end)
+      |> Repo.transaction()
+      |> case do
+        {:ok, %{event: event}} -> {:ok, event}
+        {:error, :event, changeset, _} -> {:error, changeset}
+      end
+    else
+      false -> {:error, :locked}
     end
   end
 
@@ -401,6 +515,70 @@ defmodule Argus.Obligations do
       {:error, :open_event, changeset, _} -> {:error, changeset}
       {:error, _, reason, _} -> {:error, reason}
     end
+  end
+
+  defp apply_obligation_update(scope, obligation, changeset) do
+    Ecto.Multi.new()
+    |> Ecto.Multi.update(:obligation, changeset)
+    |> Ecto.Multi.run(:audit, fn repo, %{obligation: updated} ->
+      Enum.each(changeset.changes, fn {field, new_value} ->
+        old_value = Map.get(obligation, field)
+        audit_field = audit_field_name(field)
+
+        insert_audit_log!(
+          repo,
+          scope,
+          updated,
+          audit_field,
+          audit_value(field, old_value),
+          audit_value(field, new_value)
+        )
+      end)
+
+      {:ok, :logged}
+    end)
+    |> Repo.transaction()
+    |> case do
+      {:ok, %{obligation: obligation}} -> {:ok, obligation}
+      {:error, :obligation, changeset, _} -> {:error, changeset}
+    end
+  end
+
+  defp insert_audit_log!(repo, scope, obligation, field, old_value, new_value, event \\ nil) do
+    %AuditLog{
+      obligation_id: obligation.id,
+      obligation_event_id: event && event.id,
+      user_id: scope.user.id
+    }
+    |> AuditLog.changeset(%{field: field, old_value: old_value, new_value: new_value})
+    |> repo.insert!()
+  end
+
+  defp audit_field_name(:primary_assignee_id), do: "primary_assignee"
+  defp audit_field_name(field), do: Atom.to_string(field)
+
+  defp audit_value(:primary_assignee_id, user_id), do: assignee_label(user_id)
+  defp audit_value(:due_by, %Date{} = date), do: Date.to_iso8601(date)
+  defp audit_value(_field, value) when is_nil(value), do: nil
+  defp audit_value(_field, value), do: to_string(value)
+
+  defp assignee_label(nil), do: nil
+
+  defp assignee_label(user_id) do
+    Repo.get!(User, user_id).email
+  end
+
+  defp can_edit_note?(scope, event, obligation) do
+    cond do
+      locked_cycle?(obligation) -> false
+      Authorization.can?(scope, :edit_obligation) -> true
+      event.status_by_id == scope.user.id and within_note_window?(event) -> true
+      true -> false
+    end
+  end
+
+  defp within_note_window?(%Event{inserted_at: inserted_at}) do
+    DateTime.diff(DateTime.utc_now(:second), inserted_at, :second) <= 48 * 3600
   end
 
   defp insert_document(%Scope{user: user}, %Event{} = event, file, document_slot) do

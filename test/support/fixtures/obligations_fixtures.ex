@@ -40,6 +40,22 @@ defmodule Argus.ObligationsFixtures do
     user
   end
 
+  def manager_scope_fixture_on_entity(%Entities.Entity{} = entity) do
+    user = user_fixture()
+
+    %Entities.Membership{
+      user_id: user.id,
+      entity_id: entity.id,
+      role: "manager",
+      accepted_at: DateTime.utc_now(:second)
+    }
+    |> Entities.Membership.changeset(%{})
+    |> Repo.insert!()
+
+    membership = Entities.get_membership!(user, entity)
+    Argus.Accounts.Scope.put_entity(Argus.Accounts.Scope.for_user(user), entity, membership)
+  end
+
   def member_scope_on_entity(%Entities.Entity{} = entity) do
     user = user_fixture()
 
