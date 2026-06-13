@@ -89,6 +89,22 @@ defmodule Argus.ObligationsFixtures do
     {member_scope, obligation}
   end
 
+  def manager_obligation_scope_fixture(attrs \\ %{}) do
+    manager = Argus.EntitiesFixtures.manager_scope_fixture(attrs)
+    assignee = member_fixture(manager.entity)
+    type = type_fixture(manager.entity)
+
+    {:ok, obligation} =
+      Argus.Obligations.create_obligation(manager, %{
+        title: "Manager task",
+        obligation_type_id: type.id,
+        primary_assignee_id: assignee.id,
+        due_by: ~D[2026-06-15]
+      })
+
+    {manager, obligation}
+  end
+
   def recurring_manager_scope_fixture(opts \\ []) do
     interval = Keyword.get(opts, :interval, "monthly")
     manager = Argus.EntitiesFixtures.manager_scope_fixture()

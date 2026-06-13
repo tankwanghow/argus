@@ -24,7 +24,14 @@ defmodule Argus.Obligations do
   def latest_event(%Obligation{} = obligation) do
     Event
     |> where([e], e.obligation_id == ^obligation.id)
-    |> order_by([e], desc: e.inserted_at, desc: e.id)
+    |> order_by([e], [
+      desc: e.inserted_at,
+      desc:
+        fragment(
+          "CASE ? WHEN 'done' THEN 4 WHEN 'in_progress' THEN 3 WHEN 'cancelled' THEN 2 WHEN 'open' THEN 1 ELSE 0 END",
+          e.status
+        )
+    ])
     |> limit(1)
     |> Repo.one!()
   end
@@ -64,6 +71,44 @@ defmodule Argus.Obligations do
     else
       false -> :not_authorise
       {:error, _} = error -> error
+    end
+  end
+
+  def cancel_obligation(%Scope{} = scope, %Obligation{} = obligation, attrs) do
+    note = Map.get(attrs, :note) || Map.get(attrs, "note")
+
+    with true <- Authorization.can?(scope, :cancel_obligation) do
+      now = DateTime.utc_now(:second)
+
+      Ecto.Multi.new()
+      |> Ecto.Multi.update_all(
+        :obligation,
+        live(Obligation) |> where([o], o.id == ^obligation.id),
+        set: [status: "cancelled", updated_at: now]
+      )
+      |> Ecto.Multi.run(:check, fn _repo, %{obligation: {count, _}} ->
+        if count == 1, do: {:ok, :updated}, else: {:error, :not_live}
+      end)
+      |> Ecto.Multi.insert(:cancelled_event, fn _ ->
+        %Event{
+          obligation_id: obligation.id,
+          status_by_id: scope.user.id
+        }
+        |> Event.changeset(%{status: "cancelled", note: note})
+      end)
+      |> Repo.transaction()
+      |> case do
+        {:ok, _} ->
+          {:ok, Repo.get!(Obligation, obligation.id)}
+
+        {:error, :check, :not_live, _} ->
+          {:error, :not_live}
+
+        {:error, :cancelled_event, changeset, _} ->
+          {:error, changeset}
+      end
+    else
+      false -> :not_authorise
     end
   end
 

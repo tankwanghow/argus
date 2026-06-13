@@ -91,6 +91,15 @@ defmodule Argus.ObligationsTest do
     end
   end
 
+  describe "cancel_obligation/3" do
+    test "sets status cancelled and logs event" do
+      {scope, obligation} = manager_obligation_scope_fixture()
+      assert {:ok, cancelled} = Obligations.cancel_obligation(scope, obligation, %{})
+      assert cancelled.status == "cancelled"
+      assert Obligations.latest_event(cancelled).status == "cancelled"
+    end
+  end
+
   describe "end_series/3" do
     test "cancels the current cycle so it can never be completed/spawn" do
       {scope, obligation} = recurring_manager_scope_fixture(interval: "monthly")
