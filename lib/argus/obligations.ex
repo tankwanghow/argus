@@ -27,6 +27,31 @@ defmodule Argus.Obligations do
     from(o in query, where: o.status == "active" and is_nil(o.completed_at))
   end
 
+  def list_my_work(%Scope{entity: entity, user: user}) do
+    collaborator_ids = collaborator_obligation_ids(user.id)
+
+    Obligation
+    |> live()
+    |> where([o], o.entity_id == ^entity.id)
+    |> where([o], o.primary_assignee_id == ^user.id or o.id in subquery(collaborator_ids))
+    |> order_by([o], asc: o.due_by)
+    |> preload([:obligation_type, :primary_assignee])
+    |> Repo.all()
+  end
+
+  def list_team_overview(%Scope{entity: entity}) do
+    Obligation
+    |> live()
+    |> where([o], o.entity_id == ^entity.id)
+    |> order_by([o], asc: o.due_by)
+    |> preload([:obligation_type, :primary_assignee])
+    |> Repo.all()
+  end
+
+  defp collaborator_obligation_ids(user_id) do
+    from c in Collaborator, where: c.user_id == ^user_id, select: c.obligation_id
+  end
+
   def list_events(%Obligation{} = obligation) do
     Event
     |> where([e], e.obligation_id == ^obligation.id)
