@@ -48,12 +48,12 @@ From initial brainstorm (`argus_brainstrom.txt`):
 |------|-------------|
 | **admin** | Full control — members, settings, types, obligations, cancel, end series |
 | **manager** | Create obligations, manage types, mark Done on any obligation, cancel, end series, edit fields (active cycles) |
-| **member** | View assigned work, add progress events/documents, mark Done on assigned obligations (primary only) |
+| **member** | View assigned work, add notes/documents while in progress, mark Done on assigned obligations (primary only) |
 
 ### Assignment
 
 - **Primary assignee** (required) — owner of the obligation
-- **Collaborators** (optional, via join table) — can add `in_progress` / `progress` events and documents
+- **Collaborators** (optional, via join table) — can transition to `in_progress` and add notes/documents
 - **Done:** primary assignee or manager/admin only (collaborators cannot mark Done)
 
 ### Cancel (manager/admin only)
@@ -110,7 +110,7 @@ One row per workflow step — append-only audit trail.
 | Field | Type | Notes |
 |-------|------|-------|
 | `obligation_id` | FK | |
-| `status` | enum | `open`, `in_progress`, `progress`, `done`, `cancelled` |
+| `status` | enum | `open`, `in_progress`, `done`, `cancelled` |
 | `status_by_id` | FK → users | Who triggered this step |
 | `due_by` | date/datetime | Snapshot — groups events into a cycle |
 | `inserted_at` | utc_datetime | |
@@ -170,13 +170,12 @@ Field-level before/after for corrections.
 
 ### Work (optional)
 
-While cycle is active (`open` / `in_progress` / progress events exist, not yet `done`):
+While cycle is active (not yet `done`):
 
-- Transition to `in_progress`
-- Add `progress` events with optional notes/documents (incremental, multiple per event)
-- Open event may also accumulate documents
+- Transition to `in_progress` (one event per cycle)
+- Add notes/documents incrementally on the `open` or `in_progress` event (multiple `ObligationEventDocument` rows over time)
 
-Note and document requirements on type are **not** enforced during progress — only on Done.
+Note and document requirements on type are **not** enforced until Done — only on Done.
 
 ### Done
 
@@ -243,7 +242,7 @@ Lock after Done/cancelled. Edits while cycle is active.
 
 ### Events
 
-Append-only. Wrong status → corrective progress note or cancel obligation.
+Append-only. Wrong status → corrective note on `in_progress` event or cancel obligation.
 
 ## Dashboard (v1)
 
