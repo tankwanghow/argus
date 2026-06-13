@@ -25,7 +25,7 @@ From initial brainstorm (`argus_brainstrom.txt`):
 ### Users
 
 - `email` (citext), `hashed_password`, `confirmed_at`
-- `locale` (default `"en"`), `timezone` (default `"Etc/UTC"`)
+- `locale` (default `"en"`)
 
 ### Entities (tenants)
 
