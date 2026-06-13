@@ -13,7 +13,10 @@ defmodule ArgusWeb.ObligationLive.Show do
         <.header>
           {@obligation.title}
           <:subtitle>
-            {@obligation.obligation_type.name} · due {@obligation.due_by}
+            {@obligation.obligation_type.name} · due {format_date(@obligation.due_by)} · {due_label(
+              @obligation.due_by,
+              @today
+            )}
           </:subtitle>
           <:actions>
             <.urgency_badge urgency={@urgency} />
@@ -21,23 +24,102 @@ defmodule ArgusWeb.ObligationLive.Show do
         </.header>
 
         <section class="mt-6">
-          <h2 class="text-lg font-semibold">Assignees</h2>
-          <p class="text-sm mt-1">{@obligation.primary_assignee.email}</p>
+          <h2 class="text-sm font-semibold uppercase tracking-wide text-base-content/60">
+            Assignees
+          </h2>
+          <div class="mt-2 flex flex-wrap gap-2">
+            <span class="badge badge-primary badge-soft gap-1">
+              <.icon name="hero-user-mini" class="size-3" />
+              {@obligation.primary_assignee.email}
+            </span>
+            <span :for={c <- @obligation.collaborators} class="badge badge-ghost gap-1">
+              <.icon name="hero-user-group-mini" class="size-3" />
+              {c.user.email}
+            </span>
+          </div>
+        </section>
+
+        <section :if={@required_docs != []} class="mt-6">
+          <h2 class="text-sm font-semibold uppercase tracking-wide text-base-content/60">
+            Required documents
+          </h2>
+          <ul class="mt-2 space-y-1 text-sm">
+            <li :for={{slot, satisfied?} <- @required_docs} class="flex items-center gap-2">
+              <.icon
+                name={if satisfied?, do: "hero-check-circle-mini", else: "hero-x-circle-mini"}
+                class={["size-4", if(satisfied?, do: "text-success", else: "text-base-content/40")]}
+              />
+              <span class={if satisfied?, do: "", else: "text-base-content/60"}>{slot}</span>
+            </li>
+          </ul>
         </section>
 
         <section class="mt-8">
-          <h2 class="text-lg font-semibold">Timeline</h2>
-          <ol id="event-timeline" class="mt-3 space-y-3">
-            <li :for={event <- @obligation.events} id={"event-#{event.id}"} class="border-l-2 pl-4">
-              <div class="font-medium capitalize">{event.status}</div>
-              <div :if={event.note} class="text-sm text-base-content/70">{event.note}</div>
-              <ul :if={event.documents != []} class="mt-2 text-sm">
-                <li :for={doc <- event.documents}>
-                  {doc.document_slot || "file"} — {file_name(doc)}
+          <h2 class="text-sm font-semibold uppercase tracking-wide text-base-content/60">Timeline</h2>
+          <ol id="event-timeline" class="mt-3 space-y-4">
+            <li
+              :for={event <- @obligation.events}
+              id={"event-#{event.id}"}
+              data-status={event.status}
+              class={["border-l-2 pl-4", event_accent(event.status)]}
+            >
+              <div class="flex items-center justify-between gap-3">
+                <span class="font-medium">{humanize_status(event.status)}</span>
+                <span class="text-xs text-base-content/50">{format_datetime(event.inserted_at)}</span>
+              </div>
+              <div :if={event.status_by} class="text-xs text-base-content/50">
+                by {event.status_by.email}
+              </div>
+              <div :if={event.note} class="text-sm text-base-content/70 mt-1">{event.note}</div>
+              <ul :if={event.documents != []} class="mt-2 space-y-1 text-sm">
+                <li :for={doc <- event.documents} class="flex items-center gap-2">
+                  <.icon name="hero-paper-clip-mini" class="size-4 text-base-content/40" />
+                  <span :if={doc.document_slot} class="badge badge-xs badge-ghost">
+                    {doc.document_slot}
+                  </span>
+                  <.link
+                    href={
+                      ~p"/entities/#{@current_scope.entity.slug}/obligations/#{@obligation.id}/documents/#{doc.id}"
+                    }
+                    target="_blank"
+                    class={["link link-hover", doc.voided_at && "line-through text-base-content/40"]}
+                  >
+                    {file_name(doc)}
+                  </.link>
+                  <span :if={doc.voided_at} class="badge badge-xs badge-error">voided</span>
                 </li>
               </ul>
             </li>
           </ol>
+        </section>
+
+        <section :if={@live? and @can_add_document?} class="mt-8">
+          <h2 class="text-sm font-semibold uppercase tracking-wide text-base-content/60">
+            Add document
+          </h2>
+          <.form
+            for={%{}}
+            id="document-form"
+            phx-change="validate_upload"
+            phx-submit="add_document"
+            class="mt-2 flex flex-wrap items-end gap-3"
+          >
+            <select
+              :if={@doc_slots != []}
+              id="document-slot"
+              name="document_slot"
+              class="select select-bordered"
+              required
+            >
+              <option value="">Choose slot…</option>
+              <option :for={slot <- @doc_slots} value={slot}>{slot}</option>
+            </select>
+            <.live_file_input upload={@uploads.document} class="file-input file-input-bordered" />
+            <.button class="btn btn-primary btn-sm" phx-disable-with="Uploading…">Upload</.button>
+          </.form>
+          <p :for={err <- upload_errors(@uploads.document)} class="text-sm text-error mt-1">
+            {upload_error_to_string(err)}
+          </p>
         </section>
 
         <section :if={@live?} id="obligation-actions" class="mt-8 flex flex-wrap gap-2">
@@ -132,12 +214,13 @@ defmodule ArgusWeb.ObligationLive.Show do
 
     {:ok,
      socket
-     |> assign(:obligation, obligation)
-     |> assign(:urgency, urgency)
-     |> assign(:today, today)
-     |> assign(:live?, live?)
      |> assign(:show_done_modal, false)
      |> assign(:recurring?, recurring?(obligation))
+     |> assign(:today, today)
+     |> assign(:urgency, urgency)
+     |> assign(:live?, live?)
+     |> allow_upload(:document, accept: :any, max_entries: 1, max_file_size: 20_000_000)
+     |> assign_obligation(obligation)
      |> assign_done_form(obligation)}
   end
 
@@ -224,11 +307,108 @@ defmodule ArgusWeb.ObligationLive.Show do
     end
   end
 
+  def handle_event("validate_upload", _params, socket) do
+    {:noreply, socket}
+  end
+
+  def handle_event("add_document", params, socket) do
+    scope = socket.assigns.current_scope
+    obligation = socket.assigns.obligation
+    slot = params["document_slot"]
+
+    case current_workable_event(obligation) do
+      nil ->
+        {:noreply, put_flash(socket, :error, "No open step to attach a document to.")}
+
+      event ->
+        results =
+          consume_uploaded_entries(socket, :document, fn %{path: path}, entry ->
+            upload = %Plug.Upload{
+              path: path,
+              filename: entry.client_name,
+              content_type: entry.client_type
+            }
+
+            {:ok, Obligations.add_document(scope, obligation, event, upload, slot)}
+          end)
+
+        case results do
+          [{:ok, _document}] ->
+            {:noreply, reload(socket) |> put_flash(:info, "Document added.")}
+
+          [:not_authorise] ->
+            {:noreply, put_flash(socket, :error, "Not authorized.")}
+
+          [{:error, _}] ->
+            {:noreply, put_flash(socket, :error, "Could not add document.")}
+
+          [] ->
+            {:noreply, put_flash(socket, :error, "Choose a file to upload.")}
+        end
+    end
+  end
+
   defp reload(socket) do
     scope = socket.assigns.current_scope
     obligation = Obligations.get_obligation!(scope, socket.assigns.obligation.id)
-    assign(socket, :obligation, obligation)
+    assign_obligation(socket, obligation)
   end
+
+  defp assign_obligation(socket, obligation) do
+    doc_slots = parse_slots(obligation.complete_documents)
+    satisfied = satisfied_slots(obligation)
+
+    required_docs = Enum.map(doc_slots, fn slot -> {slot, MapSet.member?(satisfied, slot)} end)
+
+    socket
+    |> assign(:obligation, obligation)
+    |> assign(:doc_slots, doc_slots)
+    |> assign(:required_docs, required_docs)
+    |> assign(:can_add_document?, can_add_document?(socket.assigns.current_scope, obligation))
+  end
+
+  defp can_add_document?(scope, obligation) do
+    Authorization.can?(scope, :edit_obligation) or
+      Authorization.can?(scope, :start_progress, obligation)
+  end
+
+  defp current_workable_event(obligation) do
+    obligation.events
+    |> Enum.filter(&(&1.status in ["open", "in_progress"]))
+    |> List.last()
+  end
+
+  defp satisfied_slots(obligation) do
+    obligation.events
+    |> Enum.flat_map(& &1.documents)
+    |> Enum.reject(& &1.voided_at)
+    |> Enum.map(& &1.document_slot)
+    |> Enum.reject(&is_nil/1)
+    |> MapSet.new()
+  end
+
+  defp parse_slots(nil), do: []
+  defp parse_slots(""), do: []
+
+  defp parse_slots(csv) do
+    csv
+    |> String.split(",")
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
+  end
+
+  defp event_accent("done"), do: "border-success"
+  defp event_accent("cancelled"), do: "border-error"
+  defp event_accent("in_progress"), do: "border-warning"
+  defp event_accent(_), do: "border-base-300"
+
+  defp humanize_status("in_progress"), do: "In progress"
+  defp humanize_status(status), do: String.capitalize(status)
+
+  defp upload_error_to_string(:too_large), do: "File is too large (max 20 MB)."
+  defp upload_error_to_string(:too_many_files), do: "You can only upload one file at a time."
+  defp upload_error_to_string(:not_accepted), do: "This file type is not accepted."
+  defp upload_error_to_string(_), do: "Invalid file."
 
   defp assign_done_form(socket, obligation) do
     suggestion =
@@ -239,7 +419,7 @@ defmodule ArgusWeb.ObligationLive.Show do
     assign(
       socket,
       :done_form,
-      to_form(%{"note" => "", "next_due_by" => format_date(suggestion)}, as: :done)
+      to_form(%{"note" => "", "next_due_by" => iso_date(suggestion)}, as: :done)
     )
   end
 
@@ -264,6 +444,6 @@ defmodule ArgusWeb.ObligationLive.Show do
     end
   end
 
-  defp format_date(nil), do: ""
-  defp format_date(%Date{} = date), do: Date.to_iso8601(date)
+  defp iso_date(nil), do: ""
+  defp iso_date(%Date{} = date), do: Date.to_iso8601(date)
 end

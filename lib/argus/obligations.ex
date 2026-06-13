@@ -49,7 +49,12 @@ defmodule Argus.Obligations do
   def get_obligation!(%Scope{entity: entity}, id) do
     Obligation
     |> where([o], o.id == ^id and o.entity_id == ^entity.id)
-    |> preload([:obligation_type, :primary_assignee, :collaborators, events: :documents])
+    |> preload([
+      :obligation_type,
+      :primary_assignee,
+      [collaborators: :user],
+      [events: [:documents, :status_by]]
+    ])
     |> Repo.one!()
   end
 

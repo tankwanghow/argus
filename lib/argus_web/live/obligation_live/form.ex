@@ -36,6 +36,20 @@ defmodule ArgusWeb.ObligationLive.Form do
             prompt="Choose assignee"
             required
           />
+          <div class="fieldset mb-2">
+            <label class="label mb-1" for="collaborator-ids">Collaborators (optional)</label>
+            <select
+              id="collaborator-ids"
+              name="obligation[collaborator_ids][]"
+              multiple
+              class="select w-full h-32"
+            >
+              <option :for={{label, id} <- @member_options} value={id}>{label}</option>
+            </select>
+            <p class="text-xs text-base-content/50 mt-1">
+              Hold ⌘/Ctrl to select more than one.
+            </p>
+          </div>
           <.input field={@form[:due_by]} type="date" label="Due by" required />
           <.input field={@form[:open_note]} type="textarea" label="Open note (optional)" />
           <.button phx-disable-with="Creating..." class="btn btn-primary">Create obligation</.button>
@@ -111,7 +125,14 @@ defmodule ArgusWeb.ObligationLive.Form do
   defp map_create_params(params) do
     params
     |> Map.update("due_by", nil, &parse_date/1)
-    |> Map.take(["title", "obligation_type_id", "primary_assignee_id", "due_by", "open_note"])
+    |> Map.take([
+      "title",
+      "obligation_type_id",
+      "primary_assignee_id",
+      "due_by",
+      "open_note",
+      "collaborator_ids"
+    ])
     |> Map.new(fn {k, v} -> {String.to_existing_atom(k), v} end)
   end
 

@@ -4,6 +4,8 @@ defmodule ArgusWeb.DashboardLiveTest do
   import Phoenix.LiveViewTest
   import Argus.ObligationsFixtures
 
+  alias Argus.Obligations
+
   setup :register_and_log_in_user
 
   test "member defaults to My work tab", %{conn: conn} do
@@ -38,5 +40,25 @@ defmodule ArgusWeb.DashboardLiveTest do
 
     view |> element("#tab-my-work") |> render_click()
     assert has_element?(view, "#tab-my-work.tab-active")
+  end
+
+  test "overdue obligations render in the overdue tier", %{conn: conn} do
+    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    conn = log_in_user(conn, manager.user)
+    member = member_fixture(manager.entity)
+    type = type_fixture(manager.entity)
+
+    {:ok, _} =
+      Obligations.create_obligation(manager, %{
+        title: "Late filing",
+        obligation_type_id: type.id,
+        primary_assignee_id: member.id,
+        due_by: ~D[2020-01-01]
+      })
+
+    {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}")
+
+    assert has_element?(view, "[data-tier=overdue]")
+    assert has_element?(view, "[data-overdue-count]")
   end
 end

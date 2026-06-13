@@ -28,10 +28,13 @@ defmodule ArgusWeb.ObligationLive.Index do
               navigate={~p"/entities/#{@current_scope.entity.slug}/obligations/#{row.obligation.id}"}
               class="flex items-center justify-between gap-3 hover:opacity-80"
             >
-              <div>
-                <div class="font-medium">{row.obligation.title}</div>
-                <div class="text-sm text-base-content/60">
-                  {row.obligation.obligation_type.name} · due {row.obligation.due_by}
+              <div class="min-w-0">
+                <div class="font-medium truncate">{row.obligation.title}</div>
+                <div class="text-sm text-base-content/60 truncate">
+                  {row.obligation.obligation_type.name} · due {format_date(row.obligation.due_by)} · {due_label(
+                    row.obligation.due_by,
+                    @today
+                  )}
                 </div>
               </div>
               <.urgency_badge urgency={row.urgency} />

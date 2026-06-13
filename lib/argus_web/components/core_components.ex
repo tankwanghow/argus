@@ -445,6 +445,32 @@ defmodule ArgusWeb.CoreComponents do
     """
   end
 
+  @doc """
+  Formats a `Date` for display, e.g. `15 Jan 2026`.
+  """
+  def format_date(nil), do: "—"
+  def format_date(%Date{} = date), do: Calendar.strftime(date, "%d %b %Y")
+
+  @doc """
+  Formats a `DateTime` for display, e.g. `15 Jan 2026, 14:30`.
+  """
+  def format_datetime(nil), do: ""
+  def format_datetime(%DateTime{} = dt), do: Calendar.strftime(dt, "%d %b %Y, %H:%M")
+
+  @doc """
+  A human-friendly relative label for a due date against `today`,
+  e.g. `due today`, `due in 3 days`, `2 days overdue`.
+  """
+  def due_label(%Date{} = due_by, %Date{} = today) do
+    case Date.diff(due_by, today) do
+      0 -> "due today"
+      1 -> "due tomorrow"
+      n when n > 0 -> "due in #{n} days"
+      -1 -> "1 day overdue"
+      n -> "#{abs(n)} days overdue"
+    end
+  end
+
   ## JS Commands
 
   def show(js \\ %JS{}, selector) do

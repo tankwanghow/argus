@@ -4,6 +4,8 @@ defmodule ArgusWeb.ObligationLiveTest do
   import Phoenix.LiveViewTest
   import Argus.ObligationsFixtures
 
+  alias Argus.Obligations
+
   setup :register_and_log_in_user
 
   test "manager creates obligation via form", %{conn: conn} do
@@ -29,6 +31,65 @@ defmodule ArgusWeb.ObligationLiveTest do
 
     {path, _flash} = assert_redirect(view)
     assert path =~ "/obligations/"
+  end
+
+  test "manager creates obligation with collaborators", %{conn: conn} do
+    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    conn = log_in_user(conn, manager.user)
+    assignee = member_fixture(manager.entity)
+    collaborator = member_fixture(manager.entity)
+    type = type_fixture(manager.entity)
+
+    {:ok, view, _html} =
+      live(conn, ~p"/entities/#{manager.entity.slug}/obligations/new")
+
+    view
+    |> form("#obligation-create-form", %{
+      "obligation" => %{
+        "title" => "EPF with helpers",
+        "obligation_type_id" => type.id,
+        "primary_assignee_id" => assignee.id,
+        "due_by" => "2026-06-30",
+        "collaborator_ids" => [collaborator.id]
+      }
+    })
+    |> render_submit()
+
+    assert_redirect(view)
+
+    [created] = Obligations.list_team_overview(manager)
+    obligation = Obligations.get_obligation!(manager, created.id)
+    assert Enum.map(obligation.collaborators, & &1.user_id) == [collaborator.id]
+  end
+
+  test "manager uploads a document on the show page", %{conn: conn} do
+    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    conn = log_in_user(conn, manager.user)
+    member = member_fixture(manager.entity)
+    type = type_fixture(manager.entity, complete_documents: "receipt")
+
+    {:ok, obligation} =
+      Obligations.create_obligation(manager, %{
+        title: "EPF June",
+        obligation_type_id: type.id,
+        primary_assignee_id: member.id,
+        due_by: ~D[2026-06-30]
+      })
+
+    {:ok, view, _html} =
+      live(conn, ~p"/entities/#{manager.entity.slug}/obligations/#{obligation.id}")
+
+    file =
+      file_input(view, "#document-form", :document, [
+        %{name: "receipt.pdf", content: "scan", type: "application/pdf"}
+      ])
+
+    render_upload(file, "receipt.pdf")
+
+    view |> form("#document-form", %{"document_slot" => "receipt"}) |> render_submit()
+
+    assert render(view) =~ "receipt.pdf"
+    assert has_element?(view, "[data-status] .badge", "receipt")
   end
 
   test "start_progress from show page", %{conn: conn} do
