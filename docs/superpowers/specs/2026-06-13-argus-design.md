@@ -92,12 +92,14 @@ Stored as snake_case atoms/strings in code. User-facing labels via Gettext.
 | `quarterly` | Quarterly | current `due_by` + 3 months |
 | `semiannual` | Every 6 months | current `due_by` + 6 months |
 | `annual` | Yearly | current `due_by` + 1 year |
+| `custom` | Custom | — (always prompt; user picks a specific date) |
 
 **Naming notes:**
 
 - **`every_two_weeks`** not `bi_weekly` / `biweekly` — "bi-weekly" is ambiguous (every 2 weeks vs twice per week).
 - **`semiannual`** not `half_year` / `biannual` — means once every 6 months; "biannual" is often confused with every 2 years.
 - **`annual`** not `annually` — enum values read better as adjectives (`:monthly`, `:annual`); labels use full words ("Yearly").
+- **`custom`** — recurring, but no fixed formula. On Done the system always shows a date picker with no pre-fill; `suggest_next_due` is ignored when interval is `custom`.
 
 ### Obligation
 
@@ -204,8 +206,9 @@ Note and document requirements on type are **not** enforced until Done — only 
    - `complete_note_required` → note present on Done event/document
    - `complete_documents` → one non-voided file per named slot
 3. Create `ObligationEvent` (`status: done`) + `ObligationEventDocument`
-4. If `recurring_interval ≠ none` **and** `series_ended_at IS NULL`:
-   - Prompt: "Next due date?" (pre-filled if `suggest_next_due`, else blank)
+4. If `recurring_interval` is not `none` **and** `series_ended_at IS NULL`:
+   - Prompt: "Next due date?"
+   - Pre-fill only when `suggest_next_due` is true **and** interval is not `custom` (otherwise blank date picker)
    - Create **new** `Obligation` (same `series_id`, type, title, assignees, collaborators, new `due_by`)
    - Create `ObligationEvent` (`status: open`) on new obligation
 5. Completed obligation remains unchanged (historical record)
