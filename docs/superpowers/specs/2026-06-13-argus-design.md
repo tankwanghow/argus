@@ -5,9 +5,9 @@
 
 ## Overview
 
-Argus is a multi-tenant web application for tracking obligations — regulatory filings, operational renewals, client deliverables, and custom deadlines. Users define obligation types (with system presets), assign work to team members, track progress with notes and documents, and receive in-app reminders before due dates.
+Argus is a multi-tenant web application for tracking obligations — regulatory filings, operational renewals, client deliverables, and custom deadlines. Users define obligation types (with system presets), assign work to team members, track progress with notes and documents, and see what needs attention on the dashboard.
 
-**Tech stack:** Phoenix LiveView monolith, PostgreSQL, Oban (reminders).
+**Tech stack:** Phoenix LiveView monolith, PostgreSQL.
 
 ## Goals
 
@@ -76,7 +76,7 @@ System presets (`entity_id` null) + per-entity custom types (clone/edit/create).
 | `recurring_interval` | enum | See [Recurring intervals](#recurring-intervals) |
 | `complete_note_required` | boolean | Enforced on Done only |
 | `complete_documents` | string | Comma-delimited slot names, e.g. `"statutory_form,payment_receipt"` — one file per name required on Done |
-| `reminder_offsets` | string | Comma-delimited days before due, e.g. `"30,7,1"` |
+| `reminder_offsets` | string | Comma-delimited days before due, e.g. `"30,7,1"` — drives dashboard urgency badges (not push notifications) |
 
 #### Recurring intervals
 
@@ -177,16 +177,6 @@ Field-level before/after for corrections.
 | `user_id` | FK | |
 | `inserted_at` | utc_datetime | |
 
-### InAppNotification (v1 reminders)
-
-| Field | Type | Notes |
-|-------|------|-------|
-| `user_id` | FK | |
-| `obligation_id` | FK | |
-| `kind` | string | e.g. `reminder` |
-| `read_at` | utc_datetime nullable | |
-| `inserted_at` | utc_datetime | |
-
 ## Workflows
 
 ### Create Obligation
@@ -234,12 +224,6 @@ Note and document requirements on type are **not** enforced until Done — only 
 - Set `series_ended_at` on the obligation (or series record keyed by `series_id`)
 - Future Done on any obligation in series does not spawn next cycle
 
-### Reminders (v1: in-app only)
-
-- Oban job checks active obligations' `due_by` against type `reminder_offsets`
-- Creates `InAppNotification` for primary assignee (and collaborators TBD)
-- Dashboard notification bell; no email in v1
-
 ## Corrections Model
 
 Lock after Done/cancelled. Edits while cycle is active.
@@ -279,7 +263,7 @@ Status transitions only move forward (`open` → `in_progress` → `done`). Even
 
 ## Dashboard (v1)
 
-Split view with role-aware default tab:
+Split view with role-aware default tab. **No separate notification system** — the dashboard is the attention surface (users must open the app; overdue and due-soon items are visible here).
 
 | Tab | Content | Default for |
 |-----|---------|-------------|
@@ -287,6 +271,18 @@ Split view with role-aware default tab:
 | **Team overview** | All active upcoming/overdue obligations in entity | manager, admin |
 
 Filter: `Obligation.status = active`.
+
+### Urgency badges (from `reminder_offsets`)
+
+Computed at render time from `due_by` vs today — no background jobs, no notification records.
+
+| Urgency | Rule |
+|---------|------|
+| **Overdue** | `due_by < today` — red badge |
+| **Due soon** | `today <= due_by <= today + offset` for any offset in type's `reminder_offsets` — amber badge |
+| **OK** | otherwise — no badge or subtle styling |
+
+Sort: overdue first, then due-soon, then by `due_by` ascending.
 
 ## Audit Trail
 
@@ -316,6 +312,7 @@ Explicit `series_id` (not title+type matching) avoids collisions from duplicate 
 ## Out of Scope (v1)
 
 - Subjects / subject types (client, asset linking) — use title for context
+- In-app notifications / notification bell / Oban reminder jobs
 - Email/SMS reminders
 - REST API / mobile app
 - Billing integration beyond `plan` / `seat_limit` fields on entity
@@ -324,6 +321,5 @@ Explicit `series_id` (not title+type matching) avoids collisions from duplicate 
 ## Open Implementation Details
 
 - File storage backend for `documents`
-- Whether collaborators receive in-app reminders
 - `due_by` type: date vs utc_datetime (entity timezone handling)
 - System preset seed data for Malaysia regulatory types

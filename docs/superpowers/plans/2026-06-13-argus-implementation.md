@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build Argus — a multi-tenant Phoenix LiveView app for tracking obligations with event-based audit trails, recurrence via `series_id`, and in-app reminders.
+**Goal:** Build Argus — a multi-tenant Phoenix LiveView app for tracking obligations with event-based audit trails, recurrence via `series_id`, and dashboard urgency badges.
 
-**Architecture:** Phoenix 1.8 LiveView monolith with PostgreSQL. Multi-tenancy via `entities` scoped routes (`/entities/:slug/...`). Domain logic in context modules (`Argus.Obligations`, `Argus.Entities`, `Argus.Accounts`). Oban cron for reminder generation. Local filesystem uploads for v1 documents.
+**Architecture:** Phoenix 1.8 LiveView monolith with PostgreSQL. Multi-tenancy via `entities` scoped routes (`/entities/:slug/...`). Domain logic in context modules (`Argus.Obligations`, `Argus.Entities`, `Argus.Accounts`). Dashboard computes overdue/due-soon from `due_by` and type `reminder_offsets` — no background jobs. Local filesystem uploads for v1 documents.
 
-**Tech Stack:** Elixir 1.19, OTP 28, Phoenix 1.8, LiveView 1.1, Ecto 3.13, PostgreSQL (citext), Oban, Tailwind, bcrypt
+**Tech Stack:** Elixir 1.19, OTP 28, Phoenix 1.8, LiveView 1.1, Ecto 3.13, PostgreSQL (citext), Tailwind, bcrypt
 
 **Spec:** `docs/superpowers/specs/2026-06-13-argus-design.md`
 
@@ -35,11 +35,9 @@ lib/argus/
   obligations/recurrence.ex          # next-due calculation
   obligations/completion.ex          # Done validation
   obligations/series.ex              # series_ended?/end_series
+  obligations/urgency.ex             # overdue / due_soon badges from reminder_offsets
   authorization.ex                   # can?(user, action, entity)
-  notifications.ex
-  notifications/notification.ex
   uploads.ex                         # local file storage
-  workers/reminder_worker.ex
 
 lib/argus_web/
   router.ex
@@ -53,8 +51,8 @@ lib/argus_web/
   live/obligation_type_live/index.ex
   live/obligation_type_live/form.ex
   live/membership_live/index.ex
-  components/notification_bell.ex
   components/layouts/
+  components/urgency_badge.ex
 
 priv/repo/migrations/              # one migration per table group
 priv/repo/seeds.exs                # system obligation type presets
@@ -83,36 +81,22 @@ When prompted for `argus` directory already exists (has `docs/`), answer **Y** t
 Modify `mix.exs` deps list — add:
 
 ```elixir
-{:oban, "~> 2.19"},
 {:bcrypt_elixir, "~> 3.0"},
 {:tzdata, "~> 1.1"}
 ```
 
 Run: `mix deps.get`
 
-- [ ] **Step 3: Configure Oban**
-
-In `config/config.exs`:
-
-```elixir
-config :argus, Oban,
-  repo: Argus.Repo,
-  plugins: [{Oban.Plugins.Cron, crontab: [{"0 6 * * *", Argus.Workers.ReminderWorker}]}],
-  queues: [default: 10, reminders: 5]
-```
-
-In `lib/argus/application.ex` children list, add `Oban` before `ArgusWeb.Endpoint`.
-
-- [ ] **Step 4: Verify boot**
+- [ ] **Step 3: Verify boot**
 
 Run: `mix test`  
 Expected: PASS (0 failures, generated scaffold tests)
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
 git add -A
-git commit -m "chore: bootstrap Phoenix app with Oban"
+git commit -m "chore: bootstrap Phoenix app"
 ```
 
 ---
@@ -740,35 +724,73 @@ Examples:
 
 ---
 
-## Task 14: In-app notifications and Oban worker
+## Task 14: Urgency badges (replaces notifications)
 
 **Files:**
-- Create: `priv/repo/migrations/20260613000008_create_in_app_notifications.exs`
-- Create: `lib/argus/notifications/notification.ex`
-- Create: `lib/argus/notifications.ex`
-- Create: `lib/argus/workers/reminder_worker.ex`
-- Create: `test/argus/workers/reminder_worker_test.exs`
+- Create: `lib/argus/obligations/urgency.ex`
+- Create: `lib/argus_web/components/urgency_badge.ex`
+- Create: `test/argus/obligations/urgency_test.exs`
 
-- [ ] **Step 1: Test worker creates notification N days before due**
+- [ ] **Step 1: Write failing tests**
 
 ```elixir
-test "creates reminder for primary assignee" do
-  obligation = obligation_fixture(due_by: Date.add(Date.utc_today(), 7))
-  type = update_type!(obligation, reminder_offsets: "7,1")
-  :ok = ReminderWorker.run(%Oban.Job{})
+defmodule Argus.Obligations.UrgencyTest do
+  use ExUnit.Case, async: true
+  alias Argus.Obligations.Urgency
+  alias Argus.Obligations.Type
 
-  notifications = Notifications.list_unread(obligation.primary_assignee_id)
-  assert length(notifications) == 1
+  @today ~D[2026-06-13]
+
+  test "overdue when due_by is in the past" do
+    type = %Type{reminder_offsets: "7,1"}
+    assert Urgency.classify(type, ~D[2026-06-10], @today) == :overdue
+  end
+
+  test "due_soon when within reminder offset" do
+    type = %Type{reminder_offsets: "7,1"}
+    assert Urgency.classify(type, ~D[2026-06-18], @today) == :due_soon
+  end
+
+  test "ok when outside reminder offsets" do
+    type = %Type{reminder_offsets: "7,1"}
+    assert Urgency.classify(type, ~D[2026-07-01], @today) == :ok
+  end
 end
 ```
 
-- [ ] **Step 2: Worker logic**
+- [ ] **Step 2: Implement Urgency**
 
-For each active obligation where `due_by - offset == today` and no existing notification for `(user, obligation, kind, offset)` → insert `InAppNotification`.
+```elixir
+defmodule Argus.Obligations.Urgency do
+  alias Argus.Obligations.Type
 
-v1: primary assignee only (collaborators deferred).
+  @type urgency :: :overdue | :due_soon | :ok
 
-- [ ] **Step 3: `Notifications.mark_read/1`**
+  @spec classify(Type.t(), Date.t(), Date.t()) :: urgency()
+  def classify(%Type{reminder_offsets: offsets}, due_by, today \\ Date.utc_today()) do
+    cond do
+      Date.compare(due_by, today) == :lt -> :overdue
+      due_soon?(offsets, due_by, today) -> :due_soon
+      true -> :ok
+    end
+  end
+
+  defp due_soon?(offsets, due_by, today) do
+    days = Date.diff(due_by, today)
+
+    offsets
+    |> parse_offsets()
+    |> Enum.any?(fn offset -> days <= offset end)
+  end
+
+  def parse_offsets(nil), do: [7]
+  def parse_offsets(str) do
+    str |> String.split(",") |> Enum.map(&String.trim/1) |> Enum.map(&String.to_integer/1)
+  end
+end
+```
+
+- [ ] **Step 3: UrgencyBadge component** — red for `:overdue`, amber for `:due_soon`, hidden for `:ok`
 
 - [ ] **Step 4: Run tests — PASS**
 
@@ -803,7 +825,7 @@ def list_team_overview(entity) do
 end
 ```
 
-- [ ] **Step 3: UI** — table with title, type, assignee, due_by, status badge (overdue if `due_by < today`).
+- [ ] **Step 3: UI** — table with title, type, assignee, due_by, `<.urgency_badge>`; sort overdue first, then due_soon, then `due_by` asc
 
 - [ ] **Step 4: Commit**
 
@@ -852,21 +874,7 @@ end
 
 ---
 
-## Task 18: Notification bell component
-
-**Files:**
-- Create: `lib/argus_web/components/notification_bell.ex`
-- Modify: `lib/argus_web/components/layouts/app.html.heex`
-
-- [ ] **Step 1: Bell shows unread count; dropdown lists notifications linking to obligation show**
-
-- [ ] **Step 2: `phx-click` mark read**
-
-- [ ] **Step 3: Commit**
-
----
-
-## Task 19: Membership management UI
+## Task 18: Membership management UI
 
 **Files:**
 - Create: `lib/argus_web/live/membership_live/index.ex`
@@ -879,7 +887,7 @@ end
 
 ---
 
-## Task 20: Series history on obligation show
+## Task 19: Series history on obligation show
 
 **Files:**
 - Modify: `lib/argus_web/live/obligation_live/show.ex`
@@ -910,14 +918,14 @@ end
 | Completion rules on Done | Task 9 |
 | Incremental documents + void | Task 11 |
 | Audit log corrections | Task 12 |
-| In-app reminders | Task 14, 18 |
+| Dashboard urgency badges | Task 14, 15 |
 | Dashboard split view | Task 15 |
 | Lock after Done | Task 12 |
 
 ## Deferred (spec open items)
 
-- Collaborator reminders → Task 14 primary only; extend later
-- Email notifications → out of scope
+- In-app notifications / Oban reminder jobs → out of scope v1
+- Email/SMS notifications → out of scope
 - Subjects → out of scope
 
 ---
@@ -926,7 +934,7 @@ end
 
 - [ ] Run full suite: `mix test`
 - [ ] Run credo: `mix credo` (add if desired)
-- [ ] Manual smoke: register → create entity → create type → create obligation → progress → done → verify spawn → verify reminder notification
+- [ ] Manual smoke: register → create entity → create type → create obligation → progress → done → verify spawn → verify dashboard urgency badges
 
 ```bash
 mix phx.server
