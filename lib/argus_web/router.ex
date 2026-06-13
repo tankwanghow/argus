@@ -68,6 +68,8 @@ defmodule ArgusWeb.Router do
 
     post "/users/update-password", UserSessionController, :update_password
 
+    get "/set-view", ViewController, :set
+
     get "/entities/:entity_slug/obligations/:obligation_id/documents/:id",
         DocumentController,
         :show

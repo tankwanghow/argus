@@ -35,35 +35,86 @@ defmodule ArgusWeb.Layouts do
 
   def app(assigns) do
     ~H"""
-    <header class="navbar px-4 sm:px-6 lg:px-8">
-      <div class="flex-1">
-        <a href="/" class="flex-1 flex w-fit items-center gap-2">
-          <img src={~p"/images/logo.svg"} width="36" />
-          <span class="text-sm font-semibold">v{Application.spec(:phoenix, :vsn)}</span>
+    <header class="navbar bg-base-100 border-b border-base-200 px-4 sm:px-6 lg:px-8">
+      <div class="flex-1 flex items-center gap-2 min-w-0">
+        <a href="/" class="flex items-center gap-2 shrink-0">
+          <img src={~p"/images/logo.svg"} width="32" />
+          <span class="font-semibold">Argus</span>
         </a>
+
+        <div :if={entity_scope?(@current_scope)} class="dropdown">
+          <div tabindex="0" role="button" class="btn btn-ghost btn-sm gap-1 max-w-[12rem]">
+            <span class="truncate">{@current_scope.entity.name}</span>
+            <span class="badge badge-ghost badge-sm hidden sm:inline">
+              {@current_scope.entity.slug}
+            </span>
+            <.icon name="hero-chevron-down-mini" class="size-4" />
+          </div>
+          <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box shadow z-50 w-64 p-2">
+            <li class="menu-title">Switch entity</li>
+            <li :for={entity <- Argus.Entities.list_user_entities(@current_scope.user)}>
+              <.link
+                navigate={~p"/entities/#{entity.slug}"}
+                class={entity.id == @current_scope.entity.id && "menu-active"}
+              >
+                {entity.name}
+              </.link>
+            </li>
+          </ul>
+        </div>
       </div>
-      <div class="flex-none">
-        <ul class="flex flex-column px-1 space-x-4 items-center">
-          <li>
-            <a href="https://phoenixframework.org/" class="btn btn-ghost">Website</a>
-          </li>
-          <li>
-            <a href="https://github.com/phoenixframework/phoenix" class="btn btn-ghost">GitHub</a>
-          </li>
-          <li>
-            <.theme_toggle />
-          </li>
-          <li>
-            <a href="https://hexdocs.pm/phoenix/overview.html" class="btn btn-primary">
-              Get Started <span aria-hidden="true">&rarr;</span>
-            </a>
-          </li>
-        </ul>
+
+      <div class="flex-none flex items-center gap-1">
+        <nav :if={entity_scope?(@current_scope)} class="hidden md:flex items-center gap-1">
+          <.link navigate={~p"/entities/#{@current_scope.entity.slug}"} class="btn btn-ghost btn-sm">
+            Dashboard
+          </.link>
+          <.link
+            navigate={~p"/entities/#{@current_scope.entity.slug}/obligations"}
+            class="btn btn-ghost btn-sm"
+          >
+            Obligations
+          </.link>
+          <.link
+            navigate={~p"/entities/#{@current_scope.entity.slug}/obligation-types"}
+            class="btn btn-ghost btn-sm"
+          >
+            Types
+          </.link>
+          <.link
+            navigate={~p"/entities/#{@current_scope.entity.slug}/members"}
+            class="btn btn-ghost btn-sm"
+          >
+            Members
+          </.link>
+        </nav>
+
+        <a
+          :if={entity_scope?(@current_scope)}
+          href={~p"/set-view?#{[view: "mobile", to: "/m/#{@current_scope.entity.slug}"]}"}
+          class="btn btn-ghost btn-sm"
+          title="Switch to mobile view"
+        >
+          <.icon name="hero-device-phone-mobile" class="size-5" />
+        </a>
+
+        <.theme_toggle />
+
+        <div :if={account_scope?(@current_scope)} class="dropdown dropdown-end">
+          <div tabindex="0" role="button" class="btn btn-ghost btn-sm">
+            <.icon name="hero-user-circle" class="size-5" />
+          </div>
+          <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box shadow z-50 w-52 p-2">
+            <li><.link navigate={~p"/users/settings"}>Settings</.link></li>
+            <li><.link navigate={~p"/entities"}>Switch entity</.link></li>
+            <li><.link href={~p"/users/log-out"} method="delete">Log out</.link></li>
+          </ul>
+        </div>
       </div>
     </header>
 
-    <main class="px-4 py-20 sm:px-6 lg:px-8">
-      <div class="mx-auto max-w-2xl space-y-4">
+    <main class="px-4 py-6 sm:px-6 lg:px-8">
+      <div class="mx-auto max-w-5xl space-y-4">
         {render_slot(@inner_block)}
       </div>
     </main>
@@ -71,6 +122,96 @@ defmodule ArgusWeb.Layouts do
     <.flash_group flash={@flash} />
     """
   end
+
+  @doc """
+  The mobile shell — bottom-nav layout for the `/m/:entity_slug` field-work UI.
+  """
+  attr :flash, :map, required: true
+  attr :current_scope, :map, default: nil
+  attr :active, :atom, default: :home, doc: "the active bottom-nav tab"
+  slot :inner_block, required: true
+
+  def mobile_app(assigns) do
+    ~H"""
+    <div class="min-h-screen bg-base-100 pb-20">
+      <main class="px-4 py-4">
+        {render_slot(@inner_block)}
+      </main>
+    </div>
+
+    <.mobile_bottom_nav active={@active} slug={@current_scope.entity.slug} />
+    <.flash_group flash={@flash} />
+    """
+  end
+
+  attr :active, :atom, required: true
+  attr :slug, :string, required: true
+
+  defp mobile_bottom_nav(assigns) do
+    ~H"""
+    <nav class="fixed bottom-0 inset-x-0 z-40 bg-base-100 border-t border-base-200 pb-[env(safe-area-inset-bottom)]">
+      <div class="grid grid-cols-3">
+        <.link
+          navigate={~p"/m/#{@slug}"}
+          class={["flex flex-col items-center gap-1 py-2 text-xs", @active == :home && "text-primary"]}
+        >
+          <.icon name="hero-home" class="size-6" /> Dashboard
+        </.link>
+        <.link
+          navigate={~p"/m/#{@slug}/obligations"}
+          class={[
+            "flex flex-col items-center gap-1 py-2 text-xs",
+            @active == :obligations && "text-primary"
+          ]}
+        >
+          <.icon name="hero-clipboard-document-list" class="size-6" /> Tasks
+        </.link>
+        <label for="more-sheet" class="flex flex-col items-center gap-1 py-2 text-xs cursor-pointer">
+          <.icon name="hero-ellipsis-horizontal-circle" class="size-6" /> More
+        </label>
+      </div>
+    </nav>
+
+    <input type="checkbox" id="more-sheet" class="modal-toggle" />
+    <div class="modal modal-bottom" role="dialog">
+      <div class="modal-box">
+        <h3 class="font-bold text-lg">More</h3>
+        <ul class="menu mt-2">
+          <li>
+            <a href={~p"/set-view?#{[view: "desktop", to: "/entities/#{@slug}"]}"}>
+              <.icon name="hero-computer-desktop" class="size-5" /> Switch to desktop
+            </a>
+          </li>
+          <li>
+            <.link navigate={~p"/entities"}>
+              <.icon name="hero-building-office-2" class="size-5" /> Switch entity
+            </.link>
+          </li>
+          <li>
+            <.link navigate={~p"/users/settings"}>
+              <.icon name="hero-cog-6-tooth" class="size-5" /> Settings
+            </.link>
+          </li>
+          <li>
+            <.link href={~p"/users/log-out"} method="delete">
+              <.icon name="hero-arrow-right-start-on-rectangle" class="size-5" /> Log out
+            </.link>
+          </li>
+        </ul>
+        <div class="mt-4 flex justify-center">
+          <.theme_toggle />
+        </div>
+      </div>
+      <label class="modal-backdrop" for="more-sheet">Close</label>
+    </div>
+    """
+  end
+
+  defp entity_scope?(%{entity: %{} = _entity}), do: true
+  defp entity_scope?(_), do: false
+
+  defp account_scope?(%{user: %{} = _user}), do: true
+  defp account_scope?(_), do: false
 
   @doc """
   Shows the flash group with standard titles and content.
