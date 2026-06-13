@@ -39,6 +39,24 @@ defmodule Argus.Obligations do
     |> Repo.all()
   end
 
+  def list_types(%Scope{entity: entity}) do
+    Type
+    |> where([t], is_nil(t.entity_id) or t.entity_id == ^entity.id)
+    |> order_by([t], asc: t.name)
+    |> Repo.all()
+  end
+
+  def get_obligation!(%Scope{entity: entity}, id) do
+    Obligation
+    |> where([o], o.id == ^id and o.entity_id == ^entity.id)
+    |> preload([:obligation_type, :primary_assignee, :collaborators, events: :documents])
+    |> Repo.one!()
+  end
+
+  def change_obligation(%Obligation{} = obligation, attrs \\ %{}) do
+    Obligation.changeset(obligation, attrs)
+  end
+
   def list_team_overview(%Scope{entity: entity}) do
     Obligation
     |> live()

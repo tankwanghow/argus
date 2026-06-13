@@ -15,6 +15,7 @@ defmodule Argus.Obligations.Obligation do
     field :series_ended_at, :utc_datetime
     field :complete_note_required, :boolean, default: false
     field :complete_documents, :string, default: ""
+    field :open_note, :string, virtual: true
 
     belongs_to :entity, Entity
     belongs_to :obligation_type, Type
@@ -26,7 +27,7 @@ defmodule Argus.Obligations.Obligation do
     timestamps()
   end
 
-  @cast_fields ~w(title obligation_type_id primary_assignee_id due_by)a
+  @cast_fields ~w(title obligation_type_id primary_assignee_id due_by open_note)a
 
   @doc false
   def changeset(obligation, attrs) do

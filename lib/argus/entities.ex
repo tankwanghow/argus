@@ -46,6 +46,15 @@ defmodule Argus.Entities do
     |> Repo.all()
   end
 
+  def list_entity_members(%Entity{} = entity) do
+    Membership
+    |> join(:inner, [m], u in User, on: u.id == m.user_id)
+    |> where([m], m.entity_id == ^entity.id and not is_nil(m.accepted_at))
+    |> order_by([m, u], asc: u.email)
+    |> select([m, u], {u, m})
+    |> Repo.all()
+  end
+
   def list_entity_memberships(%User{} = user) do
     Membership
     |> join(:inner, [m], e in Entity, on: e.id == m.entity_id)

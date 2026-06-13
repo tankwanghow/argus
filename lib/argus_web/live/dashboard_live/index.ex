@@ -105,7 +105,10 @@ defmodule ArgusWeb.DashboardLive.Index do
     rows =
       obligations
       |> Enum.map(fn obligation ->
-        %{obligation: obligation, urgency: Urgency.classify(obligation.obligation_type, obligation.due_by, today)}
+        %{
+          obligation: obligation,
+          urgency: Urgency.classify(obligation.obligation_type, obligation.due_by, today)
+        }
       end)
       |> sort_by_urgency()
 
