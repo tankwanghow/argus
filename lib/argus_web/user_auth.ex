@@ -237,7 +237,13 @@ defmodule ArgusWeb.UserAuth do
     try do
       entity = Entities.get_entity_by_slug_for_user!(slug, scope.user)
       membership = Entities.get_membership!(scope.user, entity)
-      {:cont, Phoenix.Component.assign(socket, :current_scope, Scope.put_entity(scope, entity, membership))}
+
+      {:cont,
+       Phoenix.Component.assign(
+         socket,
+         :current_scope,
+         Scope.put_entity(scope, entity, membership)
+       )}
     rescue
       Ecto.NoResultsError ->
         socket =

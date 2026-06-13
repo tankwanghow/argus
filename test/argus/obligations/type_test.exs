@@ -13,6 +13,7 @@ defmodule Argus.Obligations.TypeTest do
         })
 
       refute changeset.valid?
+
       assert "must be comma-separated non-negative integers" in errors_on(changeset).reminder_offsets
     end
 

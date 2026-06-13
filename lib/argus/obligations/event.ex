@@ -3,7 +3,7 @@ defmodule Argus.Obligations.Event do
   import Ecto.Changeset
 
   alias Argus.Accounts.User
-  alias Argus.Obligations.Obligation
+  alias Argus.Obligations.{EventDocument, Obligation}
 
   schema "obligation_events" do
     field :status, :string
@@ -11,6 +11,7 @@ defmodule Argus.Obligations.Event do
 
     belongs_to :obligation, Obligation
     belongs_to :status_by, User, foreign_key: :status_by_id
+    has_many :documents, EventDocument, foreign_key: :obligation_event_id
 
     timestamps(type: :utc_datetime, updated_at: false)
   end

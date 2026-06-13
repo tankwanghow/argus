@@ -7,8 +7,20 @@ defmodule Argus.Obligations do
 
   alias Argus.Accounts.Scope
   alias Argus.Authorization
-  alias Argus.Obligations.{Collaborator, Completion, Event, Obligation, Recurrence, Series, Type}
+
+  alias Argus.Obligations.{
+    Collaborator,
+    Completion,
+    Event,
+    EventDocument,
+    Obligation,
+    Recurrence,
+    Series,
+    Type
+  }
+
   alias Argus.Repo
+  alias Argus.Uploads
 
   def live(query \\ Obligation) do
     from(o in query, where: o.status == "active" and is_nil(o.completed_at))
@@ -24,14 +36,14 @@ defmodule Argus.Obligations do
   def latest_event(%Obligation{} = obligation) do
     Event
     |> where([e], e.obligation_id == ^obligation.id)
-    |> order_by([e], [
+    |> order_by([e],
       desc: e.inserted_at,
       desc:
         fragment(
           "CASE ? WHEN 'done' THEN 4 WHEN 'in_progress' THEN 3 WHEN 'cancelled' THEN 2 WHEN 'open' THEN 1 ELSE 0 END",
           e.status
         )
-    ])
+    )
     |> limit(1)
     |> Repo.one!()
   end
@@ -60,11 +72,61 @@ defmodule Argus.Obligations do
     end
   end
 
+  def list_cycle_documents(%Obligation{} = obligation) do
+    EventDocument
+    |> join(:inner, [d], e in Event, on: d.obligation_event_id == e.id)
+    |> where([d, e], e.obligation_id == ^obligation.id)
+    |> Repo.all()
+  end
+
+  def get_document!(id) do
+    Repo.get!(EventDocument, id)
+  end
+
+  def add_document(
+        %Scope{} = scope,
+        %Obligation{} = obligation,
+        %Event{} = event,
+        upload,
+        document_slot
+      ) do
+    obligation = Repo.preload(obligation, :collaborators)
+
+    with true <- can_add_document?(scope, obligation),
+         :ok <- ensure_event_workable(event, obligation),
+         file = Uploads.store(upload, obligation.entity_id, obligation.id),
+         {:ok, document} <- insert_document(scope, event, file, document_slot) do
+      {:ok, document}
+    else
+      false -> :not_authorise
+      {:error, _} = error -> error
+    end
+  end
+
+  def void_document(
+        %Scope{} = scope,
+        %Obligation{} = obligation,
+        %EventDocument{} = document,
+        attrs
+      ) do
+    reason = Map.get(attrs, :reason) || Map.get(attrs, "reason")
+
+    with true <- can_void_document?(scope, obligation, document),
+         :ok <- validate_void_reason(obligation, reason),
+         {:ok, voided} <- void_document_row(scope, document, reason) do
+      {:ok, voided}
+    else
+      false -> :not_authorise
+      {:error, _} = error -> error
+    end
+  end
+
   def complete(%Scope{} = scope, %Obligation{} = obligation, attrs) do
     obligation = Repo.preload(obligation, [:collaborators, :obligation_type])
+    cycle_documents = list_cycle_documents(obligation)
 
     with true <- Authorization.can?(scope, :mark_done, obligation),
-         :ok <- Completion.validate_done_requirements(obligation, attrs, []),
+         :ok <- Completion.validate_done_requirements(obligation, attrs, cycle_documents),
          :ok <- validate_next_due(obligation, attrs),
          {:ok, completed, spawned} <- complete_multi(scope, obligation, attrs) do
       {:ok, completed, spawned}
@@ -215,7 +277,10 @@ defmodule Argus.Obligations do
 
   defp spawn_next_cycle(repo, %Obligation{} = done_obligation, next_due_by) do
     type = Repo.get!(Type, done_obligation.obligation_type_id)
-    collaborators = Repo.all(from c in Collaborator, where: c.obligation_id == ^done_obligation.id)
+
+    collaborators =
+      Repo.all(from c in Collaborator, where: c.obligation_id == ^done_obligation.id)
+
     now = DateTime.utc_now(:second)
 
     obligation_changeset =
@@ -254,9 +319,13 @@ defmodule Argus.Obligations do
     end)
     |> repo.transaction()
     |> case do
-      {:ok, %{obligation: obligation}} -> {:ok, obligation}
+      {:ok, %{obligation: obligation}} ->
+        {:ok, obligation}
+
       {:error, :obligation, %Ecto.Changeset{errors: errors}, _} ->
-        if constraint_error?(errors, :series_id), do: {:error, :not_live}, else: {:error, :invalid}
+        if constraint_error?(errors, :series_id),
+          do: {:error, :not_live},
+          else: {:error, :invalid}
 
       {:error, _, reason, _} ->
         {:error, reason}
@@ -302,7 +371,9 @@ defmodule Argus.Obligations do
   defp insert_obligation(%Scope{user: user, entity: entity}, attrs, %Type{} = type) do
     series_id = Ecto.UUID.generate()
     open_note = Map.get(attrs, :open_note) || Map.get(attrs, "open_note")
-    collaborator_ids = Map.get(attrs, :collaborator_ids, []) || Map.get(attrs, "collaborator_ids", [])
+
+    collaborator_ids =
+      Map.get(attrs, :collaborator_ids, []) || Map.get(attrs, "collaborator_ids", [])
 
     Ecto.Multi.new()
     |> Ecto.Multi.insert(:obligation, fn _ ->
@@ -331,6 +402,70 @@ defmodule Argus.Obligations do
       {:error, _, reason, _} -> {:error, reason}
     end
   end
+
+  defp insert_document(%Scope{user: user}, %Event{} = event, file, document_slot) do
+    %EventDocument{
+      obligation_event_id: event.id,
+      user_id: user.id
+    }
+    |> EventDocument.changeset(%{file: file, document_slot: document_slot})
+    |> Repo.insert()
+  end
+
+  defp void_document_row(%Scope{user: user}, %EventDocument{} = document, reason) do
+    document
+    |> EventDocument.changeset(%{
+      voided_at: DateTime.utc_now(:second),
+      voided_by_id: user.id,
+      void_reason: reason
+    })
+    |> Repo.update()
+  end
+
+  defp can_add_document?(scope, obligation) do
+    live_cycle?(obligation) and
+      (Authorization.can?(scope, :edit_obligation) or
+         Authorization.can?(scope, :start_progress, obligation))
+  end
+
+  defp can_void_document?(scope, obligation, document) do
+    cond do
+      locked_cycle?(obligation) ->
+        scope.role == :admin
+
+      Authorization.can?(scope, :void_document) ->
+        true
+
+      document.user_id == scope.user.id and can_add_document?(scope, obligation) ->
+        true
+
+      true ->
+        false
+    end
+  end
+
+  defp validate_void_reason(obligation, reason) do
+    if locked_cycle?(obligation) and reason in [nil, ""] do
+      {:error, :reason_required}
+    else
+      :ok
+    end
+  end
+
+  defp ensure_event_workable(%Event{} = event, %Obligation{} = obligation) do
+    cond do
+      event.obligation_id != obligation.id -> {:error, :not_found}
+      event.status not in ["open", "in_progress"] -> {:error, :not_workable}
+      true -> :ok
+    end
+  end
+
+  defp live_cycle?(%Obligation{status: "active", completed_at: nil}), do: true
+  defp live_cycle?(_), do: false
+
+  defp locked_cycle?(%Obligation{status: "cancelled"}), do: true
+  defp locked_cycle?(%Obligation{completed_at: %DateTime{}}), do: true
+  defp locked_cycle?(_), do: false
 
   defp maybe_insert_collaborators(multi, []), do: multi
 

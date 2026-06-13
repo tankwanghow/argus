@@ -50,7 +50,10 @@ defmodule ArgusWeb.Router do
     end
 
     live_session :entity_scoped,
-      on_mount: [{ArgusWeb.UserAuth, :require_authenticated}, {ArgusWeb.UserAuth, :require_entity}] do
+      on_mount: [
+        {ArgusWeb.UserAuth, :require_authenticated},
+        {ArgusWeb.UserAuth, :require_entity}
+      ] do
       live "/entities/:entity_slug", DashboardLive.Index, :index
       live "/entities/:entity_slug/obligations", ObligationLive.Index, :index
       live "/entities/:entity_slug/obligations/new", ObligationLive.Form, :new
@@ -64,6 +67,10 @@ defmodule ArgusWeb.Router do
     end
 
     post "/users/update-password", UserSessionController, :update_password
+
+    get "/entities/:entity_slug/obligations/:obligation_id/documents/:id",
+        DocumentController,
+        :show
   end
 
   scope "/", ArgusWeb do

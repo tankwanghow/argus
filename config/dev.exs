@@ -1,5 +1,7 @@
 import Config
 
+config :argus, :uploads_dir, Path.expand("priv/uploads", __DIR__)
+
 # Configure your database
 config :argus, Argus.Repo,
   username: "argus",

@@ -82,7 +82,13 @@ defmodule Argus.AuthorizationTest do
     |> Argus.Repo.insert!()
 
     membership = Argus.Entities.get_membership!(collaborator, admin_scope.entity)
-    scope = Argus.Accounts.Scope.put_entity(Argus.Accounts.Scope.for_user(collaborator), admin_scope.entity, membership)
+
+    scope =
+      Argus.Accounts.Scope.put_entity(
+        Argus.Accounts.Scope.for_user(collaborator),
+        admin_scope.entity,
+        membership
+      )
 
     primary = user_fixture()
 

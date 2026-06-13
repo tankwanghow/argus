@@ -32,9 +32,9 @@ defmodule Argus.Repo.Migrations.CreateEntitiesTables do
     create unique_index(:memberships, [:user_id, :entity_id])
 
     create unique_index(:memberships, [:user_id],
-      where: "is_default = true",
-      name: :memberships_one_default_per_user
-    )
+             where: "is_default = true",
+             name: :memberships_one_default_per_user
+           )
 
     create table(:entity_invitations, primary_key: false) do
       add :id, :binary_id, primary_key: true
@@ -42,7 +42,10 @@ defmodule Argus.Repo.Migrations.CreateEntitiesTables do
       add :email, :citext, null: false
       add :role, :string, null: false
       add :token, :binary, null: false
-      add :invited_by_id, references(:users, type: :binary_id, on_delete: :nilify_all), null: false
+
+      add :invited_by_id, references(:users, type: :binary_id, on_delete: :nilify_all),
+        null: false
+
       add :expires_at, :utc_datetime, null: false
       add :accepted_at, :utc_datetime
 
@@ -50,9 +53,9 @@ defmodule Argus.Repo.Migrations.CreateEntitiesTables do
     end
 
     create unique_index(:entity_invitations, [:entity_id, :email],
-      where: "accepted_at IS NULL",
-      name: :entity_invitations_one_pending_per_email
-    )
+             where: "accepted_at IS NULL",
+             name: :entity_invitations_one_pending_per_email
+           )
 
     create unique_index(:entity_invitations, [:token])
   end

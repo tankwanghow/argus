@@ -59,7 +59,11 @@ defmodule Argus.Obligations.Type do
 
         case parsed do
           :invalid ->
-            add_error(changeset, :reminder_offsets, "must be comma-separated non-negative integers")
+            add_error(
+              changeset,
+              :reminder_offsets,
+              "must be comma-separated non-negative integers"
+            )
 
           nums ->
             canonical =

@@ -21,7 +21,10 @@ defmodule Argus.Obligations.Completion do
 
   defp validate_document_slots(%Obligation{complete_documents: ""}, _cycle_documents), do: :ok
 
-  defp validate_document_slots(%Obligation{complete_documents: complete_documents}, cycle_documents) do
+  defp validate_document_slots(
+         %Obligation{complete_documents: complete_documents},
+         cycle_documents
+       ) do
     required = parse_csv(complete_documents)
 
     slots =

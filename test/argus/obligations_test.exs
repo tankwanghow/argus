@@ -9,7 +9,10 @@ defmodule Argus.ObligationsTest do
   describe "create_obligation/2" do
     test "creates obligation, open event, snapshots type rules, and optional open note" do
       scope = manager_scope_fixture()
-      type = type_fixture(scope.entity, complete_note_required: true, complete_documents: "receipt")
+
+      type =
+        type_fixture(scope.entity, complete_note_required: true, complete_documents: "receipt")
+
       assignee = member_fixture(scope.entity)
 
       attrs = %{

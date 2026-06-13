@@ -88,7 +88,8 @@ defmodule Argus.MixProject do
     ]
   end
 
-  defp workspace_assets?, do: File.exists?(Path.expand("../shared_config/workspace_assets.ex", __DIR__))
+  defp workspace_assets?,
+    do: File.exists?(Path.expand("../shared_config/workspace_assets.ex", __DIR__))
 
   defp load_workspace_assets! do
     unless Code.ensure_loaded?(WorkspaceAssets) do

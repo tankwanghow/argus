@@ -34,7 +34,8 @@ defmodule Argus.Authorization do
 
   def can?(%Scope{}, _, _obligation), do: false
 
-  defp collaborator_user_ids(%Obligation{collaborators: collaborators}) when is_list(collaborators) do
+  defp collaborator_user_ids(%Obligation{collaborators: collaborators})
+       when is_list(collaborators) do
     Enum.map(collaborators, & &1.user_id)
   end
 

@@ -61,7 +61,10 @@ defmodule Argus.EntitiesTest do
 
     test "accept re-checks seat limit at accept time" do
       admin_scope = Scope.for_user(user_fixture())
-      {:ok, entity} = Entities.create_entity(admin_scope, %{slug: "full", name: "Full", seat_limit: 2})
+
+      {:ok, entity} =
+        Entities.create_entity(admin_scope, %{slug: "full", name: "Full", seat_limit: 2})
+
       membership = Entities.get_membership!(admin_scope.user, entity)
       admin_scope = Scope.put_entity(admin_scope, entity, membership)
 
@@ -72,7 +75,9 @@ defmodule Argus.EntitiesTest do
       assert {:ok, %Membership{}} = Entities.accept_invitation(member, invitation.token)
 
       late_user = user_fixture(%{email: "late@example.com"})
-      assert {:error, :seat_limit_reached} = Entities.accept_invitation(late_user, late_invitation.token)
+
+      assert {:error, :seat_limit_reached} =
+               Entities.accept_invitation(late_user, late_invitation.token)
     end
   end
 end
