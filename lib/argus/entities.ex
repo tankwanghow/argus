@@ -6,6 +6,7 @@ defmodule Argus.Entities do
   import Ecto.Query, warn: false
 
   alias Argus.Accounts.{Scope, User}
+  alias Argus.Authorization
   alias Argus.Entities.{Entity, Invitation, Membership}
   alias Argus.Repo
 
@@ -77,6 +78,12 @@ defmodule Argus.Entities do
     |> Repo.one!()
   end
 
+  def get_membership_in_entity!(%Entity{} = entity, id) do
+    Membership
+    |> where([m], m.id == ^id and m.entity_id == ^entity.id)
+    |> Repo.one!()
+  end
+
   def seats_available?(%Entity{} = entity) do
     count =
       Membership
@@ -86,13 +93,37 @@ defmodule Argus.Entities do
     count < entity.seat_limit
   end
 
-  def invite_member(%Scope{user: inviter, entity: entity}, email, role) do
-    with true <- seats_available?(entity),
-         {:ok, invitation} <- insert_invitation(entity, inviter, email, role) do
-      {:ok, invitation}
+  def invite_member(%Scope{user: inviter, entity: entity} = scope, email, role) do
+    cond do
+      not Authorization.can?(scope, :manage_entity) -> :not_authorise
+      not seats_available?(entity) -> {:error, :seat_limit_reached}
+      true -> insert_invitation(entity, inviter, email, role)
+    end
+  end
+
+  @doc """
+  Pending (un-accepted, un-expired) invitations for an entity.
+  """
+  def list_pending_invitations(%Entity{} = entity) do
+    now = DateTime.utc_now(:second)
+
+    Invitation
+    |> where([i], i.entity_id == ^entity.id and is_nil(i.accepted_at) and i.expires_at > ^now)
+    |> order_by([i], asc: i.inserted_at)
+    |> Repo.all()
+  end
+
+  @doc """
+  Changes a member's role. Admin-only (`:manage_entity`); the membership must
+  belong to the scope's entity. Role changes don't consume a seat.
+  """
+  def update_member_role(%Scope{} = scope, %Membership{} = membership, role) do
+    if Authorization.can?(scope, :manage_entity) and membership.entity_id == scope.entity.id do
+      membership
+      |> Membership.changeset(%{role: role})
+      |> Repo.update()
     else
-      false -> {:error, :seat_limit_reached}
-      {:error, changeset} -> {:error, changeset}
+      :not_authorise
     end
   end
 

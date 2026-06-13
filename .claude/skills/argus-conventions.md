@@ -22,6 +22,12 @@ rules apply to Argus too.
 - Only `app.js` / `app.css` bundles. Vendor deps import into those. Never reference external
   `src`/`href` in layouts; never inline `<script>` — use colocated hooks
   (`:type={Phoenix.LiveView.ColocatedHook}`).
+- **daisyUI 5 renamed/removed several v4 class names — they fail silently (no compile error,
+  just unstyled output).** Don't carry v4 names over from older snippets. Known traps:
+  `tabs-boxed` → **`tabs-box`**; the `*-bordered` modifiers are **gone** (border is the default —
+  use plain `select` / `input` / `textarea` / `file-input`, never `select-bordered` etc.);
+  `card-bordered` → `card-border`; `form-control` is dropped (use `fieldset`). `core_components.ex`
+  already uses the correct v5 names — match it rather than inventing classes.
 - HTTP: `Req` only.
 
 ## Shared workspace toolchain (`~/Projects/elixir`)
