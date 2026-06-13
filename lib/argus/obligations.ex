@@ -111,6 +111,16 @@ defmodule Argus.Obligations do
     from c in Collaborator, where: c.user_id == ^user_id, select: c.obligation_id
   end
 
+  @doc """
+  All cycles sharing a `series_id`, oldest first — the recurrence history.
+  """
+  def list_series(series_id) do
+    Obligation
+    |> where([o], o.series_id == ^series_id)
+    |> order_by([o], asc: o.due_by)
+    |> Repo.all()
+  end
+
   def list_events(%Obligation{} = obligation) do
     Event
     |> where([e], e.obligation_id == ^obligation.id)

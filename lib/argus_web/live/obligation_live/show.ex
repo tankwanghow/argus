@@ -160,6 +160,33 @@ defmodule ArgusWeb.ObligationLive.Show do
             End series
           </button>
         </section>
+        <section :if={length(@series) > 1} id="series-history" class="mt-8">
+          <h2 class="text-sm font-semibold uppercase tracking-wide text-base-content/60">
+            Series history
+          </h2>
+          <ul class="mt-3 divide-y divide-base-300 rounded-box border border-base-300">
+            <li
+              :for={cycle <- @series}
+              id={"series-cycle-#{cycle.id}"}
+              class="flex items-center gap-3 p-3"
+            >
+              {cycle_marker(cycle, @obligation.id)}
+              <div class="flex-1 text-sm">
+                due {format_date(cycle.due_by)}
+              </div>
+              <.link
+                :if={cycle.id != @obligation.id}
+                navigate={~p"/entities/#{@current_scope.entity.slug}/obligations/#{cycle.id}"}
+                class="link link-hover text-sm"
+              >
+                View
+              </.link>
+              <span :if={cycle.id == @obligation.id} class="text-sm text-base-content/50">
+                viewing
+              </span>
+            </li>
+          </ul>
+        </section>
       </div>
 
       <div
@@ -364,7 +391,24 @@ defmodule ArgusWeb.ObligationLive.Show do
     |> assign(:obligation, obligation)
     |> assign(:doc_slots, doc_slots)
     |> assign(:required_docs, required_docs)
+    |> assign(:series, Obligations.list_series(obligation.series_id))
     |> assign(:can_add_document?, can_add_document?(socket.assigns.current_scope, obligation))
+  end
+
+  defp cycle_marker(cycle, current_id) do
+    {label, class} =
+      cond do
+        cycle.id == current_id -> {"Current", "badge-primary"}
+        cycle.status == "cancelled" -> {"Cancelled", "badge-error"}
+        match?(%DateTime{}, cycle.completed_at) -> {"Completed", "badge-success"}
+        true -> {"Live", "badge-ghost"}
+      end
+
+    assigns = %{label: label, class: class}
+
+    ~H"""
+    <span class={["badge badge-sm", @class]}>{@label}</span>
+    """
   end
 
   defp can_add_document?(scope, obligation) do

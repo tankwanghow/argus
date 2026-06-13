@@ -103,6 +103,21 @@ defmodule ArgusWeb.ObligationLiveTest do
     assert render(view) =~ "in_progress"
   end
 
+  test "series history lists prior cycles after a recurring completion", %{conn: conn} do
+    {scope, obligation} = recurring_primary_scope_fixture(interval: "monthly")
+    conn = log_in_user(conn, scope.user)
+
+    {:ok, _done, successor} =
+      Obligations.complete(scope, obligation, %{next_due_by: ~D[2026-02-15]})
+
+    {:ok, view, _html} =
+      live(conn, ~p"/entities/#{scope.entity.slug}/obligations/#{successor.id}")
+
+    assert has_element?(view, "#series-history")
+    assert has_element?(view, "#series-cycle-#{obligation.id}", "Completed")
+    assert has_element?(view, "#series-cycle-#{successor.id}", "Current")
+  end
+
   test "done modal requires next due for recurring obligations", %{conn: conn} do
     {scope, obligation} = recurring_primary_scope_fixture(interval: "monthly")
     conn = log_in_user(conn, scope.user)
