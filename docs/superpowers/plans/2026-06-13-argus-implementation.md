@@ -111,11 +111,38 @@ Modify `mix.exs` deps list — add:
 
 Run: `mix deps.get`
 
-- [ ] **Step 3: Set up Tailwind v4 + daisyUI 5** (match peggy)
+- [ ] **Step 3: Wire the shared workspace toolchain** (match every sibling project)
 
-Follow peggy's `assets/css/app.css`: `@import "tailwindcss"` + `@source` directives (no
-`tailwind.config.js`), and load **daisyUI 5** via the CSS plugin. No `@apply`. Confirm
-`mix assets.build` succeeds. Copy peggy's `assets/css/app.css` header as the starting point.
+Argus shares the pinned asset binaries under `~/Projects/elixir/.global_assets` via
+`~/Projects/elixir/shared_config` — don't let `phx.new` install its own. **Copy peggy's wiring
+verbatim, renaming the profile `peggy` → `argus`:**
+
+1. `~/Projects/elixir/.global_assets/setup.sh` — once, to fetch esbuild 0.28.1 / tailwindcss
+   4.3.1 / heroicons v2.2.0. Add `argus` to that script's `link_heroicons` project list.
+2. `config/config.exs` — prepend the shared-asset import block, name the esbuild/tailwind profiles
+   `argus`, and add the time-zone DB (urgency needs real zones):
+
+   ```elixir
+   workspace_assets_config = Path.expand("../../shared_config/assets.exs", __DIR__)
+   if File.exists?(workspace_assets_config) do
+     import_config workspace_assets_config
+   else
+     config :esbuild, version: "0.28.1"
+     config :tailwind, version: "4.3.1"
+   end
+   # ...
+   config :elixir, :time_zone_database, Tzdata.TimeZoneDatabase
+   ```
+3. `mix.exs` — replace the generated heroicons dep with `heroicons_dep()`; add peggy's
+   `workspace_assets?/0`, `load_workspace_assets!/0`, `heroicons_dep/0`, `assets_setup_tasks/0`
+   (all with the github/hex fallbacks); aliases `"assets.setup": assets_setup_tasks()`,
+   `"assets.build": ["compile", "tailwind argus", "esbuild argus"]`, matching `assets.deploy`,
+   plus `precommit`.
+4. `assets/css/app.css` — keep the stock Phoenix 1.8 daisyUI 5 setup (`@import "tailwindcss"` +
+   `@source` + `@plugin "../vendor/{heroicons,daisyui,daisyui-theme}"`); copy peggy's light/dark
+   themes. No `tailwind.config.js`, no `@apply`.
+
+Confirm `mix setup` then `mix assets.build` succeed.
 
 - [ ] **Step 4: Verify boot**
 
@@ -126,7 +153,7 @@ Expected: PASS (0 failures, generated scaffold tests)
 
 ```bash
 git add -A
-git commit -m "chore: bootstrap Phoenix app (assets + daisyUI, mailer for magic-link)"
+git commit -m "chore: bootstrap Phoenix app (shared toolchain, daisyUI, mailer for magic-link)"
 ```
 
 ---

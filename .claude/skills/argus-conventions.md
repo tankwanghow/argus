@@ -24,6 +24,43 @@ rules apply to Argus too.
   (`:type={Phoenix.LiveView.ColocatedHook}`).
 - HTTP: `Req` only.
 
+## Shared workspace toolchain (`~/Projects/elixir`)
+
+All sibling projects share **one pinned set of asset binaries** instead of each installing its own.
+Argus must wire into it the same way (mirror peggy's `mix.exs` + `config/config.exs`).
+
+- **`~/Projects/elixir/.global_assets/`** — pinned binaries populated by `.global_assets/setup.sh`:
+  esbuild **0.28.1**, tailwindcss **4.3.1** (linux x64 + arm64), heroicons **v2.2.0** (`optimized`).
+  Run `~/Projects/elixir/.global_assets/setup.sh` once after cloning (idempotent; binaries are
+  git-ignored). **Add `argus` to that script's `link_heroicons` project list.** (The mix.exs path
+  below also self-heals the `deps/heroicons` symlink on `deps.get`, so it works even before the
+  script edit.)
+- **`~/Projects/elixir/shared_config/`** — `workspace_assets.ex` (the `WorkspaceAssets` module),
+  `assets.exs` (sets `:esbuild`/`:tailwind` `path:` to the global binaries), `prod_arm64.exs`
+  (pou_con only). Do not duplicate this in Argus — reference it.
+- **`~/Projects/elixir/mise.toml`** pins elixir 1.19.5-otp-28 / erlang 28.3.1 — Argus inherits it.
+- **`config/config.exs`** — top of file, before the esbuild/tailwind profiles:
+
+  ```elixir
+  workspace_assets_config = Path.expand("../../shared_config/assets.exs", __DIR__)
+  if File.exists?(workspace_assets_config) do
+    import_config workspace_assets_config           # use shared global binaries
+  else
+    config :esbuild, version: "0.28.1"              # standalone fallback
+    config :tailwind, version: "4.3.1"
+  end
+  ```
+  Profiles are named `argus` (`config :esbuild, argus: [...]`, `config :tailwind, argus: [...]`).
+  Also set `config :elixir, :time_zone_database, Tzdata.TimeZoneDatabase` (urgency needs real
+  zones via `DateTime.now/1`).
+- **`mix.exs`** — replace the generated heroicons dep with `heroicons_dep()` and add the helpers
+  `workspace_assets?/0`, `load_workspace_assets!/0`, `heroicons_dep/0`, `assets_setup_tasks/0`
+  (each falls back to the stock github/hex install when `shared_config` is absent — copy peggy's
+  verbatim). Aliases: `"assets.setup": assets_setup_tasks()`, `"assets.build": ["compile",
+  "tailwind argus", "esbuild argus"]`, matching `assets.deploy`, and `precommit`.
+- daisyUI 5 + daisyUI-theme + the heroicons plugin are vendored under `assets/vendor/` and loaded
+  via `@plugin` in `app.css` (stock Phoenix 1.8 output) — keep that, just match peggy's themes.
+
 ## Schema & contexts
 
 - `use Argus.Schema` (binary_id PK, `@foreign_key_type :binary_id`). Mirrors `FullCircle.Schema`.

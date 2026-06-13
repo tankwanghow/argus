@@ -46,14 +46,20 @@ applies here too. Headlines:
 ## Commands (post-bootstrap)
 
 ```bash
-mix deps.get                          # fetch deps (adds bcrypt_elixir, tzdata)
-mix ecto.create && mix ecto.migrate   # set up DB
-mix run priv/repo/seeds.exs           # seed system obligation-type presets (Malaysia regulatory)
+~/Projects/elixir/.global_assets/setup.sh   # once: fetch shared esbuild/tailwind/heroicons binaries
+mix setup                             # deps.get + ecto.setup + assets.setup + assets.build
 mix phx.server                        # run app (localhost:4000)
-mix test                              # full suite
+mix test                              # full suite (auto creates/migrates test DB)
 mix test test/argus/obligations_test.exs            # single file
 mix test test/argus/obligations_test.exs:42         # single test by line
+mix precommit                         # compile --warnings-as-errors, deps.unlock --unused, format, test
 ```
+
+**Shared toolchain:** assets (esbuild 0.28.1, tailwindcss 4.3.1, heroicons v2.2.0) are pinned once
+under `~/Projects/elixir/.global_assets` and wired in via `~/Projects/elixir/shared_config` — the
+same setup every sibling project uses. `config/config.exs` imports `shared_config/assets.exs` and
+`mix.exs` resolves heroicons through `WorkspaceAssets`; both fall back to standalone installs if
+the workspace dirs are absent. Toolchain versions come from `~/Projects/elixir/mise.toml`.
 
 Tech stack: Elixir 1.19 / OTP 28, Phoenix 1.8.5, LiveView 1.1, Ecto 3.13, PostgreSQL (citext), Tailwind v4 + daisyUI 5, Swoosh mailer (magic-link login), Req.
 
