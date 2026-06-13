@@ -46,6 +46,42 @@ defmodule Argus.Obligations do
     |> Repo.all()
   end
 
+  @doc """
+  Fetches a type visible to the scope — either a system preset (`entity_id`
+  is nil) or one owned by the scope's entity. Raises if not found/visible.
+  """
+  def get_type!(%Scope{entity: entity}, id) do
+    Type
+    |> where([t], t.id == ^id and (is_nil(t.entity_id) or t.entity_id == ^entity.id))
+    |> Repo.one!()
+  end
+
+  def change_type(%Type{} = type, attrs \\ %{}), do: Type.changeset(type, attrs)
+
+  def create_type(%Scope{entity: entity} = scope, attrs) do
+    if Authorization.can?(scope, :manage_types) do
+      %Type{entity_id: entity.id}
+      |> Type.changeset(attrs)
+      |> Repo.insert()
+    else
+      :not_authorise
+    end
+  end
+
+  @doc """
+  Updates a **custom** (entity-owned) type. System presets are immutable —
+  attempting to edit one (or another entity's type) returns `:not_authorise`.
+  """
+  def update_type(%Scope{entity: entity} = scope, %Type{} = type, attrs) do
+    if Authorization.can?(scope, :manage_types) and type.entity_id == entity.id do
+      type
+      |> Type.changeset(attrs)
+      |> Repo.update()
+    else
+      :not_authorise
+    end
+  end
+
   def get_obligation!(%Scope{entity: entity}, id) do
     Obligation
     |> where([o], o.id == ^id and o.entity_id == ^entity.id)

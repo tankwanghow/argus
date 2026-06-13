@@ -108,13 +108,13 @@ defmodule ArgusWeb.ObligationLive.Show do
               :if={@doc_slots != []}
               id="document-slot"
               name="document_slot"
-              class="select select-bordered"
+              class="select"
               required
             >
               <option value="">Choose slot…</option>
               <option :for={slot <- @doc_slots} value={slot}>{slot}</option>
             </select>
-            <.live_file_input upload={@uploads.document} class="file-input file-input-bordered" />
+            <.live_file_input upload={@uploads.document} class="file-input" />
             <.button class="btn btn-primary btn-sm" phx-disable-with="Uploading…">Upload</.button>
           </.form>
           <p :for={err <- upload_errors(@uploads.document)} class="text-sm text-error mt-1">

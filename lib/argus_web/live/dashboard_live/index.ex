@@ -26,7 +26,7 @@ defmodule ArgusWeb.DashboardLive.Index do
           </:actions>
         </.header>
 
-        <div class="tabs tabs-boxed mt-6 w-fit">
+        <div class="tabs tabs-box mt-6 w-fit">
           <button
             id="tab-my-work"
             type="button"
