@@ -73,11 +73,31 @@ System presets (`entity_id` null) + per-entity custom types (clone/edit/create).
 |-------|------|-------|
 | `entity_id` | FK nullable | null = system preset |
 | `name` | string | e.g. "EPF Monthly" |
-| `recurring_interval` | enum | `monthly`, `quarterly`, `annual`, `none` |
+| `recurring_interval` | enum | See [Recurring intervals](#recurring-intervals) |
 | `complete_note_required` | boolean | Enforced on Done only |
 | `complete_documents` | string | Comma-delimited slot names, e.g. `"statutory_form,payment_receipt"` — one file per name required on Done |
 | `reminder_offsets` | string | Comma-delimited days before due, e.g. `"30,7,1"` |
 | `suggest_next_due` | boolean | Pre-fill next due date from interval when prompting on Done |
+
+#### Recurring intervals
+
+Stored as snake_case atoms/strings in code. User-facing labels via Gettext.
+
+| Code value | Display label | Suggested next due (when `suggest_next_due`) |
+|------------|---------------|-----------------------------------------------|
+| `none` | One-off | — (no next obligation spawned) |
+| `weekly` | Weekly | current `due_by` + 1 week |
+| `every_two_weeks` | Every 2 weeks | current `due_by` + 2 weeks |
+| `monthly` | Monthly | current `due_by` + 1 month |
+| `quarterly` | Quarterly | current `due_by` + 3 months |
+| `semiannual` | Every 6 months | current `due_by` + 6 months |
+| `annual` | Yearly | current `due_by` + 1 year |
+
+**Naming notes:**
+
+- **`every_two_weeks`** not `bi_weekly` / `biweekly` — "bi-weekly" is ambiguous (every 2 weeks vs twice per week).
+- **`semiannual`** not `half_year` / `biannual` — means once every 6 months; "biannual" is often confused with every 2 years.
+- **`annual`** not `annually` — enum values read better as adjectives (`:monthly`, `:annual`); labels use full words ("Yearly").
 
 ### Obligation
 
