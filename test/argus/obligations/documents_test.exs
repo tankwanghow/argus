@@ -46,6 +46,81 @@ defmodule Argus.Obligations.DocumentsTest do
       assert completed.completed_at
     end
 
+    test "slotless uploads are allowed alongside required slot documents" do
+      manager = manager_scope_fixture()
+      member_scope = member_scope_on_entity(manager.entity)
+
+      type =
+        type_fixture(manager.entity,
+          complete_note_required: false,
+          complete_documents: "receipt"
+        )
+
+      {:ok, obligation} =
+        Obligations.create_obligation(manager, %{
+          title: "EPF Jan",
+          obligation_type_id: type.id,
+          primary_assignee_id: member_scope.user.id,
+          due_by: ~D[2026-01-15]
+        })
+
+      event = hd(Obligations.list_events(obligation))
+
+      assert {:ok, extra} =
+               Obligations.add_document(
+                 manager,
+                 obligation,
+                 event,
+                 upload_fixture("notes.pdf"),
+                 nil
+               )
+
+      assert is_nil(extra.document_slot)
+
+      assert {:ok, receipt} =
+               Obligations.add_document(
+                 manager,
+                 obligation,
+                 event,
+                 upload_fixture("receipt.pdf"),
+                 "receipt"
+               )
+
+      assert receipt.document_slot == "receipt"
+
+      assert {:ok, completed, _} = Obligations.complete(member_scope, obligation, %{})
+      assert completed.completed_at
+    end
+
+    test "slotless uploads alone do not satisfy required slots" do
+      manager = manager_scope_fixture()
+      member_scope = member_scope_on_entity(manager.entity)
+
+      type = type_fixture(manager.entity, complete_documents: "receipt")
+
+      {:ok, obligation} =
+        Obligations.create_obligation(manager, %{
+          title: "EPF Jan",
+          obligation_type_id: type.id,
+          primary_assignee_id: member_scope.user.id,
+          due_by: ~D[2026-01-15]
+        })
+
+      event = hd(Obligations.list_events(obligation))
+
+      assert {:ok, _} =
+               Obligations.add_document(
+                 manager,
+                 obligation,
+                 event,
+                 upload_fixture("notes.pdf"),
+                 nil
+               )
+
+      assert {:error, {:missing_document, "receipt"}} =
+               Obligations.complete(member_scope, obligation, %{})
+    end
+
     test "uploader can void own document before done" do
       {scope, obligation} = assigned_member_scope_fixture()
       event = hd(Obligations.list_events(obligation))

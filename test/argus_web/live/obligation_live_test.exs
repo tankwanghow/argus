@@ -103,6 +103,46 @@ defmodule ArgusWeb.ObligationLiveTest do
     assert has_element?(view, "[data-status] .badge", "receipt")
   end
 
+  test "manager uploads additional file without required slot", %{conn: conn} do
+    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    conn = log_in_user(conn, manager.user)
+    member = member_fixture(manager.entity)
+    type = type_fixture(manager.entity, complete_documents: "receipt")
+
+    {:ok, obligation} =
+      Obligations.create_obligation(manager, %{
+        title: "EPF June",
+        obligation_type_id: type.id,
+        primary_assignee_id: member.id,
+        due_by: ~D[2026-06-30]
+      })
+
+    obligation = Obligations.get_obligation!(manager, obligation.id)
+    [open_event] = Enum.filter(obligation.events, &(&1.status == "open"))
+
+    {:ok, view, _html} =
+      live(conn, ~p"/entities/#{manager.entity.slug}/obligations/#{obligation.id}")
+
+    view |> element("#documents-btn-#{open_event.id}") |> render_click()
+
+    file =
+      file_input(view, "#document-form-#{open_event.id}", :document, [
+        %{name: "notes.pdf", content: "extra", type: "application/pdf"}
+      ])
+
+    render_upload(file, "notes.pdf")
+
+    view
+    |> form("#document-form-#{open_event.id}", %{
+      "document_slot" => "",
+      "event_id" => open_event.id
+    })
+    |> render_submit()
+
+    assert render(view) =~ "notes.pdf"
+    refute has_element?(view, "#event-#{open_event.id} .badge", "receipt")
+  end
+
   test "start_progress from show page", %{conn: conn} do
     {scope, obligation} = assigned_member_scope_fixture()
     conn = log_in_user(conn, scope.user)

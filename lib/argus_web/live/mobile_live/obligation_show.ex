@@ -328,16 +328,25 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
               class="mt-2 space-y-3"
             >
               <input type="hidden" name="event_id" value={@documents_modal_event.id} />
-              <select
-                :if={@doc_slots != []}
-                id={"m-document-slot-#{@documents_modal_event.id}"}
-                name="document_slot"
-                class="select w-full"
-                required
-              >
-                <option value="">Choose slot…</option>
-                <option :for={slot <- @doc_slots} value={slot}>{slot}</option>
-              </select>
+              <div :if={@doc_slots != []} class="fieldset">
+                <label
+                  class="label mb-1"
+                  for={"m-document-slot-#{@documents_modal_event.id}"}
+                >
+                  Document type
+                </label>
+                <select
+                  id={"m-document-slot-#{@documents_modal_event.id}"}
+                  name="document_slot"
+                  class="select w-full"
+                >
+                  <option value="">Additional file (optional)</option>
+                  <option :for={slot <- @doc_slots} value={slot}>{slot} (required for done)</option>
+                </select>
+                <p class="text-xs text-base-content/50 mt-1">
+                  Required slots count toward marking done. You can also attach other supporting files.
+                </p>
+              </div>
               <.live_file_input upload={@uploads.document} class="file-input w-full" />
               <.button class="btn btn-primary btn-sm" phx-disable-with="Uploading…">Upload</.button>
             </.form>
@@ -616,7 +625,7 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
   def handle_event("add_document", %{"event_id" => event_id} = params, socket) do
     scope = socket.assigns.current_scope
     obligation = socket.assigns.obligation
-    slot = params["document_slot"]
+    slot = blank_to_nil(params["document_slot"])
 
     case find_event(obligation.events, event_id) do
       nil ->
@@ -746,6 +755,10 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
 
   defp humanize_status("in_progress"), do: "In progress"
   defp humanize_status(status), do: String.capitalize(status)
+
+  defp blank_to_nil(nil), do: nil
+  defp blank_to_nil(""), do: nil
+  defp blank_to_nil(slot), do: slot
 
   defp parse_date(nil), do: nil
   defp parse_date(""), do: nil
