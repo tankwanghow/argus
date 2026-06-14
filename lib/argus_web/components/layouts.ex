@@ -42,26 +42,12 @@ defmodule ArgusWeb.Layouts do
           <span class="font-semibold">Argus</span>
         </a>
 
-        <div :if={entity_scope?(@current_scope)} class="dropdown">
-          <div tabindex="0" role="button" class="btn btn-ghost btn-sm gap-1 max-w-[12rem]">
-            <span class="truncate">{@current_scope.entity.name}</span>
-            <span class="badge badge-ghost badge-sm hidden sm:inline">
-              {@current_scope.entity.slug}
-            </span>
-            <.icon name="hero-chevron-down-mini" class="size-4" />
-          </div>
-          <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box shadow z-50 w-64 p-2">
-            <li class="menu-title">Switch entity</li>
-            <li :for={entity <- Argus.Entities.list_user_entities(@current_scope.user)}>
-              <.link
-                navigate={~p"/entities/#{entity.slug}"}
-                class={entity.id == @current_scope.entity.id && "menu-active"}
-              >
-                {entity.name}
-              </.link>
-            </li>
-          </ul>
-        </div>
+        <span
+          :if={entity_scope?(@current_scope)}
+          class="text-sm text-base-content/70 truncate max-w-[12rem]"
+        >
+          {@current_scope.entity.name}
+        </span>
       </div>
 
       <div class="flex-none flex items-center gap-1">
@@ -112,7 +98,6 @@ defmodule ArgusWeb.Layouts do
           <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box shadow z-50 w-56 p-2">
             <li class="menu-title truncate">{@current_scope.user.email}</li>
             <li><.link navigate={~p"/users/settings"}>Settings</.link></li>
-            <li><.link navigate={~p"/entities"}>Switch entity</.link></li>
             <li><.link href={~p"/users/log-out"} method="delete">Log out</.link></li>
           </ul>
         </div>
@@ -187,11 +172,6 @@ defmodule ArgusWeb.Layouts do
             <a href={~p"/set-view?#{[view: "desktop", to: "/entities/#{@slug}"]}"}>
               <.icon name="hero-computer-desktop" class="size-5" /> Switch to desktop
             </a>
-          </li>
-          <li>
-            <.link navigate={~p"/entities"}>
-              <.icon name="hero-building-office-2" class="size-5" /> Switch entity
-            </.link>
           </li>
           <li>
             <.link navigate={~p"/users/settings"}>
