@@ -155,6 +155,26 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
               options={@member_options}
               required
             />
+            <div class="fieldset mb-2">
+              <label class="label mb-1" for="m-edit-collaborator-ids">Collaborators</label>
+              <select
+                id="m-edit-collaborator-ids"
+                name="obligation[collaborator_ids][]"
+                multiple
+                class="select w-full h-32"
+              >
+                <option
+                  :for={{label, id} <- @member_options}
+                  value={id}
+                  selected={collaborator_selected?(@edit_collaborator_ids, id)}
+                >
+                  {label}
+                </option>
+              </select>
+              <p class="text-xs text-base-content/50 mt-1">
+                Hold ⌘/Ctrl to select more than one. Deselect all to remove collaborators.
+              </p>
+            </div>
             <div class="modal-action">
               <button type="button" class="btn" phx-click="close_edit_modal">Cancel</button>
               <.button class="btn btn-primary" phx-disable-with="Saving…">Save</.button>
@@ -221,21 +241,37 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
   def handle_event("save_obligation", %{"obligation" => params}, socket) do
     scope = socket.assigns.current_scope
 
+    obligation = socket.assigns.obligation
+
     attrs = %{
       title: params["title"],
       due_by: parse_date(params["due_by"]),
       primary_assignee_id: params["primary_assignee_id"]
     }
 
-    case Obligations.update_obligation(scope, socket.assigns.obligation, attrs) do
-      {:ok, _} ->
-        {:noreply,
-         reload(socket)
-         |> assign(:show_edit_modal, false)
-         |> put_flash(:info, "Obligation updated.")}
+    collaborator_ids = parse_collaborator_ids(params["collaborator_ids"])
+
+    case Obligations.update_obligation(scope, obligation, attrs) do
+      {:ok, updated} ->
+        case Obligations.update_collaborators(scope, updated, collaborator_ids) do
+          {:ok, _} ->
+            {:noreply,
+             reload(socket)
+             |> assign(:show_edit_modal, false)
+             |> put_flash(:info, "Obligation updated.")}
+
+          :not_authorise ->
+            {:noreply, put_flash(socket, :error, "Not authorized to update collaborators.")}
+
+          {:error, _} ->
+            {:noreply, put_flash(socket, :error, "Could not update collaborators.")}
+        end
 
       {:error, %Ecto.Changeset{} = changeset} ->
-        {:noreply, assign(socket, :edit_form, to_form(changeset, as: "obligation"))}
+        {:noreply,
+         socket
+         |> assign(:edit_form, to_form(changeset, as: "obligation"))
+         |> assign(:edit_collaborator_ids, collaborator_ids)}
 
       :not_authorise ->
         {:noreply, put_flash(socket, :error, "Not authorized.")}
@@ -368,8 +404,9 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
   end
 
   defp assign_edit_form(socket, obligation) do
-    assign(
-      socket,
+    socket
+    |> assign(:edit_collaborator_ids, Enum.map(obligation.collaborators, & &1.user_id))
+    |> assign(
       :edit_form,
       to_form(
         %{
@@ -381,6 +418,20 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
       )
     )
   end
+
+  defp collaborator_selected?(ids, id) do
+    Enum.any?(ids, &(to_string(&1) == to_string(id)))
+  end
+
+  defp parse_collaborator_ids(nil), do: []
+
+  defp parse_collaborator_ids(ids) when is_list(ids) do
+    ids
+    |> Enum.reject(&(&1 in [nil, ""]))
+    |> Enum.uniq()
+  end
+
+  defp parse_collaborator_ids(id), do: [id]
 
   defp find_event(events, event_id) do
     Enum.find(events, &(to_string(&1.id) == to_string(event_id)))

@@ -160,6 +160,68 @@ defmodule ArgusWeb.ObligationLiveTest do
     assert has_element?(view, "#audit-log", "title")
   end
 
+  test "manager updates collaborators from edit modal", %{conn: conn} do
+    {scope, obligation} = manager_obligation_scope_fixture()
+    conn = log_in_user(conn, scope.user)
+    collab = member_fixture(scope.entity)
+
+    {:ok, view, _html} =
+      live(conn, ~p"/entities/#{scope.entity.slug}/obligations/#{obligation.id}")
+
+    view |> element("#edit-obligation-btn") |> render_click()
+
+    view
+    |> form("#edit-obligation-form", %{
+      "obligation" => %{
+        "title" => obligation.title,
+        "due_by" => Date.to_iso8601(obligation.due_by),
+        "primary_assignee_id" => obligation.primary_assignee_id,
+        "collaborator_ids" => [collab.id]
+      }
+    })
+    |> render_submit()
+
+    updated = Obligations.get_obligation!(scope, obligation.id)
+    assert Enum.map(updated.collaborators, & &1.user_id) == [collab.id]
+    assert render(view) =~ collab.email
+  end
+
+  test "manager removes collaborators from edit modal", %{conn: conn} do
+    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    conn = log_in_user(conn, manager.user)
+    assignee = member_fixture(manager.entity)
+    collaborator = member_fixture(manager.entity)
+    type = type_fixture(manager.entity)
+
+    {:ok, obligation} =
+      Obligations.create_obligation(manager, %{
+        title: "With collaborators",
+        obligation_type_id: type.id,
+        primary_assignee_id: assignee.id,
+        due_by: ~D[2026-06-30],
+        collaborator_ids: [collaborator.id]
+      })
+
+    {:ok, view, _html} =
+      live(conn, ~p"/entities/#{manager.entity.slug}/obligations/#{obligation.id}")
+
+    view |> element("#edit-obligation-btn") |> render_click()
+
+    view
+    |> form("#edit-obligation-form", %{
+      "obligation" => %{
+        "title" => obligation.title,
+        "due_by" => Date.to_iso8601(obligation.due_by),
+        "primary_assignee_id" => obligation.primary_assignee_id,
+        "collaborator_ids" => []
+      }
+    })
+    |> render_submit()
+
+    updated = Obligations.get_obligation!(manager, obligation.id)
+    assert updated.collaborators == []
+  end
+
   test "manager edits event note from show page", %{conn: conn} do
     manager = Argus.EntitiesFixtures.manager_scope_fixture()
     conn = log_in_user(conn, manager.user)
