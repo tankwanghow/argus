@@ -104,7 +104,8 @@ defmodule ArgusWeb.Layouts do
           <div tabindex="0" role="button" class="btn btn-ghost btn-sm">
             <.icon name="hero-user-circle" class="size-5" />
           </div>
-          <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box shadow z-50 w-52 p-2">
+          <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box shadow z-50 w-56 p-2">
+            <li class="menu-title truncate">{@current_scope.user.email}</li>
             <li><.link navigate={~p"/users/settings"}>Settings</.link></li>
             <li><.link navigate={~p"/entities"}>Switch entity</.link></li>
             <li><.link href={~p"/users/log-out"} method="delete">Log out</.link></li>
