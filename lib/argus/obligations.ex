@@ -202,6 +202,7 @@ defmodule Argus.Obligations do
     AuditLog
     |> where([l], l.obligation_id == ^obligation.id)
     |> order_by([l], asc: l.inserted_at)
+    |> preload(:user)
     |> Repo.all()
   end
 
@@ -283,6 +284,13 @@ defmodule Argus.Obligations do
     else
       false -> :not_authorise
     end
+  end
+
+  @doc """
+  True when `scope` may correct `event.note` on a live cycle (author within 48h, or manager/admin).
+  """
+  def note_editable?(%Scope{} = scope, %Event{} = event, %Obligation{} = obligation) do
+    can_edit_note?(scope, event, obligation)
   end
 
   def edit_note(%Scope{} = scope, %Event{} = event, attrs) do

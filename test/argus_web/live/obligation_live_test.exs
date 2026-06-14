@@ -133,6 +133,61 @@ defmodule ArgusWeb.ObligationLiveTest do
     assert render(view) =~ "Next due date is required"
   end
 
+  test "manager corrects obligation title from show page", %{conn: conn} do
+    {scope, obligation} = manager_obligation_scope_fixture()
+    conn = log_in_user(conn, scope.user)
+
+    {:ok, view, _html} =
+      live(conn, ~p"/entities/#{scope.entity.slug}/obligations/#{obligation.id}")
+
+    view |> element("#edit-obligation-btn") |> render_click()
+    assert has_element?(view, "#edit-obligation-form")
+
+    view
+    |> form("#edit-obligation-form", %{
+      "obligation" => %{
+        "title" => "EPF June (corrected)",
+        "due_by" => Date.to_iso8601(obligation.due_by),
+        "primary_assignee_id" => obligation.primary_assignee_id
+      }
+    })
+    |> render_submit()
+
+    assert render(view) =~ "EPF June (corrected)"
+    assert has_element?(view, "#audit-log", "title")
+  end
+
+  test "manager edits event note from show page", %{conn: conn} do
+    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    conn = log_in_user(conn, manager.user)
+    assignee = member_fixture(manager.entity)
+    type = type_fixture(manager.entity)
+
+    {:ok, created} =
+      Obligations.create_obligation(manager, %{
+        title: "SST Return",
+        obligation_type_id: type.id,
+        primary_assignee_id: assignee.id,
+        due_by: ~D[2026-06-30],
+        open_note: "Orginal typo"
+      })
+
+    obligation = Obligations.get_obligation!(manager, created.id)
+    event = hd(obligation.events)
+
+    {:ok, view, _html} =
+      live(conn, ~p"/entities/#{manager.entity.slug}/obligations/#{obligation.id}")
+
+    view |> element("#edit-note-#{event.id}") |> render_click()
+
+    view
+    |> form("#note-form-#{event.id}", %{"note" => %{"note" => "Original typo"}})
+    |> render_submit()
+
+    assert render(view) =~ "Original typo"
+    assert has_element?(view, "#audit-log", "note")
+  end
+
   test "complete recurring obligation with next due spawns successor", %{conn: conn} do
     {scope, obligation} = recurring_primary_scope_fixture(interval: "monthly")
     conn = log_in_user(conn, scope.user)

@@ -2,6 +2,7 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
   use ArgusWeb, :live_view
 
   alias Argus.Authorization
+  alias Argus.Entities
   alias Argus.Obligations
   alias Argus.Obligations.{Obligation, Recurrence, Urgency}
 
@@ -19,7 +20,18 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
 
         <div class="mt-2 flex items-start justify-between gap-2">
           <h1 class="text-xl font-semibold">{@obligation.title}</h1>
-          <.urgency_badge urgency={@urgency} />
+          <div class="flex items-center gap-1 shrink-0">
+            <button
+              :if={@live? and Authorization.can?(@current_scope, :edit_obligation)}
+              id="m-edit-obligation-btn"
+              type="button"
+              phx-click="open_edit_modal"
+              class="btn btn-ghost btn-xs"
+            >
+              <.icon name="hero-pencil-square-mini" class="size-4" />
+            </button>
+            <.urgency_badge urgency={@urgency} />
+          </div>
         </div>
         <p class="text-sm text-base-content/60">
           {@obligation.obligation_type.name} · due {format_date(@obligation.due_by)} · {due_label(
@@ -40,6 +52,7 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
         <ol id="event-timeline" class="mt-5 space-y-3">
           <li
             :for={event <- @obligation.events}
+            id={"m-event-#{event.id}"}
             data-status={event.status}
             class="border-l-2 border-base-300 pl-3"
           >
@@ -47,7 +60,49 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
               <span class="font-medium text-sm">{humanize_status(event.status)}</span>
               <span class="text-xs text-base-content/50">{format_datetime(event.inserted_at)}</span>
             </div>
-            <div :if={event.note} class="text-sm text-base-content/70 mt-0.5">{event.note}</div>
+            <div class="mt-1 flex items-start justify-between gap-2">
+              <div
+                :if={@editing_note_id != event.id and is_binary(event.note)}
+                class="text-sm text-base-content/70"
+              >
+                {event.note}
+              </div>
+              <div
+                :if={@editing_note_id != event.id and is_nil(event.note)}
+                class="text-sm text-base-content/40 italic"
+              >
+                No note
+              </div>
+              <button
+                :if={
+                  @editing_note_id != event.id and
+                    Obligations.note_editable?(@current_scope, event, @obligation)
+                }
+                id={"m-edit-note-#{event.id}"}
+                type="button"
+                phx-click="edit_note"
+                phx-value-event_id={event.id}
+                class="btn btn-ghost btn-xs shrink-0"
+              >
+                Edit
+              </button>
+            </div>
+            <.form
+              :if={@editing_note_id == event.id}
+              for={@note_form}
+              id={"m-note-form-#{event.id}"}
+              phx-submit="save_note"
+              class="mt-2 space-y-2"
+            >
+              <input type="hidden" name="event_id" value={event.id} />
+              <.input field={@note_form[:note]} type="textarea" label="Note" />
+              <div class="flex gap-2">
+                <.button class="btn btn-primary btn-sm" phx-disable-with="Saving…">Save</.button>
+                <button type="button" class="btn btn-ghost btn-sm" phx-click="cancel_note_edit">
+                  Cancel
+                </button>
+              </div>
+            </.form>
           </li>
         </ol>
 
@@ -79,6 +134,32 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
           >
             Cancel
           </button>
+        </div>
+      </div>
+
+      <div :if={@show_edit_modal} id="m-edit-modal" class="modal modal-bottom modal-open">
+        <div class="modal-box">
+          <h3 class="font-bold text-lg">Edit obligation</h3>
+          <.form
+            for={@edit_form}
+            id="m-edit-obligation-form"
+            phx-submit="save_obligation"
+            class="mt-2 space-y-3"
+          >
+            <.input field={@edit_form[:title]} type="text" label="Title" required />
+            <.input field={@edit_form[:due_by]} type="date" label="Due by" required />
+            <.input
+              field={@edit_form[:primary_assignee_id]}
+              type="select"
+              label="Primary assignee"
+              options={@member_options}
+              required
+            />
+            <div class="modal-action">
+              <button type="button" class="btn" phx-click="close_edit_modal">Cancel</button>
+              <.button class="btn btn-primary" phx-disable-with="Saving…">Save</.button>
+            </div>
+          </.form>
         </div>
       </div>
 
@@ -114,10 +195,95 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
   @impl true
   def mount(%{"id" => id}, _session, socket) do
     scope = socket.assigns.current_scope
-    {:ok, assign(socket, :show_done_modal, false) |> load(id, scope)}
+
+    {:ok,
+     socket
+     |> assign(:show_done_modal, false)
+     |> assign(:show_edit_modal, false)
+     |> assign(:editing_note_id, nil)
+     |> assign(:note_form, nil)
+     |> assign(:member_options, member_options(scope))
+     |> load(id, scope)}
   end
 
   @impl true
+  def handle_event("open_edit_modal", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:show_edit_modal, true)
+     |> assign_edit_form(socket.assigns.obligation)}
+  end
+
+  def handle_event("close_edit_modal", _params, socket) do
+    {:noreply, assign(socket, :show_edit_modal, false)}
+  end
+
+  def handle_event("save_obligation", %{"obligation" => params}, socket) do
+    scope = socket.assigns.current_scope
+
+    attrs = %{
+      title: params["title"],
+      due_by: parse_date(params["due_by"]),
+      primary_assignee_id: params["primary_assignee_id"]
+    }
+
+    case Obligations.update_obligation(scope, socket.assigns.obligation, attrs) do
+      {:ok, _} ->
+        {:noreply,
+         reload(socket)
+         |> assign(:show_edit_modal, false)
+         |> put_flash(:info, "Obligation updated.")}
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        {:noreply, assign(socket, :edit_form, to_form(changeset, as: "obligation"))}
+
+      :not_authorise ->
+        {:noreply, put_flash(socket, :error, "Not authorized.")}
+    end
+  end
+
+  def handle_event("edit_note", %{"event_id" => event_id}, socket) do
+    case find_event(socket.assigns.obligation.events, event_id) do
+      nil ->
+        {:noreply, put_flash(socket, :error, "Event not found.")}
+
+      event ->
+        {:noreply,
+         socket
+         |> assign(:editing_note_id, event.id)
+         |> assign(:note_form, to_form(%{"note" => event.note || ""}, as: :note))}
+    end
+  end
+
+  def handle_event("cancel_note_edit", _params, socket) do
+    {:noreply, socket |> assign(:editing_note_id, nil) |> assign(:note_form, nil)}
+  end
+
+  def handle_event("save_note", %{"event_id" => event_id, "note" => %{"note" => note}}, socket) do
+    scope = socket.assigns.current_scope
+
+    case find_event(socket.assigns.obligation.events, event_id) do
+      nil ->
+        {:noreply, put_flash(socket, :error, "Event not found.")}
+
+      event ->
+        case Obligations.edit_note(scope, event, %{note: note}) do
+          {:ok, _} ->
+            {:noreply,
+             reload(socket)
+             |> assign(:editing_note_id, nil)
+             |> assign(:note_form, nil)
+             |> put_flash(:info, "Note updated.")}
+
+          {:error, :locked} ->
+            {:noreply, put_flash(socket, :error, "This note can no longer be edited.")}
+
+          {:error, %Ecto.Changeset{}} ->
+            {:noreply, put_flash(socket, :error, "Could not save note.")}
+        end
+    end
+  end
+
   def handle_event("start_progress", _params, socket) do
     case Obligations.start_progress(socket.assigns.current_scope, socket.assigns.obligation) do
       {:ok, _} -> {:noreply, reload(socket) |> put_flash(:info, "Progress started.")}
@@ -194,11 +360,39 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
       :done_form,
       to_form(%{"note" => "", "next_due_by" => suggestion(obligation, recurring?)}, as: :done)
     )
+    |> assign_edit_form(obligation)
   end
 
   defp reload(socket) do
     load(socket, socket.assigns.obligation.id, socket.assigns.current_scope)
   end
+
+  defp assign_edit_form(socket, obligation) do
+    assign(
+      socket,
+      :edit_form,
+      to_form(
+        %{
+          "title" => obligation.title,
+          "due_by" => iso_date(obligation.due_by),
+          "primary_assignee_id" => obligation.primary_assignee_id
+        },
+        as: "obligation"
+      )
+    )
+  end
+
+  defp find_event(events, event_id) do
+    Enum.find(events, &(to_string(&1.id) == to_string(event_id)))
+  end
+
+  defp member_options(scope) do
+    Entities.list_entity_members(scope.entity)
+    |> Enum.map(fn {user, _membership} -> {user.email, user.id} end)
+  end
+
+  defp iso_date(%Date{} = date), do: Date.to_iso8601(date)
+  defp iso_date(_), do: ""
 
   defp suggestion(obligation, true) do
     case Recurrence.next_due_suggestion(obligation.obligation_type, obligation.due_by) do

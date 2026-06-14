@@ -2,6 +2,7 @@ defmodule ArgusWeb.ObligationLive.Show do
   use ArgusWeb, :live_view
 
   alias Argus.Authorization
+  alias Argus.Entities
   alias Argus.Obligations
   alias Argus.Obligations.{Obligation, Recurrence, Urgency}
 
@@ -19,6 +20,15 @@ defmodule ArgusWeb.ObligationLive.Show do
             )}
           </:subtitle>
           <:actions>
+            <button
+              :if={@live? and Authorization.can?(@current_scope, :edit_obligation)}
+              id="edit-obligation-btn"
+              type="button"
+              phx-click="open_edit_modal"
+              class="btn btn-ghost btn-sm"
+            >
+              <.icon name="hero-pencil-square-mini" class="size-4" /> Edit
+            </button>
             <.urgency_badge urgency={@urgency} />
           </:actions>
         </.header>
@@ -70,7 +80,49 @@ defmodule ArgusWeb.ObligationLive.Show do
               <div :if={event.status_by} class="text-xs text-base-content/50">
                 by {event.status_by.email}
               </div>
-              <div :if={event.note} class="text-sm text-base-content/70 mt-1">{event.note}</div>
+              <div class="mt-1 flex items-start justify-between gap-2">
+                <div
+                  :if={@editing_note_id != event.id and is_binary(event.note)}
+                  class="text-sm text-base-content/70"
+                >
+                  {event.note}
+                </div>
+                <div
+                  :if={@editing_note_id != event.id and is_nil(event.note)}
+                  class="text-sm text-base-content/40 italic"
+                >
+                  No note
+                </div>
+                <button
+                  :if={
+                    @editing_note_id != event.id and
+                      Obligations.note_editable?(@current_scope, event, @obligation)
+                  }
+                  id={"edit-note-#{event.id}"}
+                  type="button"
+                  phx-click="edit_note"
+                  phx-value-event_id={event.id}
+                  class="btn btn-ghost btn-xs shrink-0"
+                >
+                  Edit note
+                </button>
+              </div>
+              <.form
+                :if={@editing_note_id == event.id}
+                for={@note_form}
+                id={"note-form-#{event.id}"}
+                phx-submit="save_note"
+                class="mt-2 space-y-2"
+              >
+                <input type="hidden" name="event_id" value={event.id} />
+                <.input field={@note_form[:note]} type="textarea" label="Note" />
+                <div class="flex gap-2">
+                  <.button class="btn btn-primary btn-sm" phx-disable-with="Saving…">Save</.button>
+                  <button type="button" class="btn btn-ghost btn-sm" phx-click="cancel_note_edit">
+                    Cancel
+                  </button>
+                </div>
+              </.form>
               <ul :if={event.documents != []} class="mt-2 space-y-1 text-sm">
                 <li :for={doc <- event.documents} class="flex items-center gap-2">
                   <.icon name="hero-paper-clip-mini" class="size-4 text-base-content/40" />
@@ -160,6 +212,26 @@ defmodule ArgusWeb.ObligationLive.Show do
             End series
           </button>
         </section>
+        <section :if={@audit_logs != []} id="audit-log" class="mt-8">
+          <h2 class="text-sm font-semibold uppercase tracking-wide text-base-content/60">
+            Corrections
+          </h2>
+          <ul class="mt-3 divide-y divide-base-300 rounded-box border border-base-300 text-sm">
+            <li :for={log <- @audit_logs} id={"audit-#{log.id}"} class="p-3 space-y-1">
+              <div class="flex items-center justify-between gap-3">
+                <span class="font-medium">{log.field}</span>
+                <span class="text-xs text-base-content/50">{format_datetime(log.inserted_at)}</span>
+              </div>
+              <div class="text-xs text-base-content/50">by {log.user.email}</div>
+              <div class="text-base-content/70">
+                <span :if={log.old_value} class="line-through">{log.old_value}</span>
+                <span :if={log.old_value != nil and log.new_value != nil}> → </span>
+                <span :if={log.new_value}>{log.new_value}</span>
+              </div>
+            </li>
+          </ul>
+        </section>
+
         <section :if={length(@series) > 1} id="series-history" class="mt-8">
           <h2 class="text-sm font-semibold uppercase tracking-wide text-base-content/60">
             Series history
@@ -187,6 +259,30 @@ defmodule ArgusWeb.ObligationLive.Show do
             </li>
           </ul>
         </section>
+      </div>
+
+      <div :if={@show_edit_modal} id="edit-modal" class="modal modal-open">
+        <div class="modal-box">
+          <h3 class="font-bold text-lg">Edit obligation</h3>
+          <.form for={@edit_form} id="edit-obligation-form" phx-submit="save_obligation" class="mt-2">
+            <.input field={@edit_form[:title]} type="text" label="Title" required />
+            <.input field={@edit_form[:due_by]} type="date" label="Due by" required />
+            <.input
+              field={@edit_form[:primary_assignee_id]}
+              type="select"
+              label="Primary assignee"
+              options={@member_options}
+              required
+            />
+            <div class="modal-action">
+              <button type="button" class="btn" phx-click="close_edit_modal">Cancel</button>
+              <.button class="btn btn-primary" phx-disable-with="Saving…">Save changes</.button>
+            </div>
+          </.form>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+          <button type="button" phx-click="close_edit_modal">close</button>
+        </form>
       </div>
 
       <div
@@ -242,13 +338,18 @@ defmodule ArgusWeb.ObligationLive.Show do
     {:ok,
      socket
      |> assign(:show_done_modal, false)
+     |> assign(:show_edit_modal, false)
+     |> assign(:editing_note_id, nil)
+     |> assign(:note_form, nil)
      |> assign(:recurring?, recurring?(obligation))
      |> assign(:today, today)
      |> assign(:urgency, urgency)
      |> assign(:live?, live?)
+     |> assign(:member_options, member_options(scope))
      |> allow_upload(:document, accept: :any, max_entries: 1, max_file_size: 20_000_000)
      |> assign_obligation(obligation)
-     |> assign_done_form(obligation)}
+     |> assign_done_form(obligation)
+     |> assign_edit_form(obligation)}
   end
 
   @impl true
@@ -265,6 +366,84 @@ defmodule ArgusWeb.ObligationLive.Show do
 
       :not_authorise ->
         {:noreply, put_flash(socket, :error, "Not authorized.")}
+    end
+  end
+
+  def handle_event("open_edit_modal", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:show_edit_modal, true)
+     |> assign_edit_form(socket.assigns.obligation)}
+  end
+
+  def handle_event("close_edit_modal", _params, socket) do
+    {:noreply, assign(socket, :show_edit_modal, false)}
+  end
+
+  def handle_event("save_obligation", %{"obligation" => params}, socket) do
+    scope = socket.assigns.current_scope
+    obligation = socket.assigns.obligation
+
+    attrs = %{
+      title: params["title"],
+      due_by: parse_date(params["due_by"]),
+      primary_assignee_id: params["primary_assignee_id"]
+    }
+
+    case Obligations.update_obligation(scope, obligation, attrs) do
+      {:ok, _} ->
+        {:noreply,
+         reload(socket)
+         |> assign(:show_edit_modal, false)
+         |> put_flash(:info, "Obligation updated.")}
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        {:noreply, assign(socket, :edit_form, to_form(changeset, as: "obligation"))}
+
+      :not_authorise ->
+        {:noreply, put_flash(socket, :error, "Not authorized.")}
+    end
+  end
+
+  def handle_event("edit_note", %{"event_id" => event_id}, socket) do
+    case find_event(socket.assigns.obligation.events, event_id) do
+      nil ->
+        {:noreply, put_flash(socket, :error, "Event not found.")}
+
+      event ->
+        {:noreply,
+         socket
+         |> assign(:editing_note_id, event.id)
+         |> assign(:note_form, to_form(%{"note" => event.note || ""}, as: :note))}
+    end
+  end
+
+  def handle_event("cancel_note_edit", _params, socket) do
+    {:noreply, socket |> assign(:editing_note_id, nil) |> assign(:note_form, nil)}
+  end
+
+  def handle_event("save_note", %{"event_id" => event_id, "note" => %{"note" => note}}, socket) do
+    scope = socket.assigns.current_scope
+
+    case find_event(socket.assigns.obligation.events, event_id) do
+      nil ->
+        {:noreply, put_flash(socket, :error, "Event not found.")}
+
+      event ->
+        case Obligations.edit_note(scope, event, %{note: note}) do
+          {:ok, _} ->
+            {:noreply,
+             reload(socket)
+             |> assign(:editing_note_id, nil)
+             |> assign(:note_form, nil)
+             |> put_flash(:info, "Note updated.")}
+
+          {:error, :locked} ->
+            {:noreply, put_flash(socket, :error, "This note can no longer be edited.")}
+
+          {:error, %Ecto.Changeset{}} ->
+            {:noreply, put_flash(socket, :error, "Could not save note.")}
+        end
     end
   end
 
@@ -392,7 +571,32 @@ defmodule ArgusWeb.ObligationLive.Show do
     |> assign(:doc_slots, doc_slots)
     |> assign(:required_docs, required_docs)
     |> assign(:series, Obligations.list_series(obligation.series_id))
+    |> assign(:audit_logs, Obligations.list_audit_logs(obligation))
     |> assign(:can_add_document?, can_add_document?(socket.assigns.current_scope, obligation))
+  end
+
+  defp find_event(events, event_id) do
+    Enum.find(events, &(to_string(&1.id) == to_string(event_id)))
+  end
+
+  defp member_options(scope) do
+    Entities.list_entity_members(scope.entity)
+    |> Enum.map(fn {user, _membership} -> {user.email, user.id} end)
+  end
+
+  defp assign_edit_form(socket, obligation) do
+    assign(
+      socket,
+      :edit_form,
+      to_form(
+        %{
+          "title" => obligation.title,
+          "due_by" => iso_date(obligation.due_by),
+          "primary_assignee_id" => obligation.primary_assignee_id
+        },
+        as: "obligation"
+      )
+    )
   end
 
   defp cycle_marker(cycle, current_id) do
