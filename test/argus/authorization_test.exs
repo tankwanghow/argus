@@ -66,6 +66,28 @@ defmodule Argus.AuthorizationTest do
 
       refute Authorization.can?(scope, :start_progress, obligation)
     end
+
+    test "member cannot mark done on unassigned obligation" do
+      scope = member_scope_fixture()
+
+      obligation = %Obligation{
+        primary_assignee_id: nil,
+        collaborators: []
+      }
+
+      refute Authorization.can?(scope, :mark_done, obligation)
+    end
+
+    test "manager can mark done on unassigned obligation" do
+      scope = manager_scope_fixture()
+
+      obligation = %Obligation{
+        primary_assignee_id: nil,
+        collaborators: []
+      }
+
+      assert Authorization.can?(scope, :mark_done, obligation)
+    end
   end
 
   defp collaborator_scope_fixture do

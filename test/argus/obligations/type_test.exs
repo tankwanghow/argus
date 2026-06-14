@@ -12,7 +12,7 @@ defmodule Argus.Obligations.TypeTest do
 
       assert {:ok, type} =
                Obligations.create_type(manager, %{
-                 name: "SST Return",
+                 name: "Custom filing",
                  recurring_interval: "quarterly"
                })
 
@@ -35,15 +35,12 @@ defmodule Argus.Obligations.TypeTest do
       assert updated.name == "New"
     end
 
-    test "system presets are immutable" do
+    test "manager cannot update another entity's type" do
       manager = Argus.EntitiesFixtures.manager_scope_fixture()
+      other_entity = Argus.EntitiesFixtures.entity_fixture()
+      type = type_fixture(other_entity, name: "Other type")
 
-      preset =
-        %Type{entity_id: nil}
-        |> Type.changeset(%{name: "EPF Preset", recurring_interval: "monthly"})
-        |> Repo.insert!()
-
-      assert :not_authorise = Obligations.update_type(manager, preset, %{name: "Hacked"})
+      assert :not_authorise = Obligations.update_type(manager, type, %{name: "Hacked"})
     end
   end
 

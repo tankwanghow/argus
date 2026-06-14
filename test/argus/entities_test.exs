@@ -4,6 +4,8 @@ defmodule Argus.EntitiesTest do
   alias Argus.Accounts.Scope
   alias Argus.Entities
   alias Argus.Entities.Membership
+  alias Argus.Obligations
+  alias Argus.Obligations.SampleTypes
 
   import Argus.AccountsFixtures
 
@@ -17,6 +19,11 @@ defmodule Argus.EntitiesTest do
       membership = Entities.get_membership!(scope.user, entity)
       assert membership.role == "admin"
       assert membership.is_default
+
+      scope = Scope.put_entity(scope, entity, membership)
+      types = Obligations.list_types(scope)
+      assert length(types) == length(SampleTypes.samples())
+      assert Enum.any?(types, &(&1.name == "EPF Monthly"))
     end
   end
 

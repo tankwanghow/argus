@@ -35,3 +35,8 @@ argus-*.tar
 npm-debug.log
 /assets/node_modules/
 
+# Locally-uploaded obligation documents (dev fallback storage; may contain
+# real, sensitive files). Never commit these.
+/priv/uploads/
+/config/priv/uploads/
+

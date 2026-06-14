@@ -64,12 +64,52 @@ defmodule ArgusWeb.DashboardLiveTest do
         title: "Late filing",
         obligation_type_id: type.id,
         primary_assignee_id: member.id,
-        due_by: ~D[2020-01-01]
+        due_by: ~D[2020-01-01],
+        open_note: "Late"
       })
 
     {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}")
 
     assert has_element?(view, "[data-tier=overdue]")
-    assert has_element?(view, "[data-overdue-count]")
+    assert has_element?(view, "#summary-overdue")
+  end
+
+  test "dashboard rows show latest event status and count", %{conn: conn} do
+    {scope, obligation} = manager_obligation_scope_fixture()
+    conn = log_in_user(conn, scope.user)
+
+    assert {:ok, _} =
+             Obligations.start_progress(scope, obligation, %{note: "Working"})
+
+    {:ok, view, _html} = live(conn, ~p"/entities/#{scope.entity.slug}")
+
+    assert has_element?(
+             view,
+             "#obligation-row-#{obligation.id}[data-event-count='2'][data-event-status='in_progress']",
+             "In progress"
+           )
+
+    assert has_element?(view, "#obligation-row-#{obligation.id}", "2 events")
+    assert has_element?(view, "#obligation-row-#{obligation.id}", scope.user.email)
+  end
+
+  test "team overview shows unassigned section", %{conn: conn} do
+    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    conn = log_in_user(conn, manager.user)
+    type = type_fixture(manager.entity)
+
+    {:ok, _} =
+      Obligations.create_obligation(manager, %{
+        title: "Unowned task",
+        obligation_type_id: type.id,
+        primary_assignee_id: nil,
+        due_by: ~D[2026-06-20],
+        open_note: "Unowned"
+      })
+
+    {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}")
+
+    assert has_element?(view, "#tier-unassigned", "Unowned task")
+    assert has_element?(view, "#tier-unassigned", "Assign someone")
   end
 end

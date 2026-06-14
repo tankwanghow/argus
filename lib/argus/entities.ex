@@ -8,6 +8,7 @@ defmodule Argus.Entities do
   alias Argus.Accounts.{Scope, User}
   alias Argus.Authorization
   alias Argus.Entities.{Entity, Invitation, Membership}
+  alias Argus.Obligations.SampleTypes
   alias Argus.Repo
 
   @invitation_validity_days 7
@@ -30,6 +31,10 @@ defmodule Argus.Entities do
         is_default: first_entity_for_user?(user)
       }
       |> Membership.changeset(%{})
+    end)
+    |> Ecto.Multi.run(:sample_types, fn _repo, %{entity: entity} ->
+      SampleTypes.seed_for_entity(entity.id)
+      {:ok, :seeded}
     end)
     |> Repo.transaction()
     |> case do

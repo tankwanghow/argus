@@ -84,30 +84,54 @@ assigns). Contexts take `scope`/`current_scope` as their first argument; authori
 | Role | Can |
 |------|-----|
 | admin | everything |
-| manager | create/edit obligations, manage types, mark Done on **any** obligation, cancel, end series |
+| manager | create/edit obligations, manage types, mark Done on **any** obligation, cancel, **skip cycle**, end series |
 | member | view assigned work, add notes/docs while in progress, mark Done **only if primary assignee** |
 
 Collaborators (join table) can move an obligation to `in_progress` and add notes/docs, but
 **cannot** mark Done. Only the **primary assignee** or a manager/admin marks Done.
+
+**Obligations may be unassigned.** `primary_assignee_id` is **nullable** — an obligation can be
+created without a primary assignee and assigned later (`Obligations.list_unassigned/1` surfaces
+these; the title search matches the literal `"unassigned"`). An unassigned cycle has **no member
+who can mark it Done** — only a manager/admin can (or after a primary assignee is set). The
+`mark_done` / `start_progress` authorization checks guard `nil` before comparing
+`primary_assignee_id` to the user.
+
+**Every state transition requires a note.** Creating an obligation (the `open_note`),
+`start_progress`, cancel, **skip**, and end-series all reject a blank note via
+`validate_action_note`. The Done note is likewise **always required** (see rule 1). Notes are no
+longer optional context — treat them as mandatory on every write that produces an `Event`.
+
+**Skip cycle** (`Obligations.skip_cycle/3`, manager/admin) cancels the current live cycle (with a
+note) **and** spawns the next cycle in the series in one transaction — the recurrence equivalent of
+"close this cycle without doing the work." It requires a recurring, not-ended series and a
+`next_due_by`, mirroring the Done→spawn path.
 
 ### Obligations domain — the core model (read the spec before editing)
 
 The single most important design decision: **one `Obligation` row per cycle**, not a standing
 series with a rolling `due_by`. A recurrence chain is linked by a shared `series_id` (UUID).
 
-- `Argus.Obligations.Obligation` — one cycle. `status` is `active | cancelled`; **done-ness is a separate `completed_at` timestamp**, not a status value (a completed cycle keeps `status = active`). A cycle is **live** while `status = active AND completed_at IS NULL` — that's the set dashboards show and that can be worked/completed/cancelled. This predicate is defined **once** as `Obligations.live/1` (a composable query builder) and every list/dashboard/report composes it — never hand-write it. A partial unique index on `series_id` (where live) enforces **one live cycle per series**. `series_ended_at` (when set) blocks future spawning. The row also **snapshots** `complete_note_required`/`complete_documents` from the type at creation (see rule 1).
+- `Argus.Obligations.Obligation` — one cycle. `status` is `active | cancelled`; **done-ness is a separate `completed_at` timestamp**, not a status value (a completed cycle keeps `status = active`). A cycle is **live** while `status = active AND completed_at IS NULL` — that's the set dashboards show and that can be worked/completed/cancelled. This predicate is defined **once** as `Obligations.live/1` (a composable query builder) and every list/dashboard/report composes it — never hand-write it. A partial unique index on `series_id` (where live) enforces **one live cycle per series**. `series_ended_at` (when set) blocks future spawning. The row also **snapshots** `complete_documents` from the type at creation (see rule 1). `primary_assignee_id` is **nullable** (unassigned obligations).
 - `Argus.Obligations.Event` (`obligation_events`) — **append-only forward-only** status steps: `open → in_progress → done | cancelled`. New status = new row; rows are never deleted and status is never rewritten. The step `note` lives here (open context, done comment, cancel reason). `start_progress` is guarded — it only steps an `open` cycle forward, so double-clicks can't create duplicate `in_progress` rows.
 - `Argus.Obligations.EventDocument` — file uploads attached to an event; the per-file column is **`file`** (a `%{filename, original, path}` map), not `documents`. Wrong files are **voided** (`voided_at`/`voided_by_id`/`void_reason`), never deleted. `document_slot` matches a name in the obligation's snapshotted `complete_documents` for Done validation.
 - `Argus.Obligations.AuditLog` — field-level before/after for **corrections** (title, due_by, assignee, note edits).
-- `Argus.Obligations.Type` — system presets (`entity_id` NULL) + per-entity custom types.
+- `Argus.Obligations.Type` — **per-entity only** (`entity_id` is **NOT NULL**). There are no
+  global system presets; instead, when an entity is created, `Argus.Obligations.SampleTypes`
+  seeds a private copy of the sample types into that entity (`seed_for_entity/1`, run inside the
+  `create_entity` `Ecto.Multi`). Every entity therefore owns and can edit its full type set —
+  `list_types`/`get_type!` filter strictly by `entity_id`, and there is no "immutable preset"
+  case any more.
 
 ### Three rules that are easy to get wrong
 
-1. **Done validation is enforced only on Done**, never earlier, and against the obligation's
-   **snapshot** of `complete_note_required`/`complete_documents` (copied from the type at
-   creation), **not the live type** — editing a type must not retroactively move the bar for a
-   live cycle (type-definition audit is out of scope). `complete_note_required` → note present on
-   the Done event; `complete_documents` (comma-delimited slot names) → one **non-voided** document
+1. **Done validation is enforced only on Done**, never earlier. A Done **note is always
+   required** (blank ⇒ `{:error, :note_required}`) — this is unconditional and no longer
+   type-configurable (`complete_note_required` has been removed from both the type and the
+   obligation snapshot). The only **snapshotted** completion rule is `complete_documents` (copied
+   from the type at creation), validated against the obligation's snapshot, **not the live type**
+   — editing a type must not retroactively move the bar for a live cycle (type-definition audit is
+   out of scope). `complete_documents` (comma-delimited slot names) → one **non-voided** document
    per named slot, counted across **all events in the cycle** (open/in_progress/done), so
    incremental uploads count. Each spawned cycle re-snapshots from the type. See
    `Obligations.Completion`. **Only the completion contract is frozen** — `reminder_offsets`

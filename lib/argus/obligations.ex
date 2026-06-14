@@ -31,18 +31,14 @@ defmodule Argus.Obligations do
 
   def list_types(%Scope{entity: entity}) do
     Type
-    |> where([t], is_nil(t.entity_id) or t.entity_id == ^entity.id)
+    |> where([t], t.entity_id == ^entity.id)
     |> order_by([t], asc: t.name)
     |> Repo.all()
   end
 
-  @doc """
-  Fetches a type visible to the scope — either a system preset (`entity_id`
-  is nil) or one owned by the scope's entity. Raises if not found/visible.
-  """
   def get_type!(%Scope{entity: entity}, id) do
     Type
-    |> where([t], t.id == ^id and (is_nil(t.entity_id) or t.entity_id == ^entity.id))
+    |> where([t], t.id == ^id and t.entity_id == ^entity.id)
     |> Repo.one!()
   end
 
@@ -58,10 +54,6 @@ defmodule Argus.Obligations do
     end
   end
 
-  @doc """
-  Updates a **custom** (entity-owned) type. System presets are immutable —
-  attempting to edit one (or another entity's type) returns `:not_authorise`.
-  """
   def update_type(%Scope{entity: entity} = scope, %Type{} = type, attrs) do
     if Authorization.can?(scope, :manage_types) and type.entity_id == entity.id do
       type
@@ -89,6 +81,29 @@ defmodule Argus.Obligations do
   end
 
   def list_team_overview(scope), do: list_obligations(scope, status: :live)
+
+  def list_unassigned(%Scope{entity: entity}) do
+    Obligation
+    |> where([o], o.entity_id == ^entity.id)
+    |> live()
+    |> where([o], is_nil(o.primary_assignee_id))
+    |> order_by([o], asc: o.due_by)
+    |> preload([:obligation_type, :primary_assignee])
+    |> Repo.all()
+  end
+
+  @recently_completed_days 14
+
+  def list_recently_completed(%Scope{entity: entity}, days \\ @recently_completed_days) do
+    cutoff = DateTime.utc_now(:second) |> DateTime.add(-days * 24 * 3600, :second)
+
+    Obligation
+    |> where([o], o.entity_id == ^entity.id)
+    |> where([o], not is_nil(o.completed_at) and o.completed_at >= ^cutoff)
+    |> order_by([o], desc: o.completed_at)
+    |> preload([:obligation_type, :primary_assignee])
+    |> Repo.all()
+  end
 
   @status_filters ~w(my_live my_completed live completed cancelled all)a
 
@@ -158,9 +173,15 @@ defmodule Argus.Obligations do
     Enum.filter(obligations, fn obligation ->
       String.contains?(String.downcase(obligation.title), q) or
         String.contains?(String.downcase(obligation.obligation_type.name), q) or
-        String.contains?(String.downcase(obligation.primary_assignee.email), q)
+        assignee_matches_query?(obligation, q)
     end)
   end
+
+  defp assignee_matches_query?(%Obligation{primary_assignee: nil}, q),
+    do: String.contains?("unassigned", q)
+
+  defp assignee_matches_query?(%Obligation{primary_assignee: assignee}, q),
+    do: String.contains?(String.downcase(assignee.email), q)
 
   defp collaborator_obligation_ids(user_id) do
     from c in Collaborator, where: c.user_id == ^user_id, select: c.obligation_id
@@ -198,9 +219,53 @@ defmodule Argus.Obligations do
     |> Repo.one!()
   end
 
+  @doc """
+  Batch-fetches event count and latest event (with `status_by`) for a list of obligations.
+  Returns a map of `obligation_id => %{event_count: integer, latest_event: Event | nil}`.
+  """
+  def event_summaries_for(obligations) when is_list(obligations) do
+    obligations
+    |> Enum.map(& &1.id)
+    |> event_summaries_for_ids()
+  end
+
+  def event_summaries_for_ids([]), do: %{}
+
+  def event_summaries_for_ids(ids) do
+    counts =
+      Event
+      |> where([e], e.obligation_id in ^ids)
+      |> group_by([e], e.obligation_id)
+      |> select([e], {e.obligation_id, count(e.id)})
+      |> Repo.all()
+      |> Map.new()
+
+    latest_events =
+      Event
+      |> where([e], e.obligation_id in ^ids)
+      |> order_by([e],
+        asc: e.obligation_id,
+        desc: e.inserted_at,
+        desc:
+          fragment(
+            "CASE ? WHEN 'done' THEN 4 WHEN 'in_progress' THEN 3 WHEN 'cancelled' THEN 2 WHEN 'open' THEN 1 ELSE 0 END",
+            e.status
+          )
+      )
+      |> distinct([e], e.obligation_id)
+      |> preload(:status_by)
+      |> Repo.all()
+      |> Map.new(&{&1.obligation_id, &1})
+
+    Map.new(ids, fn id ->
+      {id, %{event_count: Map.get(counts, id, 0), latest_event: Map.get(latest_events, id)}}
+    end)
+  end
+
   def create_obligation(%Scope{} = scope, attrs) do
     with true <- Authorization.can?(scope, :create_obligation),
          {:ok, type} <- fetch_type_for_entity(scope, attrs),
+         :ok <- validate_open_note(attrs),
          {:ok, obligation} <- insert_obligation(scope, attrs, type) do
       {:ok, obligation}
     else
@@ -209,12 +274,14 @@ defmodule Argus.Obligations do
     end
   end
 
-  def start_progress(%Scope{} = scope, %Obligation{} = obligation) do
+  def start_progress(%Scope{} = scope, %Obligation{} = obligation, attrs \\ %{}) do
     obligation = Repo.preload(obligation, :collaborators)
+    note = Map.get(attrs, :note) || Map.get(attrs, "note")
 
     with true <- Authorization.can?(scope, :start_progress, obligation),
          :ok <- ensure_latest_open(obligation),
-         {:ok, event} <- insert_progress_event(scope, obligation) do
+         :ok <- validate_action_note(note),
+         {:ok, event} <- insert_progress_event(scope, obligation, note) do
       {:ok, event}
     else
       false -> :not_authorise
@@ -465,6 +532,23 @@ defmodule Argus.Obligations do
     end
   end
 
+  def skip_cycle(%Scope{} = scope, %Obligation{} = obligation, attrs) do
+    obligation = Repo.preload(obligation, [:collaborators, :obligation_type])
+    note = Map.get(attrs, :note) || Map.get(attrs, "note")
+    next_due_by = Map.get(attrs, :next_due_by) || Map.get(attrs, "next_due_by")
+
+    with true <- Authorization.can?(scope, :skip_cycle),
+         :ok <- validate_skipable(obligation),
+         :ok <- validate_action_note(note),
+         :ok <- validate_next_due(obligation, attrs),
+         {:ok, cancelled, spawned} <- skip_cycle_multi(scope, obligation, note, next_due_by) do
+      {:ok, cancelled, spawned}
+    else
+      false -> :not_authorise
+      {:error, _} = error -> error
+    end
+  end
+
   def end_series(%Scope{} = scope, %Obligation{} = obligation, attrs) do
     note = Map.get(attrs, :note) || Map.get(attrs, "note")
 
@@ -505,6 +589,44 @@ defmodule Argus.Obligations do
     end
   end
 
+  defp skip_cycle_multi(scope, obligation, note, next_due_by) do
+    now = DateTime.utc_now(:second)
+
+    Ecto.Multi.new()
+    |> Ecto.Multi.update_all(
+      :obligation,
+      live(Obligation) |> where([o], o.id == ^obligation.id),
+      set: [status: "cancelled", updated_at: now]
+    )
+    |> Ecto.Multi.run(:check, fn _repo, %{obligation: {count, _}} ->
+      if count == 1, do: {:ok, :updated}, else: {:error, :not_live}
+    end)
+    |> Ecto.Multi.insert(:cancelled_event, fn _ ->
+      %Event{
+        obligation_id: obligation.id,
+        status_by_id: scope.user.id
+      }
+      |> Event.changeset(%{status: "cancelled", note: note})
+    end)
+    |> Ecto.Multi.run(:spawn, fn repo, %{check: _} ->
+      spawn_next_cycle(repo, obligation, next_due_by, scope.user.id)
+    end)
+    |> Repo.transaction()
+    |> case do
+      {:ok, %{spawn: spawned}} ->
+        {:ok, Repo.get!(Obligation, obligation.id), spawned}
+
+      {:error, :check, :not_live, _} ->
+        {:error, :not_live}
+
+      {:error, :cancelled_event, changeset, _} ->
+        {:error, changeset}
+
+      {:error, :spawn, reason, _} ->
+        {:error, reason}
+    end
+  end
+
   defp complete_multi(scope, obligation, attrs) do
     now = DateTime.utc_now(:second)
     next_due_by = Map.get(attrs, :next_due_by) || Map.get(attrs, "next_due_by")
@@ -529,7 +651,7 @@ defmodule Argus.Obligations do
     end)
     |> Ecto.Multi.run(:spawn, fn repo, %{close: {_, _}} ->
       if spawn? do
-        case spawn_next_cycle(repo, obligation, next_due_by) do
+        case spawn_next_cycle(repo, obligation, next_due_by, scope.user.id) do
           {:ok, new_obligation} -> {:ok, new_obligation}
           {:error, reason} -> {:error, reason}
         end
@@ -558,6 +680,16 @@ defmodule Argus.Obligations do
       not is_nil(next_due_by)
   end
 
+  defp validate_skipable(%Obligation{} = obligation) do
+    type = obligation.obligation_type || Repo.get!(Type, obligation.obligation_type_id)
+
+    cond do
+      not Recurrence.recurring?(type) -> {:error, :not_recurring}
+      Series.ended?(obligation.series_id) -> {:error, :series_ended}
+      true -> :ok
+    end
+  end
+
   defp validate_next_due(%Obligation{} = obligation, attrs) do
     next_due_by = Map.get(attrs, :next_due_by) || Map.get(attrs, "next_due_by")
     type = obligation.obligation_type || Repo.get!(Type, obligation.obligation_type_id)
@@ -570,7 +702,7 @@ defmodule Argus.Obligations do
     end
   end
 
-  defp spawn_next_cycle(repo, %Obligation{} = done_obligation, next_due_by) do
+  defp spawn_next_cycle(repo, %Obligation{} = done_obligation, next_due_by, actor_id) do
     type = Repo.get!(Type, done_obligation.obligation_type_id)
 
     collaborators =
@@ -583,7 +715,6 @@ defmodule Argus.Obligations do
         entity_id: done_obligation.entity_id,
         series_id: done_obligation.series_id,
         status: "active",
-        complete_note_required: type.complete_note_required,
         complete_documents: type.complete_documents
       }
       |> Obligation.changeset(%{
@@ -608,9 +739,9 @@ defmodule Argus.Obligations do
     |> Ecto.Multi.insert(:open_event, fn %{obligation: obligation} ->
       %Event{
         obligation_id: obligation.id,
-        status_by_id: done_obligation.primary_assignee_id
+        status_by_id: done_obligation.primary_assignee_id || actor_id
       }
-      |> Event.changeset(%{status: "open"})
+      |> Event.changeset(%{status: "open", note: "Next cycle opened"})
     end)
     |> repo.transaction()
     |> case do
@@ -643,20 +774,24 @@ defmodule Argus.Obligations do
     if forward_step?, do: {:error, :not_open}, else: :ok
   end
 
-  defp insert_progress_event(%Scope{user: user}, %Obligation{} = obligation) do
+  defp insert_progress_event(%Scope{user: user}, %Obligation{} = obligation, note) do
     %Event{
       obligation_id: obligation.id,
       status_by_id: user.id
     }
-    |> Event.changeset(%{status: "in_progress"})
+    |> Event.changeset(%{status: "in_progress", note: note})
     |> Repo.insert()
+  end
+
+  defp validate_open_note(attrs) do
+    open_note = Map.get(attrs, :open_note) || Map.get(attrs, "open_note")
+    validate_action_note(open_note)
   end
 
   defp fetch_type_for_entity(%Scope{entity: entity}, attrs) do
     type_id = Map.get(attrs, :obligation_type_id) || Map.get(attrs, "obligation_type_id")
 
     case Repo.get(Type, type_id) do
-      %Type{entity_id: nil} = type -> {:ok, type}
       %Type{entity_id: entity_id} = type when entity_id == entity.id -> {:ok, type}
       %Type{} -> {:error, :not_found}
       nil -> {:error, :not_found}
@@ -676,7 +811,6 @@ defmodule Argus.Obligations do
         entity_id: entity.id,
         series_id: series_id,
         status: "active",
-        complete_note_required: type.complete_note_required,
         complete_documents: type.complete_documents
       }
       |> Obligation.changeset(attrs)

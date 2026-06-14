@@ -12,14 +12,12 @@ defmodule Argus.Repo.Migrations.CreateObligations do
       add :series_id, :binary_id, null: false
       add :title, :string, null: false
 
-      add :primary_assignee_id, references(:users, type: :binary_id, on_delete: :restrict),
-        null: false
+      add :primary_assignee_id, references(:users, type: :binary_id, on_delete: :restrict)
 
       add :due_by, :date, null: false
       add :status, :string, null: false, default: "active"
       add :completed_at, :utc_datetime
       add :series_ended_at, :utc_datetime
-      add :complete_note_required, :boolean, null: false, default: false
       add :complete_documents, :string, null: false, default: ""
 
       timestamps(type: :utc_datetime)

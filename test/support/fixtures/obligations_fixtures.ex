@@ -13,7 +13,6 @@ defmodule Argus.ObligationsFixtures do
     defaults = %{
       name: "Type #{System.unique_integer([:positive])}",
       recurring_interval: "none",
-      complete_note_required: false,
       complete_documents: "",
       reminder_offsets: ""
     }
@@ -82,7 +81,8 @@ defmodule Argus.ObligationsFixtures do
         title: "Assigned task",
         obligation_type_id: type.id,
         primary_assignee_id: member_scope.user.id,
-        due_by: ~D[2026-06-15]
+        due_by: ~D[2026-06-15],
+        open_note: "Assigned task opened"
       })
 
     {member_scope, obligation}
@@ -99,7 +99,8 @@ defmodule Argus.ObligationsFixtures do
         title: "Recurring task",
         obligation_type_id: type.id,
         primary_assignee_id: member_scope.user.id,
-        due_by: ~D[2026-01-15]
+        due_by: ~D[2026-01-15],
+        open_note: "Recurring task opened"
       })
 
     {member_scope, obligation}
@@ -115,7 +116,8 @@ defmodule Argus.ObligationsFixtures do
         title: "Manager task",
         obligation_type_id: type.id,
         primary_assignee_id: assignee.id,
-        due_by: ~D[2026-06-15]
+        due_by: ~D[2026-06-15],
+        open_note: "Manager task opened"
       })
 
     {manager, obligation}
@@ -132,7 +134,8 @@ defmodule Argus.ObligationsFixtures do
         title: "Recurring task",
         obligation_type_id: type.id,
         primary_assignee_id: assignee.id,
-        due_by: ~D[2026-01-15]
+        due_by: ~D[2026-01-15],
+        open_note: "Recurring task opened"
       })
 
     {manager, obligation}
@@ -148,7 +151,8 @@ defmodule Argus.ObligationsFixtures do
           title: "Obligation #{System.unique_integer([:positive])}",
           obligation_type_id: type.id,
           primary_assignee_id: assignee.id,
-          due_by: ~D[2026-06-15]
+          due_by: ~D[2026-06-15],
+          open_note: "Fixture open note"
         },
         Map.drop(attrs, [:type_attrs])
       )

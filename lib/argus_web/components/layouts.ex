@@ -35,83 +35,93 @@ defmodule ArgusWeb.Layouts do
 
   def app(assigns) do
     ~H"""
-    <header class="navbar bg-base-100 border-b border-base-200 px-4 sm:px-6 lg:px-8">
-      <div class="flex-1 flex items-center gap-2 min-w-0">
-        <a href="/" class="flex items-center gap-2 shrink-0">
-          <img src={~p"/images/logo.svg"} width="32" />
-          <span class="font-semibold">Argus</span>
-        </a>
+    <div
+      id="argus-shell"
+      phx-window-keydown="close_modal_on_escape"
+      phx-key="Escape"
+      class="argus-app min-h-screen flex flex-col"
+    >
+      <header class="sticky top-0 z-40 bg-base-100 border-b border-base-300 shadow-sm">
+        <div class="flex items-center gap-4 px-4 sm:px-6 lg:px-8 h-12">
+          <a href="/" class="flex items-center gap-1.5 shrink-0">
+            <img src={~p"/images/logo.svg"} width="24" height="24" alt="" />
+            <span class="text-sm font-semibold tracking-tight hidden sm:inline">Argus</span>
+          </a>
 
-        <span
-          :if={entity_scope?(@current_scope)}
-          class="text-sm text-base-content/70"
-        >
-          {@current_scope.entity.name}
-        </span>
-      </div>
-
-      <div class="flex-none flex items-center gap-1">
-        <nav :if={entity_scope?(@current_scope)} class="hidden md:flex items-center gap-1">
-          <.link navigate={~p"/entities/#{@current_scope.entity.slug}"} class="btn btn-ghost btn-sm">
-            Dashboard
-          </.link>
           <.link
-            navigate={~p"/entities/#{@current_scope.entity.slug}/obligations"}
-            class="btn btn-ghost btn-sm"
+            :if={entity_scope?(@current_scope)}
+            href={~p"/entities?pick=1"}
+            class="text-sm font-semibold truncate max-w-[12rem] sm:max-w-xs hover:text-primary transition-colors"
+            title="Switch entity"
           >
-            Obligations
+            {@current_scope.entity.name}
           </.link>
-          <.link
-            navigate={~p"/entities/#{@current_scope.entity.slug}/obligation-types"}
-            class="btn btn-ghost btn-sm"
-          >
-            Types
-          </.link>
-          <.link
-            navigate={~p"/entities/#{@current_scope.entity.slug}/members"}
-            class="btn btn-ghost btn-sm"
-          >
-            Members
-          </.link>
-        </nav>
 
-        <a
-          :if={entity_scope?(@current_scope)}
-          href={~p"/set-view?#{[view: "mobile", to: "/m/#{@current_scope.entity.slug}"]}"}
-          class="btn btn-ghost btn-sm"
-          title="Switch to mobile view"
-        >
-          <.icon name="hero-device-phone-mobile" class="size-5" />
-        </a>
+          <nav :if={entity_scope?(@current_scope)} class="hidden md:flex items-center gap-4 ml-2">
+            <.nav_tab navigate={~p"/entities/#{@current_scope.entity.slug}"} label="Dashboard" />
+            <.nav_tab
+              navigate={~p"/entities/#{@current_scope.entity.slug}/obligations"}
+              label="Obligations"
+            />
+            <.nav_tab
+              navigate={~p"/entities/#{@current_scope.entity.slug}/obligation-types"}
+              label="Types"
+            />
+            <.nav_tab
+              navigate={~p"/entities/#{@current_scope.entity.slug}/members"}
+              label="Members"
+            />
+          </nav>
 
-        <nav :if={!account_scope?(@current_scope)} class="flex items-center gap-1">
-          <.link href={~p"/users/log-in"} class="btn btn-ghost btn-sm">Log in</.link>
-          <.link href={~p"/users/register"} class="btn btn-primary btn-sm">Get started</.link>
-        </nav>
+          <div class="flex-1" />
 
-        <.theme_toggle />
+          <nav :if={!account_scope?(@current_scope)} class="flex items-center gap-2 text-sm">
+            <.link href={~p"/users/log-in"} class="hover:text-primary transition-colors">
+              Log in
+            </.link>
+            <.link href={~p"/users/register"} class="btn btn-primary btn-xs">Get started</.link>
+          </nav>
 
-        <details :if={account_scope?(@current_scope)} class="dropdown dropdown-end">
-          <summary class="btn btn-ghost btn-sm list-none [&::-webkit-details-marker]:hidden">
-            <.icon name="hero-user-circle" class="size-5" />
-          </summary>
-          <ul class="dropdown-content menu bg-base-100 rounded-box shadow z-50 w-56 p-2 mt-2">
-            <li class="menu-title truncate">{@current_scope.user.email}</li>
-            <li><.link href={~p"/users/settings"}>Settings</.link></li>
-            <li><.link href={~p"/entities?pick=1"}>All entities</.link></li>
-            <li><.link href={~p"/users/log-out"} method="delete">Log out</.link></li>
-          </ul>
-        </details>
-      </div>
-    </header>
+          <div :if={account_scope?(@current_scope)} class="flex items-center gap-2">
+            <.theme_toggle compact />
 
-    <main class="px-4 py-6 sm:px-6 lg:px-8">
-      <div class="mx-auto max-w-5xl space-y-4">
-        {render_slot(@inner_block)}
-      </div>
-    </main>
+            <details class="dropdown dropdown-end">
+              <summary class="btn btn-ghost btn-xs btn-circle list-none [&::-webkit-details-marker]:hidden">
+                <.icon name="hero-user-circle" class="size-5" />
+              </summary>
+              <ul class="dropdown-content menu bg-base-100 rounded-box shadow z-50 w-56 p-2 mt-2 border border-base-300">
+                <li class="menu-title truncate text-xs">{@current_scope.user.email}</li>
+                <li><.link href={~p"/users/settings"}>Settings</.link></li>
+                <li><.link href={~p"/entities?pick=1"}>All entities</.link></li>
+                <li><.link href={~p"/users/log-out"} method="delete">Log out</.link></li>
+              </ul>
+            </details>
+          </div>
+        </div>
+      </header>
+
+      <main class="flex-1 px-4 py-5 sm:px-6 lg:px-8">
+        <div class="mx-auto max-w-4xl space-y-3">
+          {render_slot(@inner_block)}
+        </div>
+      </main>
+    </div>
 
     <.flash_group flash={@flash} />
+    """
+  end
+
+  attr :navigate, :string, required: true
+  attr :label, :string, required: true
+
+  defp nav_tab(assigns) do
+    ~H"""
+    <.link
+      navigate={@navigate}
+      class="text-sm text-base-content/70 hover:text-base-content transition-colors"
+    >
+      {@label}
+    </.link>
     """
   end
 
@@ -144,7 +154,12 @@ defmodule ArgusWeb.Layouts do
 
   def mobile_app(assigns) do
     ~H"""
-    <div class="min-h-screen bg-base-100 pb-20">
+    <div
+      id="argus-shell"
+      phx-window-keydown="close_modal_on_escape"
+      phx-key="Escape"
+      class="min-h-screen bg-base-100 pb-20"
+    >
       <main class="px-4 py-4">
         {render_slot(@inner_block)}
       </main>
@@ -272,33 +287,38 @@ defmodule ArgusWeb.Layouts do
 
   See <head> in root.html.heex which applies the theme before page load.
   """
+  attr :compact, :boolean, default: false
+
   def theme_toggle(assigns) do
     ~H"""
-    <div class="card relative flex flex-row items-center border-2 border-base-300 bg-base-300 rounded-full">
-      <div class="absolute w-1/3 h-full rounded-full border-1 border-base-200 bg-base-100 brightness-200 left-0 [[data-theme=light]_&]:left-1/3 [[data-theme=dark]_&]:left-2/3 transition-[left]" />
+    <div class={[
+      "relative flex flex-row items-center border border-base-300 bg-base-200 rounded-full",
+      if(@compact, do: "scale-90", else: "")
+    ]}>
+      <div class="absolute w-1/3 h-full rounded-full border border-base-300 bg-base-100 left-0 [[data-theme=light]_&]:left-1/3 [[data-theme=dark]_&]:left-2/3 transition-[left]" />
 
       <button
-        class="flex p-2 cursor-pointer w-1/3"
+        class="flex p-1.5 cursor-pointer w-1/3"
         phx-click={JS.dispatch("phx:set-theme")}
         data-phx-theme="system"
       >
-        <.icon name="hero-computer-desktop-micro" class="size-4 opacity-75 hover:opacity-100" />
+        <.icon name="hero-computer-desktop-micro" class="size-3.5 opacity-75 hover:opacity-100" />
       </button>
 
       <button
-        class="flex p-2 cursor-pointer w-1/3"
+        class="flex p-1.5 cursor-pointer w-1/3"
         phx-click={JS.dispatch("phx:set-theme")}
         data-phx-theme="light"
       >
-        <.icon name="hero-sun-micro" class="size-4 opacity-75 hover:opacity-100" />
+        <.icon name="hero-sun-micro" class="size-3.5 opacity-75 hover:opacity-100" />
       </button>
 
       <button
-        class="flex p-2 cursor-pointer w-1/3"
+        class="flex p-1.5 cursor-pointer w-1/3"
         phx-click={JS.dispatch("phx:set-theme")}
         data-phx-theme="dark"
       >
-        <.icon name="hero-moon-micro" class="size-4 opacity-75 hover:opacity-100" />
+        <.icon name="hero-moon-micro" class="size-3.5 opacity-75 hover:opacity-100" />
       </button>
     </div>
     """

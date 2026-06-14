@@ -19,7 +19,8 @@ defmodule ArgusWeb.ObligationLiveTest do
         title: "Alpha Live",
         obligation_type_id: type.id,
         primary_assignee_id: member_scope.user.id,
-        due_by: ~D[2026-06-30]
+        due_by: ~D[2026-06-30],
+        open_note: "Alpha"
       })
 
     {:ok, to_complete} =
@@ -27,17 +28,20 @@ defmodule ArgusWeb.ObligationLiveTest do
         title: "Beta Done",
         obligation_type_id: type.id,
         primary_assignee_id: member_scope.user.id,
-        due_by: ~D[2026-05-30]
+        due_by: ~D[2026-05-30],
+        open_note: "Beta"
       })
 
-    assert {:ok, completed, _} = Obligations.complete(member_scope, to_complete, %{})
+    assert {:ok, completed, _} =
+             Obligations.complete(member_scope, to_complete, %{note: "Done"})
 
     {:ok, to_cancel} =
       Obligations.create_obligation(manager, %{
         title: "Gamma Cancelled",
         obligation_type_id: type.id,
         primary_assignee_id: member_scope.user.id,
-        due_by: ~D[2026-04-30]
+        due_by: ~D[2026-04-30],
+        open_note: "Gamma"
       })
 
     assert {:ok, _} =
@@ -97,6 +101,58 @@ defmodule ArgusWeb.ObligationLiveTest do
     assert path =~ "/obligations/"
   end
 
+  test "manager creates obligation with general file attachment", %{conn: conn} do
+    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    conn = log_in_user(conn, manager.user)
+    assignee = member_fixture(manager.entity)
+    type = type_fixture(manager.entity, complete_documents: "receipt")
+
+    {:ok, view, _html} =
+      live(conn, ~p"/entities/#{manager.entity.slug}/obligations/new")
+
+    refute has_element?(view, "#create-slot-upload-new-receipt")
+
+    view |> element("#create-select-upload-new") |> render_click()
+
+    file =
+      file_input(view, "#create-document-form-new-active", :document, [
+        %{name: "notes.pdf", content: "extra", type: "application/pdf"}
+      ])
+
+    render_upload(file, "notes.pdf")
+
+    view
+    |> form("#create-document-form-new-active", %{})
+    |> render_submit()
+
+    assert has_element?(view, "#staged-documents", "notes.pdf")
+
+    view
+    |> form("#obligation-create-form", %{
+      "obligation" => %{
+        "title" => "EPF with notes",
+        "obligation_type_id" => type.id,
+        "primary_assignee_id" => assignee.id,
+        "due_by" => "2026-06-30",
+        "open_note" => "Opened with notes"
+      }
+    })
+    |> render_submit()
+
+    {path, _flash} = assert_redirect(view)
+    obligation_id = path |> String.split("/") |> List.last()
+
+    obligation = Obligations.get_obligation!(manager, obligation_id)
+    documents = Obligations.list_cycle_documents(obligation)
+
+    assert Enum.any?(
+             documents,
+             &(is_nil(&1.document_slot) and &1.file["original"] == "notes.pdf")
+           )
+
+    refute Enum.any?(documents, &(&1.document_slot == "receipt"))
+  end
+
   test "manager creates obligation with collaborators", %{conn: conn} do
     manager = Argus.EntitiesFixtures.manager_scope_fixture()
     conn = log_in_user(conn, manager.user)
@@ -114,6 +170,7 @@ defmodule ArgusWeb.ObligationLiveTest do
         "obligation_type_id" => type.id,
         "primary_assignee_id" => assignee.id,
         "due_by" => "2026-06-30",
+        "open_note" => "Opened with helpers",
         "collaborator_ids" => [collaborator.id]
       }
     })
@@ -137,7 +194,8 @@ defmodule ArgusWeb.ObligationLiveTest do
         title: "EPF June",
         obligation_type_id: type.id,
         primary_assignee_id: member.id,
-        due_by: ~D[2026-06-30]
+        due_by: ~D[2026-06-30],
+        open_note: "EPF opened"
       })
 
     obligation = Obligations.get_obligation!(manager, obligation.id)
@@ -184,7 +242,8 @@ defmodule ArgusWeb.ObligationLiveTest do
         title: "EPF June",
         obligation_type_id: type.id,
         primary_assignee_id: member.id,
-        due_by: ~D[2026-06-30]
+        due_by: ~D[2026-06-30],
+        open_note: "EPF opened"
       })
 
     obligation = Obligations.get_obligation!(manager, obligation.id)
@@ -216,7 +275,7 @@ defmodule ArgusWeb.ObligationLiveTest do
     refute has_element?(view, "#event-#{open_event.id} .badge", "receipt")
   end
 
-  test "start_progress from show page", %{conn: conn} do
+  test "start_progress from show page requires progress note modal", %{conn: conn} do
     {scope, obligation} = assigned_member_scope_fixture()
     conn = log_in_user(conn, scope.user)
 
@@ -224,22 +283,134 @@ defmodule ArgusWeb.ObligationLiveTest do
       live(conn, ~p"/entities/#{scope.entity.slug}/obligations/#{obligation.id}")
 
     view |> element("#start-progress-btn") |> render_click()
+    assert has_element?(view, "#progress-modal")
+
+    view
+    |> form("#progress-form", %{"progress" => %{"note" => "Gathering receipts"}})
+    |> render_submit()
+
     assert render(view) =~ "in_progress"
+    assert render(view) =~ "Gathering receipts"
   end
 
-  test "series history lists prior cycles after a recurring completion", %{conn: conn} do
+  test "completed obligation hides urgency and relative due label", %{conn: conn} do
     {scope, obligation} = recurring_primary_scope_fixture(interval: "monthly")
     conn = log_in_user(conn, scope.user)
 
-    {:ok, _done, successor} =
-      Obligations.complete(scope, obligation, %{next_due_by: ~D[2026-02-15]})
+    {:ok, completed, _} =
+      Obligations.complete(scope, obligation, %{
+        note: "Done",
+        next_due_by: ~D[2026-02-15]
+      })
+
+    {:ok, view, html} =
+      live(conn, ~p"/entities/#{scope.entity.slug}/obligations/#{completed.id}")
+
+    refute has_element?(view, "[data-urgency]")
+    assert html =~ "Completed"
+    refute html =~ "overdue"
+    refute html =~ "Due soon"
+    refute html =~ "due in"
+    refute html =~ "days overdue"
+  end
+
+  test "cancelled obligation hides urgency and relative due label", %{conn: conn} do
+    {scope, obligation} = manager_obligation_scope_fixture()
+    conn = log_in_user(conn, scope.user)
+
+    assert {:ok, _} =
+             Obligations.cancel_obligation(scope, obligation, %{note: "No longer needed"})
+
+    {:ok, view, html} =
+      live(conn, ~p"/entities/#{scope.entity.slug}/obligations/#{obligation.id}")
+
+    refute has_element?(view, "[data-urgency]")
+    assert html =~ "Cancelled"
+    refute html =~ "overdue"
+    refute html =~ "Due soon"
+  end
+
+  test "recurring obligation shows skip instead of cancel", %{conn: conn} do
+    {scope, obligation} = recurring_manager_scope_fixture(interval: "monthly")
+    conn = log_in_user(conn, scope.user)
 
     {:ok, view, _html} =
-      live(conn, ~p"/entities/#{scope.entity.slug}/obligations/#{successor.id}")
+      live(conn, ~p"/entities/#{scope.entity.slug}/obligations/#{obligation.id}")
 
-    assert has_element?(view, "#series-history")
-    assert has_element?(view, "#series-cycle-#{obligation.id}", "Completed")
-    assert has_element?(view, "#series-cycle-#{successor.id}", "Current")
+    refute has_element?(view, "#cancel-btn")
+    assert has_element?(view, "#skip-btn")
+  end
+
+  test "skip modal requires reason and next due", %{conn: conn} do
+    {scope, obligation} = recurring_manager_scope_fixture(interval: "monthly")
+    conn = log_in_user(conn, scope.user)
+
+    {:ok, view, _html} =
+      live(conn, ~p"/entities/#{scope.entity.slug}/obligations/#{obligation.id}")
+
+    view |> element("#skip-btn") |> render_click()
+    assert has_element?(view, "#skip-modal")
+
+    view
+    |> form("#skip-form", %{"skip" => %{"note" => "", "next_due_by" => ""}})
+    |> render_submit()
+
+    assert render(view) =~ "A reason is required"
+
+    view |> element("#skip-btn") |> render_click()
+
+    view
+    |> form("#skip-form", %{"skip" => %{"note" => "Deferred", "next_due_by" => ""}})
+    |> render_submit()
+
+    assert render(view) =~ "Next due date is required"
+  end
+
+  test "skip modal submits and spawns next cycle", %{conn: conn} do
+    {scope, obligation} = recurring_manager_scope_fixture(interval: "monthly")
+    conn = log_in_user(conn, scope.user)
+
+    {:ok, view, _html} =
+      live(conn, ~p"/entities/#{scope.entity.slug}/obligations/#{obligation.id}")
+
+    view |> element("#skip-btn") |> render_click()
+
+    view
+    |> form("#skip-form", %{
+      "skip" => %{"note" => "Deferred", "next_due_by" => "2026-02-15"}
+    })
+    |> render_submit()
+
+    assert_redirect(view, ~p"/entities/#{scope.entity.slug}/obligations")
+    assert Obligations.get_obligation!(scope, obligation.id).status == "cancelled"
+
+    live_cycles =
+      scope
+      |> Obligations.list_obligations(status: :live)
+      |> Enum.filter(&(&1.series_id == obligation.series_id))
+
+    assert length(live_cycles) == 1
+    assert hd(live_cycles).due_by == ~D[2026-02-15]
+  end
+
+  test "escape closes open modals", %{conn: conn} do
+    {scope, obligation} = manager_obligation_scope_fixture()
+    conn = log_in_user(conn, scope.user)
+
+    {:ok, view, _html} =
+      live(conn, ~p"/entities/#{scope.entity.slug}/obligations/#{obligation.id}")
+
+    view |> element("#cancel-btn") |> render_click()
+    assert has_element?(view, "#cancel-modal")
+
+    view |> element("#argus-shell") |> render_keydown()
+    refute has_element?(view, "#cancel-modal")
+
+    view |> element("#done-btn") |> render_click()
+    assert has_element?(view, "#done-modal")
+
+    view |> element("#argus-shell") |> render_keydown()
+    refute has_element?(view, "#done-modal")
   end
 
   test "cancel modal requires a reason", %{conn: conn} do
@@ -287,6 +458,65 @@ defmodule ArgusWeb.ObligationLiveTest do
     assert render(view) =~ "A reason is required"
   end
 
+  test "done modal shows document checklist and opens uploads for missing slots", %{conn: conn} do
+    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    member_scope = member_scope_on_entity(manager.entity)
+    type = type_fixture(manager.entity, complete_documents: "receipt")
+
+    {:ok, obligation} =
+      Obligations.create_obligation(manager, %{
+        title: "EPF Jan",
+        obligation_type_id: type.id,
+        primary_assignee_id: member_scope.user.id,
+        due_by: ~D[2026-06-15],
+        open_note: "Open"
+      })
+
+    obligation = Obligations.get_obligation!(member_scope, obligation.id)
+    open_event = Enum.find(obligation.events, &(&1.status == "open"))
+    conn = log_in_user(conn, member_scope.user)
+
+    {:ok, view, _html} =
+      live(conn, ~p"/entities/#{manager.entity.slug}/obligations/#{obligation.id}")
+
+    view |> element("#done-btn") |> render_click()
+    assert has_element?(view, "#done-document-checklist")
+    assert has_element?(view, "#done-document-checklist-receipt", "Missing")
+    assert has_element?(view, "#done-doc-upload-now")
+
+    view |> element("#done-doc-upload-now") |> render_click()
+    refute has_element?(view, "#done-modal")
+    assert has_element?(view, "#document-modal-#{open_event.id}")
+  end
+
+  test "done modal reports missing document on submit", %{conn: conn} do
+    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    member_scope = member_scope_on_entity(manager.entity)
+    type = type_fixture(manager.entity, complete_documents: "receipt")
+
+    {:ok, obligation} =
+      Obligations.create_obligation(manager, %{
+        title: "EPF Jan",
+        obligation_type_id: type.id,
+        primary_assignee_id: member_scope.user.id,
+        due_by: ~D[2026-06-15],
+        open_note: "Open"
+      })
+
+    conn = log_in_user(conn, member_scope.user)
+
+    {:ok, view, _html} =
+      live(conn, ~p"/entities/#{manager.entity.slug}/obligations/#{obligation.id}")
+
+    view |> element("#done-btn") |> render_click()
+
+    view
+    |> form("#done-form", %{"done" => %{"note" => "Done"}})
+    |> render_submit()
+
+    assert render(view) =~ "Missing required document: receipt"
+  end
+
   test "done modal requires next due for recurring obligations", %{conn: conn} do
     {scope, obligation} = recurring_primary_scope_fixture(interval: "monthly")
     conn = log_in_user(conn, scope.user)
@@ -297,7 +527,9 @@ defmodule ArgusWeb.ObligationLiveTest do
     view |> element("#done-btn") |> render_click()
     assert has_element?(view, "#done-modal")
 
-    view |> form("#done-form", %{"done" => %{"next_due_by" => ""}}) |> render_submit()
+    view
+    |> form("#done-form", %{"done" => %{"next_due_by" => "", "note" => "Done"}})
+    |> render_submit()
 
     assert render(view) =~ "Next due date is required"
   end
@@ -368,6 +600,7 @@ defmodule ArgusWeb.ObligationLiveTest do
         obligation_type_id: type.id,
         primary_assignee_id: assignee.id,
         due_by: ~D[2026-06-30],
+        open_note: "With collaborators",
         collaborator_ids: [collaborator.id]
       })
 
@@ -433,7 +666,9 @@ defmodule ArgusWeb.ObligationLiveTest do
 
     view |> element("#done-btn") |> render_click()
 
-    view |> form("#done-form", %{"done" => %{"next_due_by" => "2026-07-15"}}) |> render_submit()
+    view
+    |> form("#done-form", %{"done" => %{"next_due_by" => "2026-07-15", "note" => "Done"}})
+    |> render_submit()
 
     assert_redirect(view, ~p"/entities/#{scope.entity.slug}/obligations")
   end

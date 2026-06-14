@@ -3,6 +3,20 @@
 **Date:** 2026-06-13  
 **Status:** Approved for implementation planning
 
+> **Revisions since v1 (2026-06-14) — current baseline. Where this spec below conflicts, the
+> revisions win; see `CLAUDE.md` for the authoritative current description.**
+> 1. **Obligation types are per-entity only** (`entity_id` NOT NULL). The "system presets
+>    (`entity_id` NULL)" concept is removed; each entity gets a private, editable copy of the
+>    sample types, seeded on entity creation (`Argus.Obligations.SampleTypes`).
+> 2. **`complete_note_required` is removed.** A Done note is now **always required**; only
+>    `complete_documents` remains as a snapshotted, type-configurable completion rule.
+> 3. **`primary_assignee_id` is nullable** — obligations may be created unassigned and assigned
+>    later. Only managers/admins can mark an unassigned cycle Done.
+> 4. **New `skip_cycle` action** (manager/admin): cancel the current cycle and spawn the next in
+>    one transaction (recurring, not-ended series; requires `next_due_by`).
+> 5. **Every state transition requires a note** (open/start_progress/cancel/skip/end-series), not
+>    just Done.
+
 ## Overview
 
 Argus is a multi-tenant web application for tracking obligations — regulatory filings, operational renewals, client deliverables, and custom deadlines. Users define obligation types (with system presets), assign work to team members, track progress with notes and documents, and see what needs attention on the dashboard.

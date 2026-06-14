@@ -12,6 +12,7 @@ defmodule Argus.Authorization do
   def can?(%Scope{role: :manager}, :create_obligation), do: true
   def can?(%Scope{role: :manager}, :edit_obligation), do: true
   def can?(%Scope{role: :manager}, :cancel_obligation), do: true
+  def can?(%Scope{role: :manager}, :skip_cycle), do: true
   def can?(%Scope{role: :manager}, :end_series), do: true
   def can?(%Scope{role: :manager}, :void_document), do: true
   def can?(%Scope{role: :manager}, _), do: false
@@ -25,11 +26,12 @@ defmodule Argus.Authorization do
   def can?(%Scope{role: :manager}, _, _obligation), do: false
 
   def can?(%Scope{role: :member, user: user}, :mark_done, %Obligation{} = obligation) do
-    obligation.primary_assignee_id == user.id
+    not is_nil(obligation.primary_assignee_id) and obligation.primary_assignee_id == user.id
   end
 
   def can?(%Scope{role: :member, user: user}, :start_progress, %Obligation{} = obligation) do
-    obligation.primary_assignee_id == user.id or user.id in collaborator_user_ids(obligation)
+    (not is_nil(obligation.primary_assignee_id) and obligation.primary_assignee_id == user.id) or
+      user.id in collaborator_user_ids(obligation)
   end
 
   def can?(%Scope{}, _, _obligation), do: false

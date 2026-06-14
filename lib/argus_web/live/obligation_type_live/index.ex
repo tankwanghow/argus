@@ -1,6 +1,7 @@
 defmodule ArgusWeb.ObligationTypeLive.Index do
   use ArgusWeb, :live_view
 
+  alias ArgusWeb.ModalEscape
   alias Argus.Authorization
   alias Argus.Obligations
   alias Argus.Obligations.{Recurrence, Type}
@@ -26,64 +27,40 @@ defmodule ArgusWeb.ObligationTypeLive.Index do
           </:actions>
         </.header>
 
-        <section class="mt-6">
-          <h2 class="text-sm font-semibold uppercase tracking-wide text-base-content/60">
-            Custom types
-          </h2>
-          <ul
-            :if={@custom_types != []}
-            id="custom-types"
-            class="mt-3 divide-y divide-base-300 rounded-box border border-base-300"
+        <ul
+          :if={@types != []}
+          id="types"
+          class="mt-6 divide-y divide-base-300 rounded-box border border-base-300"
+        >
+          <li
+            :for={type <- @types}
+            id={"type-#{type.id}"}
+            class="flex items-center gap-3 p-3"
           >
-            <li
-              :for={type <- @custom_types}
-              id={"type-#{type.id}"}
-              class="flex items-center gap-3 p-3"
+            <.type_summary type={type} />
+            <button
+              :if={@can_manage?}
+              type="button"
+              phx-click="clone"
+              phx-value-id={type.id}
+              class="btn btn-ghost btn-xs"
             >
-              <.type_summary type={type} />
-              <button
-                :if={@can_manage?}
-                type="button"
-                phx-click="edit"
-                phx-value-id={type.id}
-                class="btn btn-ghost btn-xs"
-              >
-                Edit
-              </button>
-            </li>
-          </ul>
-          <p :if={@custom_types == []} class="mt-3 text-sm text-base-content/60">
-            No custom types yet. Clone a preset below or create a new one.
-          </p>
-        </section>
-
-        <section class="mt-8">
-          <h2 class="text-sm font-semibold uppercase tracking-wide text-base-content/60">
-            System presets
-          </h2>
-          <ul
-            id="preset-types"
-            class="mt-3 divide-y divide-base-300 rounded-box border border-base-300"
-          >
-            <li
-              :for={type <- @preset_types}
-              id={"type-#{type.id}"}
-              class="flex items-center gap-3 p-3"
+              Clone
+            </button>
+            <button
+              :if={@can_manage?}
+              type="button"
+              phx-click="edit"
+              phx-value-id={type.id}
+              class="btn btn-ghost btn-xs"
             >
-              <.type_summary type={type} />
-              <span class="badge badge-ghost badge-sm">preset</span>
-              <button
-                :if={@can_manage?}
-                type="button"
-                phx-click="clone"
-                phx-value-id={type.id}
-                class="btn btn-ghost btn-xs"
-              >
-                Clone
-              </button>
-            </li>
-          </ul>
-        </section>
+              Edit
+            </button>
+          </li>
+        </ul>
+        <p :if={@types == []} class="mt-6 text-sm text-base-content/60">
+          No types yet. Create one to get started.
+        </p>
       </div>
 
       <div :if={@type_form} id="type-modal" class="modal modal-open">
@@ -108,11 +85,6 @@ defmodule ArgusWeb.ObligationTypeLive.Index do
               stops recurrence for all open obligations of this type after their next Done —
               different from <span class="font-medium">End series</span>, which cancels a single cycle.
             </p>
-            <.input
-              field={@type_form[:complete_note_required]}
-              type="checkbox"
-              label="Require a completion note on Done"
-            />
             <.input
               field={@type_form[:complete_documents]}
               type="text"
@@ -147,7 +119,6 @@ defmodule ArgusWeb.ObligationTypeLive.Index do
       <div class="font-medium truncate">{@type.name}</div>
       <div class="text-sm text-base-content/60 truncate">
         {interval_label(@type.recurring_interval)}
-        <span :if={@type.complete_note_required}>· note required</span>
         <span :if={@type.complete_documents not in [nil, ""]}>
           · docs: {@type.complete_documents}
         </span>
@@ -177,7 +148,6 @@ defmodule ArgusWeb.ObligationTypeLive.Index do
     template = %Type{
       name: "#{source.name} (copy)",
       recurring_interval: source.recurring_interval,
-      complete_note_required: source.complete_note_required,
       complete_documents: source.complete_documents,
       reminder_offsets: source.reminder_offsets
     }
@@ -188,6 +158,10 @@ defmodule ArgusWeb.ObligationTypeLive.Index do
   def handle_event("edit", %{"id" => id}, socket) do
     type = Obligations.get_type!(socket.assigns.current_scope, id)
     {:noreply, open_modal(socket, type, type, "Edit obligation type", "Save")}
+  end
+
+  def handle_event("close_modal_on_escape", _params, socket) do
+    {:noreply, ModalEscape.close_type_modal(socket)}
   end
 
   def handle_event("cancel", _params, socket) do
@@ -239,9 +213,7 @@ defmodule ArgusWeb.ObligationTypeLive.Index do
   end
 
   defp load_types(socket) do
-    types = Obligations.list_types(socket.assigns.current_scope)
-    {presets, custom} = Enum.split_with(types, &is_nil(&1.entity_id))
-    assign(socket, preset_types: presets, custom_types: custom)
+    assign(socket, :types, Obligations.list_types(socket.assigns.current_scope))
   end
 
   defp interval_options do

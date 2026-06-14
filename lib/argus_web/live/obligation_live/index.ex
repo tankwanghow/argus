@@ -7,7 +7,7 @@ defmodule ArgusWeb.ObligationLive.Index do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope}>
-      <div id="obligations-index">
+      <div id="obligations-index" class="space-y-3">
         <.header>
           Obligations
           <:actions>
@@ -21,8 +21,8 @@ defmodule ArgusWeb.ObligationLive.Index do
           </:actions>
         </.header>
 
-        <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div id="obligation-status-filters" class="tabs tabs-box tabs-wrap w-full">
+        <div class="argus-page-toolbar flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div id="obligation-status-filters" class="tabs tabs-box tabs-wrap flex-1 min-w-0">
             <button
               :for={status <- Index.statuses()}
               id={"filter-#{status}"}
@@ -38,39 +38,53 @@ defmodule ArgusWeb.ObligationLive.Index do
             id="obligation-search"
             type="search"
             name="q"
-            placeholder="Search title, type, assignee…"
+            placeholder="Search…"
             phx-keyup="search"
             phx-debounce="150"
             value={@query}
-            class="input input-sm w-full sm:max-w-xs"
+            class="input input-sm w-full sm:w-48 shrink-0"
           />
         </div>
 
-        <ul id="obligations-list" class="mt-6 divide-y divide-base-300">
-          <li :for={row <- @rows} id={"obligation-#{row.obligation.id}"} class="py-3">
-            <.link
-              navigate={~p"/entities/#{@current_scope.entity.slug}/obligations/#{row.obligation.id}"}
-              class="flex items-center justify-between gap-3 hover:opacity-80"
-            >
-              <div class="min-w-0">
-                <div class="font-medium truncate">{row.obligation.title}</div>
-                <div class="text-sm text-base-content/60 truncate">
-                  {row.obligation.obligation_type.name} · {list_meta(row, @today)}
+        <section class="argus-section">
+          <ul id="obligations-list" class="argus-row-list">
+            <li :for={row <- @rows} id={"obligation-#{row.obligation.id}"}>
+              <.link
+                navigate={
+                  ~p"/entities/#{@current_scope.entity.slug}/obligations/#{row.obligation.id}"
+                }
+                class="argus-compact-row block border-l-4 border-transparent"
+              >
+                <div class="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_9rem_7rem] gap-x-4 gap-y-1 items-center">
+                  <div class="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
+                    <span class="font-medium">{row.obligation.title}</span>
+                    <.obligation_status_badge
+                      :if={row.cycle_status != :live}
+                      cycle_status={row.cycle_status}
+                    />
+                    <.urgency_badge :if={row.cycle_status == :live} urgency={row.urgency} />
+                  </div>
+                  <div class="text-sm text-base-content/60 truncate sm:text-right">
+                    {row.obligation.obligation_type.name}
+                  </div>
+                  <div class="text-sm text-base-content/60 sm:text-right">
+                    <div>{format_date(row.obligation.due_by)}</div>
+                    <div :if={row.cycle_status == :live} class="text-xs">
+                      {due_label(row.obligation.due_by, @today)}
+                    </div>
+                    <div :if={row.cycle_status == :completed} class="text-xs">
+                      Completed {format_datetime(row.obligation.completed_at)}
+                    </div>
+                    <div :if={row.cycle_status == :cancelled} class="text-xs">Cancelled</div>
+                  </div>
                 </div>
-              </div>
-              <div class="flex items-center gap-2 shrink-0">
-                <.obligation_status_badge
-                  :if={row.cycle_status != :live}
-                  cycle_status={row.cycle_status}
-                />
-                <.urgency_badge :if={row.cycle_status == :live} urgency={row.urgency} />
-              </div>
-            </.link>
-          </li>
-          <li :if={@rows == []} id="obligations-empty" class="py-8 text-center text-base-content/60">
-            {Index.empty_message(@status)}
-          </li>
-        </ul>
+              </.link>
+            </li>
+            <li :if={@rows == []} id="obligations-empty" class="py-8 text-center text-base-content/60">
+              {Index.empty_message(@status)}
+            </li>
+          </ul>
+        </section>
       </div>
     </Layouts.app>
     """
@@ -102,17 +116,5 @@ defmodule ArgusWeb.ObligationLive.Index do
   defp load_rows(socket) do
     %{current_scope: scope, today: today, status: status, query: query} = socket.assigns
     assign(socket, :rows, Index.load_rows(scope, today, status, query))
-  end
-
-  defp list_meta(%{cycle_status: :completed, obligation: o}, _today) do
-    "completed #{format_datetime(o.completed_at)} · due #{format_date(o.due_by)}"
-  end
-
-  defp list_meta(%{cycle_status: :cancelled, obligation: o}, _today) do
-    "cancelled · due #{format_date(o.due_by)}"
-  end
-
-  defp list_meta(%{obligation: o}, today) do
-    "due #{format_date(o.due_by)} · #{due_label(o.due_by, today)}"
   end
 end

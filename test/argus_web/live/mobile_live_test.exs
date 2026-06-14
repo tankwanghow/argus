@@ -31,7 +31,36 @@ defmodule ArgusWeb.MobileLiveTest do
     {:ok, view, _html} = live(conn, ~p"/m/#{scope.entity.slug}/obligations/#{obligation.id}")
 
     view |> element("#m-start-progress-btn") |> render_click()
+    assert has_element?(view, "#m-progress-modal")
+
+    view
+    |> form("#m-progress-form", %{"progress" => %{"note" => "On it"}})
+    |> render_submit()
+
     assert render(view) =~ "in_progress"
+  end
+
+  test "mobile recurring obligation shows skip instead of cancel", %{conn: conn} do
+    {scope, obligation} = recurring_manager_scope_fixture(interval: "monthly")
+    conn = mobile_conn(conn, scope)
+
+    {:ok, view, _html} = live(conn, ~p"/m/#{scope.entity.slug}/obligations/#{obligation.id}")
+
+    refute has_element?(view, "#m-cancel-btn")
+    assert has_element?(view, "#m-skip-btn")
+  end
+
+  test "mobile escape closes open modals", %{conn: conn} do
+    {scope, obligation} = manager_obligation_scope_fixture()
+    conn = mobile_conn(conn, scope)
+
+    {:ok, view, _html} = live(conn, ~p"/m/#{scope.entity.slug}/obligations/#{obligation.id}")
+
+    view |> element("#m-done-btn") |> render_click()
+    assert has_element?(view, "#m-done-modal")
+
+    view |> element("#argus-shell") |> render_keydown()
+    refute has_element?(view, "#m-done-modal")
   end
 
   test "mobile cancel modal requires a reason", %{conn: conn} do
@@ -54,7 +83,10 @@ defmodule ArgusWeb.MobileLiveTest do
     {:ok, view, _html} = live(conn, ~p"/m/#{scope.entity.slug}/obligations/#{obligation.id}")
 
     view |> element("#m-done-btn") |> render_click()
-    view |> form("#m-done-form", %{"done" => %{"next_due_by" => ""}}) |> render_submit()
+
+    view
+    |> form("#m-done-form", %{"done" => %{"next_due_by" => "", "note" => "Done"}})
+    |> render_submit()
 
     assert render(view) =~ "Next due date is required"
   end
@@ -66,7 +98,10 @@ defmodule ArgusWeb.MobileLiveTest do
     {:ok, view, _html} = live(conn, ~p"/m/#{scope.entity.slug}/obligations/#{obligation.id}")
 
     view |> element("#m-done-btn") |> render_click()
-    view |> form("#m-done-form", %{"done" => %{"next_due_by" => "2026-07-15"}}) |> render_submit()
+
+    view
+    |> form("#m-done-form", %{"done" => %{"next_due_by" => "2026-07-15", "note" => "Done"}})
+    |> render_submit()
 
     assert_redirect(view, ~p"/m/#{scope.entity.slug}/obligations")
     refute Obligations.get_obligation!(scope, obligation.id).completed_at == nil
@@ -83,7 +118,8 @@ defmodule ArgusWeb.MobileLiveTest do
         title: "Alpha Live",
         obligation_type_id: type.id,
         primary_assignee_id: member_scope.user.id,
-        due_by: ~D[2026-06-30]
+        due_by: ~D[2026-06-30],
+        open_note: "Alpha"
       })
 
     {:ok, to_complete} =
@@ -91,10 +127,12 @@ defmodule ArgusWeb.MobileLiveTest do
         title: "Beta Done",
         obligation_type_id: type.id,
         primary_assignee_id: member_scope.user.id,
-        due_by: ~D[2026-05-30]
+        due_by: ~D[2026-05-30],
+        open_note: "Beta"
       })
 
-    assert {:ok, completed, _} = Obligations.complete(member_scope, to_complete, %{})
+    assert {:ok, completed, _} =
+             Obligations.complete(member_scope, to_complete, %{note: "Done"})
 
     {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}/obligations")
 

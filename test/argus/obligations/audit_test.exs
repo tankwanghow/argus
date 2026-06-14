@@ -50,7 +50,7 @@ defmodule Argus.Obligations.AuditTest do
   describe "edit_note/3" do
     test "author can edit within 48 hours" do
       {scope, obligation} = assigned_member_scope_fixture()
-      {:ok, _} = Obligations.start_progress(scope, obligation)
+      {:ok, _} = Obligations.start_progress(scope, obligation, %{note: "Started"})
       event = Obligations.latest_event(obligation)
 
       assert {:ok, updated} = Obligations.edit_note(scope, event, %{note: "Fixed typo"})

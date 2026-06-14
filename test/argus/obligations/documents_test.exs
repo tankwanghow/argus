@@ -11,18 +11,15 @@ defmodule Argus.Obligations.DocumentsTest do
       manager = manager_scope_fixture()
       member_scope = member_scope_on_entity(manager.entity)
 
-      type =
-        type_fixture(manager.entity,
-          complete_note_required: false,
-          complete_documents: "receipt"
-        )
+      type = type_fixture(manager.entity, complete_documents: "receipt")
 
       {:ok, obligation} =
         Obligations.create_obligation(manager, %{
           title: "EPF Jan",
           obligation_type_id: type.id,
           primary_assignee_id: member_scope.user.id,
-          due_by: ~D[2026-01-15]
+          due_by: ~D[2026-01-15],
+          open_note: "Open"
         })
 
       event = hd(Obligations.list_events(obligation))
@@ -35,14 +32,16 @@ defmodule Argus.Obligations.DocumentsTest do
                Obligations.void_document(manager, obligation, document, %{reason: "wrong scan"})
 
       assert {:error, {:missing_document, "receipt"}} =
-               Obligations.complete(member_scope, obligation, %{})
+               Obligations.complete(member_scope, obligation, %{note: "Done"})
 
       upload2 = upload_fixture("receipt2.pdf")
 
       assert {:ok, _replacement} =
                Obligations.add_document(manager, obligation, event, upload2, "receipt")
 
-      assert {:ok, completed, _} = Obligations.complete(member_scope, obligation, %{})
+      assert {:ok, completed, _} =
+               Obligations.complete(member_scope, obligation, %{note: "Done"})
+
       assert completed.completed_at
     end
 
@@ -50,18 +49,15 @@ defmodule Argus.Obligations.DocumentsTest do
       manager = manager_scope_fixture()
       member_scope = member_scope_on_entity(manager.entity)
 
-      type =
-        type_fixture(manager.entity,
-          complete_note_required: false,
-          complete_documents: "receipt"
-        )
+      type = type_fixture(manager.entity, complete_documents: "receipt")
 
       {:ok, obligation} =
         Obligations.create_obligation(manager, %{
           title: "EPF Jan",
           obligation_type_id: type.id,
           primary_assignee_id: member_scope.user.id,
-          due_by: ~D[2026-01-15]
+          due_by: ~D[2026-01-15],
+          open_note: "Open"
         })
 
       event = hd(Obligations.list_events(obligation))
@@ -88,7 +84,9 @@ defmodule Argus.Obligations.DocumentsTest do
 
       assert receipt.document_slot == "receipt"
 
-      assert {:ok, completed, _} = Obligations.complete(member_scope, obligation, %{})
+      assert {:ok, completed, _} =
+               Obligations.complete(member_scope, obligation, %{note: "Done"})
+
       assert completed.completed_at
     end
 
@@ -103,7 +101,8 @@ defmodule Argus.Obligations.DocumentsTest do
           title: "EPF Jan",
           obligation_type_id: type.id,
           primary_assignee_id: member_scope.user.id,
-          due_by: ~D[2026-01-15]
+          due_by: ~D[2026-01-15],
+          open_note: "Open"
         })
 
       event = hd(Obligations.list_events(obligation))
@@ -118,7 +117,7 @@ defmodule Argus.Obligations.DocumentsTest do
                )
 
       assert {:error, {:missing_document, "receipt"}} =
-               Obligations.complete(member_scope, obligation, %{})
+               Obligations.complete(member_scope, obligation, %{note: "Done"})
     end
 
     test "uploader can void own document before done" do
@@ -145,7 +144,8 @@ defmodule Argus.Obligations.DocumentsTest do
           title: "Task",
           obligation_type_id: type_fixture(manager.entity).id,
           primary_assignee_id: member_scope.user.id,
-          due_by: ~D[2026-06-15]
+          due_by: ~D[2026-06-15],
+          open_note: "Task opened"
         })
 
       event = hd(Obligations.list_events(obligation))

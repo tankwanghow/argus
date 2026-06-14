@@ -8,7 +8,6 @@ defmodule Argus.Obligations.Type do
   schema "obligation_types" do
     field :name, :string
     field :recurring_interval, :string, default: "none"
-    field :complete_note_required, :boolean, default: false
     field :complete_documents, :string, default: ""
     field :reminder_offsets, :string, default: ""
 
@@ -23,7 +22,6 @@ defmodule Argus.Obligations.Type do
     |> cast(attrs, [
       :name,
       :recurring_interval,
-      :complete_note_required,
       :complete_documents,
       :reminder_offsets
     ])

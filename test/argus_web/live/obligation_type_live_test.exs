@@ -4,10 +4,21 @@ defmodule ArgusWeb.ObligationTypeLiveTest do
   import Phoenix.LiveViewTest
   import Argus.ObligationsFixtures
 
-  alias Argus.Obligations.Type
-  alias Argus.Repo
-
   setup :register_and_log_in_user
+
+  test "escape closes the type editor modal", %{conn: conn} do
+    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    conn = log_in_user(conn, manager.user)
+
+    {:ok, view, _html} =
+      live(conn, ~p"/entities/#{manager.entity.slug}/obligation-types")
+
+    view |> element("#new-type-btn") |> render_click()
+    assert has_element?(view, "#type-modal")
+
+    view |> element("#argus-shell") |> render_keydown()
+    refute has_element?(view, "#type-modal")
+  end
 
   test "manager creates a custom type via the modal", %{conn: conn} do
     manager = Argus.EntitiesFixtures.manager_scope_fixture()
@@ -24,33 +35,32 @@ defmodule ArgusWeb.ObligationTypeLiveTest do
     view
     |> form("#type-form", %{
       "type" => %{
-        "name" => "SST Return",
+        "name" => "GST Return",
         "recurring_interval" => "quarterly",
         "reminder_offsets" => "30,7"
       }
     })
     |> render_submit()
 
-    assert has_element?(view, "#custom-types", "SST Return")
+    assert has_element?(view, "#types", "GST Return")
   end
 
-  test "manager can clone a system preset", %{conn: conn} do
+  test "manager can clone a type", %{conn: conn} do
     manager = Argus.EntitiesFixtures.manager_scope_fixture()
     conn = log_in_user(conn, manager.user)
 
-    preset =
-      %Type{entity_id: nil}
-      |> Type.changeset(%{name: "EPF Monthly", recurring_interval: "monthly"})
-      |> Repo.insert!()
+    [epf | _] =
+      Argus.Obligations.list_types(manager)
+      |> Enum.filter(&(&1.name == "EPF Monthly"))
 
     {:ok, view, _html} =
       live(conn, ~p"/entities/#{manager.entity.slug}/obligation-types")
 
-    view |> element("#type-#{preset.id} button", "Clone") |> render_click()
+    view |> element("#type-#{epf.id} button", "Clone") |> render_click()
     assert has_element?(view, "#type-form")
 
     view |> form("#type-form", %{"type" => %{}}) |> render_submit()
-    assert has_element?(view, "#custom-types", "EPF Monthly (copy)")
+    assert has_element?(view, "#types", "EPF Monthly (copy)")
   end
 
   test "member cannot see management actions", %{conn: conn} do

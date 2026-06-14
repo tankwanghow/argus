@@ -8,16 +8,14 @@ defmodule Argus.Obligations.Completion do
   def validate_done_requirements(%Obligation{} = obligation, done_attrs, cycle_documents) do
     note = Map.get(done_attrs, :note) || Map.get(done_attrs, "note")
 
-    with :ok <- validate_note(obligation, note),
+    with :ok <- validate_note(note),
          :ok <- validate_document_slots(obligation, cycle_documents) do
       :ok
     end
   end
 
-  defp validate_note(%Obligation{complete_note_required: true}, note) when note in [nil, ""],
-    do: {:error, :note_required}
-
-  defp validate_note(_, _), do: :ok
+  defp validate_note(note) when note in [nil, ""], do: {:error, :note_required}
+  defp validate_note(_), do: :ok
 
   defp validate_document_slots(%Obligation{complete_documents: ""}, _cycle_documents), do: :ok
 
