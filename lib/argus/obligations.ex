@@ -293,6 +293,24 @@ defmodule Argus.Obligations do
     can_edit_note?(scope, event, obligation)
   end
 
+  @doc """
+  True when `scope` may void a non-voided document on this obligation cycle.
+  """
+  def document_voidable?(
+        %Scope{} = scope,
+        %Obligation{} = obligation,
+        %EventDocument{} = document
+      ) do
+    is_nil(document.voided_at) and can_void_document?(scope, obligation, document)
+  end
+
+  @doc """
+  True when voiding a document on this cycle requires a reason (admin on a locked cycle).
+  """
+  def document_void_reason_required?(%Obligation{} = obligation) do
+    locked_cycle?(obligation)
+  end
+
   def edit_note(%Scope{} = scope, %Event{} = event, attrs) do
     obligation = Repo.get!(Obligation, event.obligation_id)
     note = Map.get(attrs, :note) || Map.get(attrs, "note")

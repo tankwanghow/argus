@@ -103,12 +103,39 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
                 </button>
               </div>
             </.form>
+            <ul :if={event.documents != []} class="mt-2 space-y-1 text-sm">
+              <li :for={doc <- event.documents} class="flex items-center gap-2">
+                <.icon name="hero-paper-clip-mini" class="size-4 text-base-content/40" />
+                <span :if={doc.document_slot} class="badge badge-xs badge-ghost">
+                  {doc.document_slot}
+                </span>
+                <.link
+                  href={
+                    ~p"/entities/#{@current_scope.entity.slug}/obligations/#{@obligation.id}/documents/#{doc.id}"
+                  }
+                  target="_blank"
+                  class={["link link-hover", doc.voided_at && "line-through text-base-content/40"]}
+                >
+                  {file_name(doc)}
+                </.link>
+                <span :if={doc.voided_at} class="badge badge-xs badge-error">voided</span>
+              </li>
+            </ul>
           </li>
         </ol>
 
-        <div :if={@live?} class="mt-6 grid grid-cols-1 gap-2">
+        <div class="mt-6 grid grid-cols-1 gap-2">
           <button
-            :if={Authorization.can?(@current_scope, :start_progress, @obligation)}
+            id="m-documents-btn"
+            type="button"
+            phx-click="open_documents_modal"
+            class="btn btn-outline btn-lg"
+          >
+            <.icon name="hero-paper-clip-mini" class="size-4" />
+            Documents ({length(@cycle_documents)})
+          </button>
+          <button
+            :if={@live? and Authorization.can?(@current_scope, :start_progress, @obligation)}
             id="m-start-progress-btn"
             type="button"
             phx-click="start_progress"
@@ -117,7 +144,7 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
             Update progress
           </button>
           <button
-            :if={Authorization.can?(@current_scope, :mark_done, @obligation)}
+            :if={@live? and Authorization.can?(@current_scope, :mark_done, @obligation)}
             id="m-done-btn"
             type="button"
             phx-click="open_done_modal"
@@ -126,7 +153,7 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
             Mark done
           </button>
           <button
-            :if={Authorization.can?(@current_scope, :cancel_obligation)}
+            :if={@live? and Authorization.can?(@current_scope, :cancel_obligation)}
             id="m-cancel-btn"
             type="button"
             phx-click="cancel"
@@ -183,6 +210,147 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
         </div>
       </div>
 
+      <div :if={@show_documents_modal} id="m-document-modal" class="modal modal-bottom modal-open">
+        <div class="modal-box max-h-[85vh] overflow-y-auto">
+          <h3 class="font-bold text-lg">Documents</h3>
+          <p class="text-sm text-base-content/60 mt-1">
+            Files attached to this cycle — counted across all workflow steps until marked done.
+          </p>
+
+          <section :if={@required_docs != []} class="mt-4">
+            <h4 class="text-xs font-semibold uppercase tracking-wide text-base-content/60">
+              Required for completion
+            </h4>
+            <ul class="mt-2 space-y-1 text-sm">
+              <li :for={{slot, satisfied?} <- @required_docs} class="flex items-center gap-2">
+                <.icon
+                  name={if satisfied?, do: "hero-check-circle-mini", else: "hero-x-circle-mini"}
+                  class={["size-4", if(satisfied?, do: "text-success", else: "text-base-content/40")]}
+                />
+                <span>{slot}</span>
+              </li>
+            </ul>
+          </section>
+
+          <section class="mt-5">
+            <h4 class="text-xs font-semibold uppercase tracking-wide text-base-content/60">
+              Uploaded files
+            </h4>
+            <p :if={@cycle_documents == []} class="text-sm text-base-content/50 mt-2">
+              No documents yet.
+            </p>
+            <ul :if={@cycle_documents != []} id="m-document-list" class="mt-2 space-y-3">
+              <li
+                :for={row <- @cycle_documents}
+                id={"m-doc-row-#{row.document.id}"}
+                class="rounded-lg border border-base-300 p-3 text-sm"
+              >
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <div class="flex items-center gap-2 min-w-0">
+                    <.icon name="hero-paper-clip-mini" class="size-4 text-base-content/40 shrink-0" />
+                    <.link
+                      href={
+                        ~p"/entities/#{@current_scope.entity.slug}/obligations/#{@obligation.id}/documents/#{row.document.id}"
+                      }
+                      target="_blank"
+                      class={[
+                        "link link-hover truncate",
+                        row.document.voided_at && "line-through text-base-content/40"
+                      ]}
+                    >
+                      {file_name(row.document)}
+                    </.link>
+                    <span :if={row.document.document_slot} class="badge badge-xs badge-ghost">
+                      {row.document.document_slot}
+                    </span>
+                    <span :if={row.document.voided_at} class="badge badge-xs badge-error">voided</span>
+                  </div>
+                  <span class="text-xs text-base-content/50">
+                    {humanize_status(row.event.status)} · {format_datetime(row.document.inserted_at)}
+                  </span>
+                </div>
+                <p :if={row.document.void_reason} class="text-xs text-base-content/50 mt-1">
+                  Void reason: {row.document.void_reason}
+                </p>
+                <div :if={@voiding_document_id != row.document.id} class="mt-2">
+                  <button
+                    :if={Obligations.document_voidable?(@current_scope, @obligation, row.document)}
+                    id={"m-void-doc-#{row.document.id}"}
+                    type="button"
+                    phx-click="void_document"
+                    phx-value-document_id={row.document.id}
+                    class="btn btn-ghost btn-xs text-error"
+                  >
+                    Void
+                  </button>
+                </div>
+                <.form
+                  :if={@voiding_document_id == row.document.id}
+                  for={%{}}
+                  id={"m-void-form-#{row.document.id}"}
+                  phx-submit="confirm_void_document"
+                  class="mt-2 space-y-2"
+                >
+                  <input type="hidden" name="document_id" value={row.document.id} />
+                  <.input
+                    :if={@void_reason_required?}
+                    name="reason"
+                    type="text"
+                    label="Reason for voiding"
+                    required
+                  />
+                  <div class="flex gap-2">
+                    <.button class="btn btn-error btn-sm" phx-disable-with="Voiding…">
+                      Confirm void
+                    </.button>
+                    <button
+                      type="button"
+                      class="btn btn-ghost btn-sm"
+                      phx-click="cancel_void_document"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </.form>
+              </li>
+            </ul>
+          </section>
+
+          <section :if={@live? and @can_add_document?} class="mt-6 border-t border-base-300 pt-4">
+            <h4 class="text-xs font-semibold uppercase tracking-wide text-base-content/60">
+              Add document
+            </h4>
+            <.form
+              for={%{}}
+              id="m-document-form"
+              phx-change="validate_upload"
+              phx-submit="add_document"
+              class="mt-2 space-y-3"
+            >
+              <select
+                :if={@doc_slots != []}
+                id="m-document-slot"
+                name="document_slot"
+                class="select w-full"
+                required
+              >
+                <option value="">Choose slot…</option>
+                <option :for={slot <- @doc_slots} value={slot}>{slot}</option>
+              </select>
+              <.live_file_input upload={@uploads.document} class="file-input w-full" />
+              <.button class="btn btn-primary btn-sm" phx-disable-with="Uploading…">Upload</.button>
+            </.form>
+            <p :for={err <- upload_errors(@uploads.document)} class="text-sm text-error mt-1">
+              {upload_error_to_string(err)}
+            </p>
+          </section>
+
+          <div class="modal-action">
+            <button type="button" class="btn" phx-click="close_documents_modal">Close</button>
+          </div>
+        </div>
+      </div>
+
       <div :if={@show_done_modal} id="m-done-modal" class="modal modal-bottom modal-open">
         <div class="modal-box">
           <h3 class="font-bold text-lg">Mark done</h3>
@@ -220,9 +388,12 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
      socket
      |> assign(:show_done_modal, false)
      |> assign(:show_edit_modal, false)
+     |> assign(:show_documents_modal, false)
+     |> assign(:voiding_document_id, nil)
      |> assign(:editing_note_id, nil)
      |> assign(:note_form, nil)
      |> assign(:member_options, member_options(scope))
+     |> allow_upload(:document, accept: :any, max_entries: 1, max_file_size: 20_000_000)
      |> load(id, scope)}
   end
 
@@ -375,6 +546,99 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
     end
   end
 
+  def handle_event("open_documents_modal", _params, socket) do
+    {:noreply, assign(socket, :show_documents_modal, true)}
+  end
+
+  def handle_event("close_documents_modal", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:show_documents_modal, false)
+     |> assign(:voiding_document_id, nil)}
+  end
+
+  def handle_event("void_document", %{"document_id" => document_id}, socket) do
+    {:noreply, assign(socket, :voiding_document_id, document_id)}
+  end
+
+  def handle_event("cancel_void_document", _params, socket) do
+    {:noreply, assign(socket, :voiding_document_id, nil)}
+  end
+
+  def handle_event("confirm_void_document", %{"document_id" => document_id} = params, socket) do
+    scope = socket.assigns.current_scope
+    obligation = socket.assigns.obligation
+    reason = Map.get(params, "reason")
+
+    case find_cycle_document(socket.assigns.cycle_documents, document_id) do
+      nil ->
+        {:noreply, put_flash(socket, :error, "Document not found.")}
+
+      %{document: document} ->
+        case Obligations.void_document(scope, obligation, document, %{reason: reason}) do
+          {:ok, _} ->
+            {:noreply,
+             reload(socket)
+             |> assign(:voiding_document_id, nil)
+             |> assign(:show_documents_modal, true)
+             |> put_flash(:info, "Document voided.")}
+
+          :not_authorise ->
+            {:noreply, put_flash(socket, :error, "Not authorized to void this document.")}
+
+          {:error, :reason_required} ->
+            {:noreply, put_flash(socket, :error, "A reason is required to void this document.")}
+
+          {:error, _} ->
+            {:noreply, put_flash(socket, :error, "Could not void document.")}
+        end
+    end
+  end
+
+  def handle_event("validate_upload", _params, socket) do
+    {:noreply, socket}
+  end
+
+  def handle_event("add_document", params, socket) do
+    scope = socket.assigns.current_scope
+    obligation = socket.assigns.obligation
+    slot = params["document_slot"]
+
+    case current_workable_event(obligation) do
+      nil ->
+        {:noreply, put_flash(socket, :error, "No open step to attach a document to.")}
+
+      event ->
+        results =
+          consume_uploaded_entries(socket, :document, fn %{path: path}, entry ->
+            upload = %Plug.Upload{
+              path: path,
+              filename: entry.client_name,
+              content_type: entry.client_type
+            }
+
+            {:ok, Obligations.add_document(scope, obligation, event, upload, slot)}
+          end)
+
+        case results do
+          [{:ok, _document}] ->
+            {:noreply,
+             reload(socket)
+             |> assign(:show_documents_modal, true)
+             |> put_flash(:info, "Document added.")}
+
+          [:not_authorise] ->
+            {:noreply, put_flash(socket, :error, "Not authorized.")}
+
+          [{:error, _}] ->
+            {:noreply, put_flash(socket, :error, "Could not add document.")}
+
+          [] ->
+            {:noreply, put_flash(socket, :error, "Choose a file to upload.")}
+        end
+    end
+  end
+
   defp load(socket, id, scope) do
     obligation =
       scope
@@ -386,12 +650,21 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
     recurring? =
       Recurrence.recurring?(obligation.obligation_type) and is_nil(obligation.series_ended_at)
 
+    doc_slots = parse_slots(obligation.complete_documents)
+    satisfied = satisfied_slots(obligation)
+    required_docs = Enum.map(doc_slots, fn slot -> {slot, MapSet.member?(satisfied, slot)} end)
+
     socket
     |> assign(:obligation, obligation)
     |> assign(:today, today)
     |> assign(:urgency, Urgency.classify(obligation.obligation_type, obligation.due_by, today))
     |> assign(:live?, live_cycle?(obligation))
     |> assign(:recurring?, recurring?)
+    |> assign(:doc_slots, doc_slots)
+    |> assign(:required_docs, required_docs)
+    |> assign(:cycle_documents, cycle_documents(obligation))
+    |> assign(:void_reason_required?, Obligations.document_void_reason_required?(obligation))
+    |> assign(:can_add_document?, can_add_document?(scope, obligation))
     |> assign(
       :done_form,
       to_form(%{"note" => "", "next_due_by" => suggestion(obligation, recurring?)}, as: :done)
@@ -469,4 +742,54 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
       _ -> nil
     end
   end
+
+  defp cycle_documents(%Obligation{} = obligation) do
+    obligation.events
+    |> Enum.flat_map(fn event ->
+      Enum.map(event.documents, fn document -> %{event: event, document: document} end)
+    end)
+  end
+
+  defp find_cycle_document(rows, document_id) do
+    Enum.find(rows, &(to_string(&1.document.id) == to_string(document_id)))
+  end
+
+  defp can_add_document?(scope, obligation) do
+    Authorization.can?(scope, :edit_obligation) or
+      Authorization.can?(scope, :start_progress, obligation)
+  end
+
+  defp current_workable_event(obligation) do
+    obligation.events
+    |> Enum.filter(&(&1.status in ["open", "in_progress"]))
+    |> List.last()
+  end
+
+  defp satisfied_slots(obligation) do
+    obligation.events
+    |> Enum.flat_map(& &1.documents)
+    |> Enum.reject(& &1.voided_at)
+    |> Enum.map(& &1.document_slot)
+    |> Enum.reject(&is_nil/1)
+    |> MapSet.new()
+  end
+
+  defp parse_slots(nil), do: []
+  defp parse_slots(""), do: []
+
+  defp parse_slots(csv) do
+    csv
+    |> String.split(",")
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
+  end
+
+  defp file_name(%{file: file}) when is_map(file) do
+    Map.get(file, "original") || Map.get(file, :original) || "file"
+  end
+
+  defp upload_error_to_string(:too_large), do: "File is too large (max 20 MB)."
+  defp upload_error_to_string(:too_many_files), do: "You can only upload one file at a time."
+  defp upload_error_to_string(:not_accepted), do: "This file type is not accepted."
+  defp upload_error_to_string(_), do: "Invalid file."
 end

@@ -79,6 +79,9 @@ defmodule ArgusWeb.ObligationLiveTest do
     {:ok, view, _html} =
       live(conn, ~p"/entities/#{manager.entity.slug}/obligations/#{obligation.id}")
 
+    view |> element("#documents-btn") |> render_click()
+    assert has_element?(view, "#document-modal")
+
     file =
       file_input(view, "#document-form", :document, [
         %{name: "receipt.pdf", content: "scan", type: "application/pdf"}
