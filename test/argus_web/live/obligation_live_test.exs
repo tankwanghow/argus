@@ -76,20 +76,28 @@ defmodule ArgusWeb.ObligationLiveTest do
         due_by: ~D[2026-06-30]
       })
 
+    obligation = Obligations.get_obligation!(manager, obligation.id)
+    [open_event] = Enum.filter(obligation.events, &(&1.status == "open"))
+
     {:ok, view, _html} =
       live(conn, ~p"/entities/#{manager.entity.slug}/obligations/#{obligation.id}")
 
-    view |> element("#documents-btn") |> render_click()
-    assert has_element?(view, "#document-modal")
+    view |> element("#documents-btn-#{open_event.id}") |> render_click()
+    assert has_element?(view, "#document-modal-#{open_event.id}")
 
     file =
-      file_input(view, "#document-form", :document, [
+      file_input(view, "#document-form-#{open_event.id}", :document, [
         %{name: "receipt.pdf", content: "scan", type: "application/pdf"}
       ])
 
     render_upload(file, "receipt.pdf")
 
-    view |> form("#document-form", %{"document_slot" => "receipt"}) |> render_submit()
+    view
+    |> form("#document-form-#{open_event.id}", %{
+      "document_slot" => "receipt",
+      "event_id" => open_event.id
+    })
+    |> render_submit()
 
     assert render(view) =~ "receipt.pdf"
     assert has_element?(view, "[data-status] .badge", "receipt")

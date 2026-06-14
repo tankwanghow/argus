@@ -103,6 +103,16 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
                 </button>
               </div>
             </.form>
+            <button
+              id={"m-documents-btn-#{event.id}"}
+              type="button"
+              phx-click="open_documents_modal"
+              phx-value-event_id={event.id}
+              class="btn btn-ghost btn-xs mt-2 gap-1"
+            >
+              <.icon name="hero-paper-clip-mini" class="size-4" />
+              Documents ({length(event.documents)})
+            </button>
             <ul :if={event.documents != []} class="mt-2 space-y-1 text-sm">
               <li :for={doc <- event.documents} class="flex items-center gap-2">
                 <.icon name="hero-paper-clip-mini" class="size-4 text-base-content/40" />
@@ -124,18 +134,9 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
           </li>
         </ol>
 
-        <div class="mt-6 grid grid-cols-1 gap-2">
+        <div :if={@live?} class="mt-6 grid grid-cols-1 gap-2">
           <button
-            id="m-documents-btn"
-            type="button"
-            phx-click="open_documents_modal"
-            class="btn btn-outline btn-lg"
-          >
-            <.icon name="hero-paper-clip-mini" class="size-4" />
-            Documents ({length(@cycle_documents)})
-          </button>
-          <button
-            :if={@live? and Authorization.can?(@current_scope, :start_progress, @obligation)}
+            :if={Authorization.can?(@current_scope, :start_progress, @obligation)}
             id="m-start-progress-btn"
             type="button"
             phx-click="start_progress"
@@ -144,7 +145,7 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
             Update progress
           </button>
           <button
-            :if={@live? and Authorization.can?(@current_scope, :mark_done, @obligation)}
+            :if={Authorization.can?(@current_scope, :mark_done, @obligation)}
             id="m-done-btn"
             type="button"
             phx-click="open_done_modal"
@@ -153,7 +154,7 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
             Mark done
           </button>
           <button
-            :if={@live? and Authorization.can?(@current_scope, :cancel_obligation)}
+            :if={Authorization.can?(@current_scope, :cancel_obligation)}
             id="m-cancel-btn"
             type="button"
             phx-click="cancel"
@@ -210,39 +211,34 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
         </div>
       </div>
 
-      <div :if={@show_documents_modal} id="m-document-modal" class="modal modal-bottom modal-open">
+      <div
+        :if={@documents_modal_event}
+        id={"m-document-modal-#{@documents_modal_event.id}"}
+        class="modal modal-bottom modal-open"
+      >
         <div class="modal-box max-h-[85vh] overflow-y-auto">
-          <h3 class="font-bold text-lg">Documents</h3>
+          <h3 class="font-bold text-lg">
+            Documents — {humanize_status(@documents_modal_event.status)}
+          </h3>
           <p class="text-sm text-base-content/60 mt-1">
-            Files attached to this cycle — counted across all workflow steps until marked done.
+            Files attached to this workflow step.
           </p>
-
-          <section :if={@required_docs != []} class="mt-4">
-            <h4 class="text-xs font-semibold uppercase tracking-wide text-base-content/60">
-              Required for completion
-            </h4>
-            <ul class="mt-2 space-y-1 text-sm">
-              <li :for={{slot, satisfied?} <- @required_docs} class="flex items-center gap-2">
-                <.icon
-                  name={if satisfied?, do: "hero-check-circle-mini", else: "hero-x-circle-mini"}
-                  class={["size-4", if(satisfied?, do: "text-success", else: "text-base-content/40")]}
-                />
-                <span>{slot}</span>
-              </li>
-            </ul>
-          </section>
 
           <section class="mt-5">
             <h4 class="text-xs font-semibold uppercase tracking-wide text-base-content/60">
               Uploaded files
             </h4>
-            <p :if={@cycle_documents == []} class="text-sm text-base-content/50 mt-2">
-              No documents yet.
+            <p :if={@documents_modal_event.documents == []} class="text-sm text-base-content/50 mt-2">
+              No documents on this step yet.
             </p>
-            <ul :if={@cycle_documents != []} id="m-document-list" class="mt-2 space-y-3">
+            <ul
+              :if={@documents_modal_event.documents != []}
+              id={"m-document-list-#{@documents_modal_event.id}"}
+              class="mt-2 space-y-3"
+            >
               <li
-                :for={row <- @cycle_documents}
-                id={"m-doc-row-#{row.document.id}"}
+                :for={doc <- @documents_modal_event.documents}
+                id={"m-doc-row-#{doc.id}"}
                 class="rounded-lg border border-base-300 p-3 text-sm"
               >
                 <div class="flex flex-wrap items-center justify-between gap-2">
@@ -250,48 +246,49 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
                     <.icon name="hero-paper-clip-mini" class="size-4 text-base-content/40 shrink-0" />
                     <.link
                       href={
-                        ~p"/entities/#{@current_scope.entity.slug}/obligations/#{@obligation.id}/documents/#{row.document.id}"
+                        ~p"/entities/#{@current_scope.entity.slug}/obligations/#{@obligation.id}/documents/#{doc.id}"
                       }
                       target="_blank"
                       class={[
                         "link link-hover truncate",
-                        row.document.voided_at && "line-through text-base-content/40"
+                        doc.voided_at && "line-through text-base-content/40"
                       ]}
                     >
-                      {file_name(row.document)}
+                      {file_name(doc)}
                     </.link>
-                    <span :if={row.document.document_slot} class="badge badge-xs badge-ghost">
-                      {row.document.document_slot}
+                    <span :if={doc.document_slot} class="badge badge-xs badge-ghost">
+                      {doc.document_slot}
                     </span>
-                    <span :if={row.document.voided_at} class="badge badge-xs badge-error">voided</span>
+                    <span :if={doc.voided_at} class="badge badge-xs badge-error">voided</span>
                   </div>
                   <span class="text-xs text-base-content/50">
-                    {humanize_status(row.event.status)} · {format_datetime(row.document.inserted_at)}
+                    {format_datetime(doc.inserted_at)}
                   </span>
                 </div>
-                <p :if={row.document.void_reason} class="text-xs text-base-content/50 mt-1">
-                  Void reason: {row.document.void_reason}
+                <p :if={doc.void_reason} class="text-xs text-base-content/50 mt-1">
+                  Void reason: {doc.void_reason}
                 </p>
-                <div :if={@voiding_document_id != row.document.id} class="mt-2">
+                <div :if={@voiding_document_id != doc.id} class="mt-2">
                   <button
-                    :if={Obligations.document_voidable?(@current_scope, @obligation, row.document)}
-                    id={"m-void-doc-#{row.document.id}"}
+                    :if={Obligations.document_voidable?(@current_scope, @obligation, doc)}
+                    id={"m-void-doc-#{doc.id}"}
                     type="button"
                     phx-click="void_document"
-                    phx-value-document_id={row.document.id}
+                    phx-value-document_id={doc.id}
                     class="btn btn-ghost btn-xs text-error"
                   >
                     Void
                   </button>
                 </div>
                 <.form
-                  :if={@voiding_document_id == row.document.id}
+                  :if={@voiding_document_id == doc.id}
                   for={%{}}
-                  id={"m-void-form-#{row.document.id}"}
+                  id={"m-void-form-#{doc.id}"}
                   phx-submit="confirm_void_document"
                   class="mt-2 space-y-2"
                 >
-                  <input type="hidden" name="document_id" value={row.document.id} />
+                  <input type="hidden" name="document_id" value={doc.id} />
+                  <input type="hidden" name="event_id" value={@documents_modal_event.id} />
                   <.input
                     :if={@void_reason_required?}
                     name="reason"
@@ -316,20 +313,24 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
             </ul>
           </section>
 
-          <section :if={@live? and @can_add_document?} class="mt-6 border-t border-base-300 pt-4">
+          <section
+            :if={event_uploadable?(@documents_modal_event, assigns)}
+            class="mt-6 border-t border-base-300 pt-4"
+          >
             <h4 class="text-xs font-semibold uppercase tracking-wide text-base-content/60">
               Add document
             </h4>
             <.form
               for={%{}}
-              id="m-document-form"
+              id={"m-document-form-#{@documents_modal_event.id}"}
               phx-change="validate_upload"
               phx-submit="add_document"
               class="mt-2 space-y-3"
             >
+              <input type="hidden" name="event_id" value={@documents_modal_event.id} />
               <select
                 :if={@doc_slots != []}
-                id="m-document-slot"
+                id={"m-document-slot-#{@documents_modal_event.id}"}
                 name="document_slot"
                 class="select w-full"
                 required
@@ -388,7 +389,8 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
      socket
      |> assign(:show_done_modal, false)
      |> assign(:show_edit_modal, false)
-     |> assign(:show_documents_modal, false)
+     |> assign(:documents_modal_event_id, nil)
+     |> assign(:documents_modal_event, nil)
      |> assign(:voiding_document_id, nil)
      |> assign(:editing_note_id, nil)
      |> assign(:note_form, nil)
@@ -546,14 +548,24 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
     end
   end
 
-  def handle_event("open_documents_modal", _params, socket) do
-    {:noreply, assign(socket, :show_documents_modal, true)}
+  def handle_event("open_documents_modal", %{"event_id" => event_id}, socket) do
+    case find_event(socket.assigns.obligation.events, event_id) do
+      nil ->
+        {:noreply, put_flash(socket, :error, "Event not found.")}
+
+      event ->
+        {:noreply,
+         socket
+         |> assign(:documents_modal_event_id, event.id)
+         |> assign(:documents_modal_event, event)}
+    end
   end
 
   def handle_event("close_documents_modal", _params, socket) do
     {:noreply,
      socket
-     |> assign(:show_documents_modal, false)
+     |> assign(:documents_modal_event_id, nil)
+     |> assign(:documents_modal_event, nil)
      |> assign(:voiding_document_id, nil)}
   end
 
@@ -569,18 +581,20 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
     scope = socket.assigns.current_scope
     obligation = socket.assigns.obligation
     reason = Map.get(params, "reason")
+    event_id = Map.get(params, "event_id", socket.assigns.documents_modal_event_id)
 
-    case find_cycle_document(socket.assigns.cycle_documents, document_id) do
+    case find_event_document(socket.assigns.obligation.events, event_id, document_id) do
       nil ->
         {:noreply, put_flash(socket, :error, "Document not found.")}
 
-      %{document: document} ->
+      document ->
         case Obligations.void_document(scope, obligation, document, %{reason: reason}) do
           {:ok, _} ->
             {:noreply,
-             reload(socket)
+             socket
+             |> reload()
              |> assign(:voiding_document_id, nil)
-             |> assign(:show_documents_modal, true)
+             |> reopen_documents_modal(event_id)
              |> put_flash(:info, "Document voided.")}
 
           :not_authorise ->
@@ -599,14 +613,14 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
     {:noreply, socket}
   end
 
-  def handle_event("add_document", params, socket) do
+  def handle_event("add_document", %{"event_id" => event_id} = params, socket) do
     scope = socket.assigns.current_scope
     obligation = socket.assigns.obligation
     slot = params["document_slot"]
 
-    case current_workable_event(obligation) do
+    case find_event(obligation.events, event_id) do
       nil ->
-        {:noreply, put_flash(socket, :error, "No open step to attach a document to.")}
+        {:noreply, put_flash(socket, :error, "Event not found.")}
 
       event ->
         results =
@@ -623,8 +637,9 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
         case results do
           [{:ok, _document}] ->
             {:noreply,
-             reload(socket)
-             |> assign(:show_documents_modal, true)
+             socket
+             |> reload()
+             |> reopen_documents_modal(event_id)
              |> put_flash(:info, "Document added.")}
 
           [:not_authorise] ->
@@ -662,7 +677,6 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
     |> assign(:recurring?, recurring?)
     |> assign(:doc_slots, doc_slots)
     |> assign(:required_docs, required_docs)
-    |> assign(:cycle_documents, cycle_documents(obligation))
     |> assign(:void_reason_required?, Obligations.document_void_reason_required?(obligation))
     |> assign(:can_add_document?, can_add_document?(scope, obligation))
     |> assign(
@@ -743,26 +757,37 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
     end
   end
 
-  defp cycle_documents(%Obligation{} = obligation) do
-    obligation.events
-    |> Enum.flat_map(fn event ->
-      Enum.map(event.documents, fn document -> %{event: event, document: document} end)
-    end)
+  defp reopen_documents_modal(socket, nil), do: socket
+
+  defp reopen_documents_modal(socket, event_id) do
+    case find_event(socket.assigns.obligation.events, event_id) do
+      nil ->
+        assign(socket, :documents_modal_event, nil)
+
+      event ->
+        socket
+        |> assign(:documents_modal_event_id, event.id)
+        |> assign(:documents_modal_event, event)
+    end
   end
 
-  defp find_cycle_document(rows, document_id) do
-    Enum.find(rows, &(to_string(&1.document.id) == to_string(document_id)))
+  defp find_event_document(events, event_id, document_id) do
+    case find_event(events, event_id) do
+      nil ->
+        nil
+
+      event ->
+        Enum.find(event.documents, &(to_string(&1.id) == to_string(document_id)))
+    end
+  end
+
+  defp event_uploadable?(event, assigns) do
+    assigns.live? and assigns.can_add_document? and event.status in ["open", "in_progress"]
   end
 
   defp can_add_document?(scope, obligation) do
     Authorization.can?(scope, :edit_obligation) or
       Authorization.can?(scope, :start_progress, obligation)
-  end
-
-  defp current_workable_event(obligation) do
-    obligation.events
-    |> Enum.filter(&(&1.status in ["open", "in_progress"]))
-    |> List.last()
   end
 
   defp satisfied_slots(obligation) do
