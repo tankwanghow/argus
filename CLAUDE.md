@@ -185,3 +185,33 @@ Oban reminder jobs, REST API/mobile, billing beyond `plan`/`seat_limit` fields.
   (`config :argus, :uploads_dir`), laid out `:entity_id/:obligation_id/`; it defaults to the priv
   path in dev but must point at a persistent volume in prod (`:code.priv_dir` is not writable in a
   release). Reads are served by a scope-gated controller, never a static route.
+
+## Deployment (Linode + Docker, peggy parity)
+
+Argus ships the **same self-hosted Docker-on-Debian/Linode flow as peggy** (no Fly/Gigalixir).
+A two-stage `Dockerfile` builds a Mix release; `mix release` picks up `rel/overlays/bin/server`
+(boots with `PHX_SERVER=true`) and `rel/overlays/bin/migrate` (`./argus eval
+Argus.Release.migrate`, which runs migrations without Mix inside the container). All
+target-specific values live in **`deploy.conf`** (gitignored secrets stay out — `secret.txt`).
+
+```bash
+# First-time provision + deploy (prompts for server pwd, DB pwd, SMTP app-password;
+# generates SECRET_KEY_BASE). Installs Docker/Nginx/Postgres 17, certbot, builds + ships image.
+cd deploy_to_linode && ./launch.sh ../deploy.conf
+
+# Subsequent deploys: rebuild image, stream to server, recreate container, run migrate.
+./deploy.sh ../deploy.conf
+```
+
+- **`deploy.conf`** keys: `LINODE_IP`, `DB_NAME`/`DB_USER`, `DOCKER_HUB_USERNAME`, `IMAGE_NAME`,
+  `DOCKER_CONTAINER_NAME`, `DOMAIN_NAME`, `PORT` (argus uses **8083** to avoid peggy's 8082 if
+  co-located), `MAIL_HOST`/`MAIL_PORT`/`MAIL_USERNAME`/`MAIL_FROM`. Passwords + `SECRET_KEY_BASE`
+  are prompted/generated at deploy time, never committed.
+- **Prod runtime env** (baked into the container by the deploy scripts, read in `runtime.exs`):
+  `DATABASE_URL`, `SECRET_KEY_BASE`, `PHX_HOST`, `PORT`, and the SMTP `MAIL_*` vars — **all
+  fail-loud** if missing. `:uploads_dir` is set to **`/uploads`**, the host volume
+  (`/home/argus/uploads`) mounted into the container by `generate_files_at_server.sh`.
+- **Mailer:** prod uses `Swoosh.Adapters.SMTP` (needs `gen_smtp`); the from-address comes from
+  `config :argus, :mail_from` (Gmail wants an App Password, not the account password).
+- `deploy_to_linode/` scripts are app-agnostic (parameterized by `deploy.conf`) and mirror
+  peggy's — keep them in sync when peggy's deploy flow changes.
