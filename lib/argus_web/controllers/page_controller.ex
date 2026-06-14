@@ -2,6 +2,12 @@ defmodule ArgusWeb.PageController do
   use ArgusWeb, :controller
 
   def home(conn, _params) do
-    render(conn, :home)
+    # Logged-in users land on their workspace (/entities auto-forwards to the
+    # single entity's dashboard, or shows the picker); anonymous users see the
+    # marketing page.
+    case conn.assigns.current_scope do
+      %{user: %{}} -> redirect(conn, to: ~p"/entities")
+      _ -> render(conn, :home)
+    end
   end
 end
