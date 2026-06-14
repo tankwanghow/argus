@@ -6,10 +6,12 @@ defmodule Argus.Accounts.UserNotifier do
 
   # Delivers the email using the application mailer.
   defp deliver(recipient, subject, body) do
+    from_addr = Application.get_env(:argus, :mail_from, {"Argus", "noreply@argus.asia"})
+
     email =
       new()
       |> to(recipient)
-      |> from({"Argus", "contact@example.com"})
+      |> from(from_addr)
       |> subject(subject)
       |> text_body(body)
 

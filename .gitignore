@@ -40,3 +40,6 @@ npm-debug.log
 /priv/uploads/
 /config/priv/uploads/
 
+# Deploy-time secret (SECRET_KEY_BASE etc.). Never commit.
+secret.txt
+
