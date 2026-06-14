@@ -98,13 +98,60 @@ defmodule Argus.Obligations do
     Obligation.changeset(obligation, attrs)
   end
 
-  def list_team_overview(%Scope{entity: entity}) do
+  def list_team_overview(scope), do: list_obligations(scope, status: :live)
+
+  @status_filters ~w(live completed cancelled all)a
+
+  @doc """
+  Lists obligations for the entity scope.
+
+  Options:
+    * `:status` — `:live` (default), `:completed`, `:cancelled`, or `:all`
+    * `:query` — optional case-insensitive search on title, type name, assignee email
+  """
+  def list_obligations(%Scope{entity: entity}, opts \\ []) do
+    status = Keyword.get(opts, :status, :live)
+    query = Keyword.get(opts, :query)
+
+    unless status in @status_filters do
+      raise ArgumentError, "invalid status filter #{inspect(status)}"
+    end
+
     Obligation
-    |> live()
     |> where([o], o.entity_id == ^entity.id)
-    |> order_by([o], asc: o.due_by)
+    |> apply_status_filter(status)
+    |> apply_list_order(status)
     |> preload([:obligation_type, :primary_assignee])
     |> Repo.all()
+    |> filter_by_query(query)
+  end
+
+  defp apply_status_filter(query, :live), do: live(query)
+
+  defp apply_status_filter(query, :completed) do
+    from o in query, where: not is_nil(o.completed_at)
+  end
+
+  defp apply_status_filter(query, :cancelled) do
+    from o in query, where: o.status == "cancelled"
+  end
+
+  defp apply_status_filter(query, :all), do: query
+
+  defp apply_list_order(query, :live), do: order_by(query, [o], asc: o.due_by)
+  defp apply_list_order(query, :completed), do: order_by(query, [o], desc: o.completed_at)
+  defp apply_list_order(query, _), do: order_by(query, [o], desc: o.due_by)
+
+  defp filter_by_query(obligations, query) when query in [nil, ""], do: obligations
+
+  defp filter_by_query(obligations, query) do
+    q = String.downcase(query)
+
+    Enum.filter(obligations, fn obligation ->
+      String.contains?(String.downcase(obligation.title), q) or
+        String.contains?(String.downcase(obligation.obligation_type.name), q) or
+        String.contains?(String.downcase(obligation.primary_assignee.email), q)
+    end)
   end
 
   defp collaborator_obligation_ids(user_id) do

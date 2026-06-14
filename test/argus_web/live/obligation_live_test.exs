@@ -8,6 +8,58 @@ defmodule ArgusWeb.ObligationLiveTest do
 
   setup :register_and_log_in_user
 
+  test "obligation index filters completed and cancelled cycles", %{conn: conn} do
+    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    member_scope = member_scope_on_entity(manager.entity)
+    conn = log_in_user(conn, manager.user)
+    type = type_fixture(manager.entity)
+
+    {:ok, live_obligation} =
+      Obligations.create_obligation(manager, %{
+        title: "Alpha Live",
+        obligation_type_id: type.id,
+        primary_assignee_id: member_scope.user.id,
+        due_by: ~D[2026-06-30]
+      })
+
+    {:ok, to_complete} =
+      Obligations.create_obligation(manager, %{
+        title: "Beta Done",
+        obligation_type_id: type.id,
+        primary_assignee_id: member_scope.user.id,
+        due_by: ~D[2026-05-30]
+      })
+
+    assert {:ok, completed, _} = Obligations.complete(member_scope, to_complete, %{})
+
+    {:ok, to_cancel} =
+      Obligations.create_obligation(manager, %{
+        title: "Gamma Cancelled",
+        obligation_type_id: type.id,
+        primary_assignee_id: member_scope.user.id,
+        due_by: ~D[2026-04-30]
+      })
+
+    assert {:ok, _} = Obligations.cancel_obligation(manager, to_cancel, %{})
+
+    {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}/obligations")
+
+    assert has_element?(view, "#obligation-#{live_obligation.id}")
+    refute has_element?(view, "#obligation-#{completed.id}")
+
+    view |> element("#filter-completed") |> render_click()
+    assert has_element?(view, "#obligation-#{completed.id}")
+    refute has_element?(view, "#obligation-#{live_obligation.id}")
+
+    view |> element("#filter-cancelled") |> render_click()
+    assert has_element?(view, "#obligation-#{to_cancel.id}")
+
+    view |> element("#filter-live") |> render_click()
+    view |> element("#obligation-search") |> render_keyup(%{"value" => "Alpha"})
+    assert has_element?(view, "#obligation-#{live_obligation.id}")
+    refute has_element?(view, "#obligation-#{to_cancel.id}")
+  end
+
   test "manager creates obligation via form", %{conn: conn} do
     {scope, _} = manager_obligation_scope_fixture()
     conn = log_in_user(conn, scope.user)

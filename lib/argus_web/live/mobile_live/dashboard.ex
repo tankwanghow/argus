@@ -92,6 +92,7 @@ defmodule ArgusWeb.MobileLive.Dashboard do
       |> Enum.map(fn obligation ->
         %{
           obligation: obligation,
+          cycle_status: :live,
           urgency: Urgency.classify(obligation.obligation_type, obligation.due_by, today)
         }
       end)

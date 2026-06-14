@@ -87,6 +87,7 @@ defmodule ArgusWeb do
       # Core UI components
       import ArgusWeb.CoreComponents
       import ArgusWeb.ObligationDocumentUpload
+      import ArgusWeb.ObligationStatusBadge
       import ArgusWeb.UrgencyBadge
 
       # Common modules used in templates

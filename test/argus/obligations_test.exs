@@ -145,6 +145,58 @@ defmodule Argus.ObligationsTest do
     end
   end
 
+  describe "list_obligations/2" do
+    test "filters by status and query" do
+      manager = manager_scope_fixture()
+      member_scope = member_scope_on_entity(manager.entity)
+
+      {:ok, live_obligation} =
+        Obligations.create_obligation(manager, %{
+          title: "EPF Live",
+          obligation_type_id: type_fixture(manager.entity).id,
+          primary_assignee_id: member_scope.user.id,
+          due_by: ~D[2026-06-30]
+        })
+
+      {:ok, completed} =
+        Obligations.create_obligation(manager, %{
+          title: "EPF Done",
+          obligation_type_id: type_fixture(manager.entity).id,
+          primary_assignee_id: member_scope.user.id,
+          due_by: ~D[2026-05-30]
+        })
+
+      assert {:ok, completed, _} =
+               Obligations.complete(member_scope, completed, %{next_due_by: nil})
+
+      {:ok, cancelled} =
+        Obligations.create_obligation(manager, %{
+          title: "EPF Cancelled",
+          obligation_type_id: type_fixture(manager.entity).id,
+          primary_assignee_id: member_scope.user.id,
+          due_by: ~D[2026-04-30]
+        })
+
+      assert {:ok, _} = Obligations.cancel_obligation(manager, cancelled, %{})
+
+      live_ids = manager |> Obligations.list_obligations(status: :live) |> Enum.map(& &1.id)
+
+      completed_ids =
+        manager |> Obligations.list_obligations(status: :completed) |> Enum.map(& &1.id)
+
+      cancelled_ids =
+        manager |> Obligations.list_obligations(status: :cancelled) |> Enum.map(& &1.id)
+
+      assert live_obligation.id in live_ids
+      refute completed.id in live_ids
+      assert completed.id in completed_ids
+      assert cancelled.id in cancelled_ids
+
+      assert [found] = Obligations.list_obligations(manager, status: :all, query: "done")
+      assert found.id == completed.id
+    end
+  end
+
   describe "live/1" do
     test "includes active incomplete obligations only" do
       {_scope, obligation} = obligation_fixture(manager_scope_fixture())

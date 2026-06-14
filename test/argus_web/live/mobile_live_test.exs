@@ -59,6 +59,37 @@ defmodule ArgusWeb.MobileLiveTest do
     refute Obligations.get_obligation!(scope, obligation.id).completed_at == nil
   end
 
+  test "mobile obligations list filters completed cycles", %{conn: conn} do
+    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    member_scope = member_scope_on_entity(manager.entity)
+    conn = mobile_conn(conn, manager)
+    type = type_fixture(manager.entity)
+
+    {:ok, _} =
+      Obligations.create_obligation(manager, %{
+        title: "Alpha Live",
+        obligation_type_id: type.id,
+        primary_assignee_id: member_scope.user.id,
+        due_by: ~D[2026-06-30]
+      })
+
+    {:ok, to_complete} =
+      Obligations.create_obligation(manager, %{
+        title: "Beta Done",
+        obligation_type_id: type.id,
+        primary_assignee_id: member_scope.user.id,
+        due_by: ~D[2026-05-30]
+      })
+
+    assert {:ok, completed, _} = Obligations.complete(member_scope, to_complete, %{})
+
+    {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}/obligations")
+
+    view |> element("#m-filter-completed") |> render_click()
+    assert has_element?(view, "#m-ob-#{completed.id}")
+    refute has_element?(view, "#m-obligations-empty")
+  end
+
   test "mobile UA is redirected from desktop dashboard to /m", %{conn: conn} do
     {scope, _obligation} = assigned_member_scope_fixture()
 
