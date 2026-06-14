@@ -212,25 +212,47 @@ defmodule ArgusWeb.ObligationLive.Show do
             End series
           </button>
         </section>
-        <section :if={@audit_logs != []} id="audit-log" class="mt-8">
-          <h2 class="text-sm font-semibold uppercase tracking-wide text-base-content/60">
-            Corrections
-          </h2>
-          <ul class="mt-3 divide-y divide-base-300 rounded-box border border-base-300 text-sm">
-            <li :for={log <- @audit_logs} id={"audit-#{log.id}"} class="p-3 space-y-1">
-              <div class="flex items-center justify-between gap-3">
-                <span class="font-medium">{log.field}</span>
-                <span class="text-xs text-base-content/50">{format_datetime(log.inserted_at)}</span>
-              </div>
-              <div class="text-xs text-base-content/50">by {log.user.email}</div>
-              <div class="text-base-content/70">
-                <span :if={log.old_value} class="line-through">{log.old_value}</span>
-                <span :if={log.old_value != nil and log.new_value != nil}> → </span>
-                <span :if={log.new_value}>{log.new_value}</span>
-              </div>
-            </li>
-          </ul>
-        </section>
+        <div :if={@audit_logs != []} class="mt-8">
+          <button
+            :if={not @show_corrections?}
+            id="show-corrections-btn"
+            type="button"
+            phx-click="show_corrections"
+            class="btn btn-ghost btn-sm"
+          >
+            <.icon name="hero-clipboard-document-list-mini" class="size-4" />
+            Show corrections ({length(@audit_logs)})
+          </button>
+          <section :if={@show_corrections?} id="audit-log" class="space-y-3">
+            <div class="flex items-center justify-between gap-3">
+              <h2 class="text-sm font-semibold uppercase tracking-wide text-base-content/60">
+                Corrections
+              </h2>
+              <button
+                id="hide-corrections-btn"
+                type="button"
+                phx-click="hide_corrections"
+                class="btn btn-ghost btn-xs"
+              >
+                Hide
+              </button>
+            </div>
+            <ul class="divide-y divide-base-300 rounded-box border border-base-300 text-sm">
+              <li :for={log <- @audit_logs} id={"audit-#{log.id}"} class="p-3 space-y-1">
+                <div class="flex items-center justify-between gap-3">
+                  <span class="font-medium">{log.field}</span>
+                  <span class="text-xs text-base-content/50">{format_datetime(log.inserted_at)}</span>
+                </div>
+                <div class="text-xs text-base-content/50">by {log.user.email}</div>
+                <div class="text-base-content/70">
+                  <span :if={log.old_value} class="line-through">{log.old_value}</span>
+                  <span :if={log.old_value != nil and log.new_value != nil}> → </span>
+                  <span :if={log.new_value}>{log.new_value}</span>
+                </div>
+              </li>
+            </ul>
+          </section>
+        </div>
 
         <section :if={length(@series) > 1} id="series-history" class="mt-8">
           <h2 class="text-sm font-semibold uppercase tracking-wide text-base-content/60">
@@ -339,6 +361,7 @@ defmodule ArgusWeb.ObligationLive.Show do
      socket
      |> assign(:show_done_modal, false)
      |> assign(:show_edit_modal, false)
+     |> assign(:show_corrections?, false)
      |> assign(:editing_note_id, nil)
      |> assign(:note_form, nil)
      |> assign(:recurring?, recurring?(obligation))
@@ -367,6 +390,14 @@ defmodule ArgusWeb.ObligationLive.Show do
       :not_authorise ->
         {:noreply, put_flash(socket, :error, "Not authorized.")}
     end
+  end
+
+  def handle_event("show_corrections", _params, socket) do
+    {:noreply, assign(socket, :show_corrections?, true)}
+  end
+
+  def handle_event("hide_corrections", _params, socket) do
+    {:noreply, assign(socket, :show_corrections?, false)}
   end
 
   def handle_event("open_edit_modal", _params, socket) do

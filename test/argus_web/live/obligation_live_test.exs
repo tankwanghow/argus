@@ -154,6 +154,9 @@ defmodule ArgusWeb.ObligationLiveTest do
     |> render_submit()
 
     assert render(view) =~ "EPF June (corrected)"
+    refute has_element?(view, "#audit-log")
+
+    view |> element("#show-corrections-btn") |> render_click()
     assert has_element?(view, "#audit-log", "title")
   end
 
@@ -185,6 +188,8 @@ defmodule ArgusWeb.ObligationLiveTest do
     |> render_submit()
 
     assert render(view) =~ "Original typo"
+
+    view |> element("#show-corrections-btn") |> render_click()
     assert has_element?(view, "#audit-log", "note")
   end
 
