@@ -194,6 +194,25 @@ defmodule Argus.ObligationsTest do
 
       assert [found] = Obligations.list_obligations(manager, status: :all, query: "done")
       assert found.id == completed.id
+
+      {:ok, other_live} =
+        Obligations.create_obligation(manager, %{
+          title: "Other Live",
+          obligation_type_id: type_fixture(manager.entity).id,
+          primary_assignee_id: manager.user.id,
+          due_by: ~D[2026-07-01]
+        })
+
+      my_live_ids =
+        member_scope |> Obligations.list_obligations(status: :my_live) |> Enum.map(& &1.id)
+
+      my_completed_ids =
+        member_scope |> Obligations.list_obligations(status: :my_completed) |> Enum.map(& &1.id)
+
+      assert live_obligation.id in my_live_ids
+      refute other_live.id in my_live_ids
+      assert completed.id in my_completed_ids
+      refute completed.id in my_live_ids
     end
   end
 

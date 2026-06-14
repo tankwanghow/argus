@@ -20,14 +20,14 @@ defmodule ArgusWeb.MobileLive.Obligations do
           value={@query}
           class="input w-full"
         />
-        <div id="m-obligation-status-filters" class="tabs tabs-box w-full">
+        <div id="m-obligation-status-filters" class="tabs tabs-box tabs-wrap w-full">
           <button
             :for={status <- Index.statuses()}
             id={"m-filter-#{status}"}
             type="button"
             phx-click="filter_status"
             phx-value-status={status}
-            class={["tab tab-sm flex-1", @status == Index.parse_status(status) && "tab-active"]}
+            class={["tab tab-xs", @status == Index.parse_status(status) && "tab-active"]}
           >
             {Index.status_label(Index.parse_status(status))}
           </button>
@@ -57,7 +57,7 @@ defmodule ArgusWeb.MobileLive.Obligations do
     {:ok,
      socket
      |> assign(:today, today)
-     |> assign(:status, :live)
+     |> assign(:status, Index.default_status(scope))
      |> assign(:query, "")
      |> load_rows()}
   end

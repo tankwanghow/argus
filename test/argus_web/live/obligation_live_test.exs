@@ -54,6 +54,17 @@ defmodule ArgusWeb.ObligationLiveTest do
     view |> element("#filter-cancelled") |> render_click()
     assert has_element?(view, "#obligation-#{to_cancel.id}")
 
+    member_conn = log_in_user(conn, member_scope.user)
+
+    {:ok, member_view, _html} =
+      live(member_conn, ~p"/entities/#{manager.entity.slug}/obligations")
+
+    member_view |> element("#filter-my_live") |> render_click()
+    assert has_element?(member_view, "#obligation-#{live_obligation.id}")
+
+    member_view |> element("#filter-my_completed") |> render_click()
+    assert has_element?(member_view, "#obligation-#{completed.id}")
+
     view |> element("#filter-live") |> render_click()
     view |> element("#obligation-search") |> render_keyup(%{"value" => "Alpha"})
     assert has_element?(view, "#obligation-#{live_obligation.id}")

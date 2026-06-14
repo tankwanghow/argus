@@ -22,14 +22,14 @@ defmodule ArgusWeb.ObligationLive.Index do
         </.header>
 
         <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div id="obligation-status-filters" class="tabs tabs-box w-full sm:w-fit">
+          <div id="obligation-status-filters" class="tabs tabs-box tabs-wrap w-full">
             <button
               :for={status <- Index.statuses()}
               id={"filter-#{status}"}
               type="button"
               phx-click="filter_status"
               phx-value-status={status}
-              class={["tab", @status == Index.parse_status(status) && "tab-active"]}
+              class={["tab tab-sm", @status == Index.parse_status(status) && "tab-active"]}
             >
               {Index.status_label(Index.parse_status(status))}
             </button>
@@ -84,7 +84,7 @@ defmodule ArgusWeb.ObligationLive.Index do
     {:ok,
      socket
      |> assign(:today, today)
-     |> assign(:status, :live)
+     |> assign(:status, Index.default_status(scope))
      |> assign(:query, "")
      |> load_rows()}
   end

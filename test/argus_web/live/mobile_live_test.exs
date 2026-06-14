@@ -62,7 +62,7 @@ defmodule ArgusWeb.MobileLiveTest do
   test "mobile obligations list filters completed cycles", %{conn: conn} do
     manager = Argus.EntitiesFixtures.manager_scope_fixture()
     member_scope = member_scope_on_entity(manager.entity)
-    conn = mobile_conn(conn, manager)
+    conn = mobile_conn(conn, member_scope)
     type = type_fixture(manager.entity)
 
     {:ok, _} =
@@ -85,7 +85,7 @@ defmodule ArgusWeb.MobileLiveTest do
 
     {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}/obligations")
 
-    view |> element("#m-filter-completed") |> render_click()
+    view |> element("#m-filter-my_completed") |> render_click()
     assert has_element?(view, "#m-ob-#{completed.id}")
     refute has_element?(view, "#m-obligations-empty")
   end

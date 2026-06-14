@@ -27,17 +27,7 @@ defmodule Argus.Obligations do
     from(o in query, where: o.status == "active" and is_nil(o.completed_at))
   end
 
-  def list_my_work(%Scope{entity: entity, user: user}) do
-    collaborator_ids = collaborator_obligation_ids(user.id)
-
-    Obligation
-    |> live()
-    |> where([o], o.entity_id == ^entity.id)
-    |> where([o], o.primary_assignee_id == ^user.id or o.id in subquery(collaborator_ids))
-    |> order_by([o], asc: o.due_by)
-    |> preload([:obligation_type, :primary_assignee])
-    |> Repo.all()
-  end
+  def list_my_work(scope), do: list_obligations(scope, status: :my_live)
 
   def list_types(%Scope{entity: entity}) do
     Type
@@ -100,16 +90,17 @@ defmodule Argus.Obligations do
 
   def list_team_overview(scope), do: list_obligations(scope, status: :live)
 
-  @status_filters ~w(live completed cancelled all)a
+  @status_filters ~w(my_live my_completed live completed cancelled all)a
 
   @doc """
   Lists obligations for the entity scope.
 
   Options:
-    * `:status` — `:live` (default), `:completed`, `:cancelled`, or `:all`
+    * `:status` — `:my_live`, `:my_completed`, `:live` (default), `:completed`,
+      `:cancelled`, or `:all`. My filters scope to primary assignee or collaborator.
     * `:query` — optional case-insensitive search on title, type name, assignee email
   """
-  def list_obligations(%Scope{entity: entity}, opts \\ []) do
+  def list_obligations(%Scope{entity: entity, user: user}, opts \\ []) do
     status = Keyword.get(opts, :status, :live)
     query = Keyword.get(opts, :query)
 
@@ -119,6 +110,7 @@ defmodule Argus.Obligations do
 
     Obligation
     |> where([o], o.entity_id == ^entity.id)
+    |> scope_to_assignee(status, user)
     |> apply_status_filter(status)
     |> apply_list_order(status)
     |> preload([:obligation_type, :primary_assignee])
@@ -126,9 +118,21 @@ defmodule Argus.Obligations do
     |> filter_by_query(query)
   end
 
-  defp apply_status_filter(query, :live), do: live(query)
+  defp scope_to_assignee(query, status, user) when status in [:my_live, :my_completed] do
+    collaborator_ids = collaborator_obligation_ids(user.id)
 
-  defp apply_status_filter(query, :completed) do
+    where(
+      query,
+      [o],
+      o.primary_assignee_id == ^user.id or o.id in subquery(collaborator_ids)
+    )
+  end
+
+  defp scope_to_assignee(query, _status, _user), do: query
+
+  defp apply_status_filter(query, status) when status in [:live, :my_live], do: live(query)
+
+  defp apply_status_filter(query, status) when status in [:completed, :my_completed] do
     from o in query, where: not is_nil(o.completed_at)
   end
 
@@ -138,8 +142,12 @@ defmodule Argus.Obligations do
 
   defp apply_status_filter(query, :all), do: query
 
-  defp apply_list_order(query, :live), do: order_by(query, [o], asc: o.due_by)
-  defp apply_list_order(query, :completed), do: order_by(query, [o], desc: o.completed_at)
+  defp apply_list_order(query, status) when status in [:live, :my_live],
+    do: order_by(query, [o], asc: o.due_by)
+
+  defp apply_list_order(query, status) when status in [:completed, :my_completed],
+    do: order_by(query, [o], desc: o.completed_at)
+
   defp apply_list_order(query, _), do: order_by(query, [o], desc: o.due_by)
 
   defp filter_by_query(obligations, query) when query in [nil, ""], do: obligations
