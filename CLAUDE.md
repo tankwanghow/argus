@@ -4,21 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-Argus is **greenfield**: the only files committed so far are the design spec and the
-implementation plan under `docs/superpowers/`. The Phoenix app has **not been generated yet**.
+Argus is **built**: the Phoenix app is generated and the full 21-task implementation plan has
+been executed (contexts, schemas, auth/scope, dual Desktop+Mobile LiveViews, dashboard urgency,
+obligation workflow/recurrence, types & membership management, audit, uploads). `mix precommit`
+passes. What remains is the plan's two **manual smoke tests** (Desktop and Mobile happy-paths via
+`mix phx.server`) and any future enhancements beyond v1 scope.
 
 - **Spec:** `docs/superpowers/specs/2026-06-13-argus-design.md` — authoritative for data model, roles, and workflows.
-- **Plan:** `docs/superpowers/plans/2026-06-13-argus-implementation.md` — 21 phased, TDD, commit-per-task steps.
+- **Plan:** `docs/superpowers/plans/2026-06-13-argus-implementation.md` — 21 phased, TDD, commit-per-task steps (all complete).
 
-Execute the plan with `superpowers:subagent-driven-development` (or `executing-plans`).
-Task 1 bootstraps the app with:
-
-```bash
-cd /home/tankwanghow/Projects/elixir
-mix phx.new argus --binary-id --no-dashboard
-# keep the mailer (magic-link login emails) and assets (Tailwind v4 + daisyUI)
-# answer Y when it warns the argus/ dir already exists (it holds docs/)
-```
+When extending the app, follow the `argus-conventions` skill and keep the TDD/commit-per-change
+rhythm; run `mix precommit` before declaring work done.
 
 ## House conventions (read first)
 
