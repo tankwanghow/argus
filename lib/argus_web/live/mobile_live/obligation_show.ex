@@ -313,47 +313,14 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
             </ul>
           </section>
 
-          <section
-            :if={event_uploadable?(@documents_modal_event, assigns)}
-            class="mt-6 border-t border-base-300 pt-4"
-          >
-            <h4 class="text-xs font-semibold uppercase tracking-wide text-base-content/60">
-              Add document
-            </h4>
-            <.form
-              for={%{}}
-              id={"m-document-form-#{@documents_modal_event.id}"}
-              phx-change="validate_upload"
-              phx-submit="add_document"
-              class="mt-2 space-y-3"
-            >
-              <input type="hidden" name="event_id" value={@documents_modal_event.id} />
-              <div :if={@doc_slots != []} class="fieldset">
-                <label
-                  class="label mb-1"
-                  for={"m-document-slot-#{@documents_modal_event.id}"}
-                >
-                  Document type
-                </label>
-                <select
-                  id={"m-document-slot-#{@documents_modal_event.id}"}
-                  name="document_slot"
-                  class="select w-full"
-                >
-                  <option value="">Additional file (optional)</option>
-                  <option :for={slot <- @doc_slots} value={slot}>{slot} (required for done)</option>
-                </select>
-                <p class="text-xs text-base-content/50 mt-1">
-                  Required slots count toward marking done. You can also attach other supporting files.
-                </p>
-              </div>
-              <.live_file_input upload={@uploads.document} class="file-input w-full" />
-              <.button class="btn btn-primary btn-sm" phx-disable-with="Uploading…">Upload</.button>
-            </.form>
-            <p :for={err <- upload_errors(@uploads.document)} class="text-sm text-error mt-1">
-              {upload_error_to_string(err)}
-            </p>
-          </section>
+          <.obligation_document_upload_forms
+            event={@documents_modal_event}
+            required_docs={@required_docs}
+            uploads={@uploads}
+            uploadable?={event_uploadable?(@documents_modal_event, assigns)}
+            upload_slot_target={@upload_slot_target}
+            id_prefix="m-"
+          />
 
           <div class="modal-action">
             <button type="button" class="btn" phx-click="close_documents_modal">Close</button>
@@ -400,6 +367,7 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
      |> assign(:show_edit_modal, false)
      |> assign(:documents_modal_event_id, nil)
      |> assign(:documents_modal_event, nil)
+     |> assign(:upload_slot_target, nil)
      |> assign(:voiding_document_id, nil)
      |> assign(:editing_note_id, nil)
      |> assign(:note_form, nil)
@@ -566,7 +534,8 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
         {:noreply,
          socket
          |> assign(:documents_modal_event_id, event.id)
-         |> assign(:documents_modal_event, event)}
+         |> assign(:documents_modal_event, event)
+         |> assign(:upload_slot_target, nil)}
     end
   end
 
@@ -575,7 +544,22 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
      socket
      |> assign(:documents_modal_event_id, nil)
      |> assign(:documents_modal_event, nil)
+     |> assign(:upload_slot_target, nil)
      |> assign(:voiding_document_id, nil)}
+  end
+
+  def handle_event("select_upload_slot", %{"event_id" => event_id, "slot" => slot}, socket) do
+    if socket.assigns.documents_modal_event_id == event_id or
+         to_string(socket.assigns.documents_modal_event_id) == event_id do
+      target = if slot == "additional", do: :additional, else: slot
+      {:noreply, assign(socket, :upload_slot_target, target)}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  def handle_event("clear_upload_slot", _params, socket) do
+    {:noreply, assign(socket, :upload_slot_target, nil)}
   end
 
   def handle_event("void_document", %{"document_id" => document_id}, socket) do
@@ -603,6 +587,7 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
              socket
              |> reload()
              |> assign(:voiding_document_id, nil)
+             |> assign(:upload_slot_target, nil)
              |> reopen_documents_modal(event_id)
              |> put_flash(:info, "Document voided.")}
 
@@ -648,6 +633,7 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
             {:noreply,
              socket
              |> reload()
+             |> assign(:upload_slot_target, nil)
              |> reopen_documents_modal(event_id)
              |> put_flash(:info, "Document added.")}
 
@@ -825,9 +811,4 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
   defp file_name(%{file: file}) when is_map(file) do
     Map.get(file, "original") || Map.get(file, :original) || "file"
   end
-
-  defp upload_error_to_string(:too_large), do: "File is too large (max 20 MB)."
-  defp upload_error_to_string(:too_many_files), do: "You can only upload one file at a time."
-  defp upload_error_to_string(:not_accepted), do: "This file type is not accepted."
-  defp upload_error_to_string(_), do: "Invalid file."
 end

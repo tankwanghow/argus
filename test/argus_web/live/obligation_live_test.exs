@@ -85,15 +85,21 @@ defmodule ArgusWeb.ObligationLiveTest do
     view |> element("#documents-btn-#{open_event.id}") |> render_click()
     assert has_element?(view, "#document-modal-#{open_event.id}")
 
+    assert has_element?(view, "#slot-upload-#{open_event.id}-receipt")
+
+    view
+    |> element("#select-slot-#{open_event.id}-receipt")
+    |> render_click()
+
     file =
-      file_input(view, "#document-form-#{open_event.id}", :document, [
+      file_input(view, "#document-form-#{open_event.id}-active", :document, [
         %{name: "receipt.pdf", content: "scan", type: "application/pdf"}
       ])
 
     render_upload(file, "receipt.pdf")
 
     view
-    |> form("#document-form-#{open_event.id}", %{
+    |> form("#document-form-#{open_event.id}-active", %{
       "document_slot" => "receipt",
       "event_id" => open_event.id
     })
@@ -125,16 +131,19 @@ defmodule ArgusWeb.ObligationLiveTest do
 
     view |> element("#documents-btn-#{open_event.id}") |> render_click()
 
+    view
+    |> element("#select-additional-#{open_event.id}")
+    |> render_click()
+
     file =
-      file_input(view, "#document-form-#{open_event.id}", :document, [
+      file_input(view, "#document-form-#{open_event.id}-active", :document, [
         %{name: "notes.pdf", content: "extra", type: "application/pdf"}
       ])
 
     render_upload(file, "notes.pdf")
 
     view
-    |> form("#document-form-#{open_event.id}", %{
-      "document_slot" => "",
+    |> form("#document-form-#{open_event.id}-active", %{
       "event_id" => open_event.id
     })
     |> render_submit()
