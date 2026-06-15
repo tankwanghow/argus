@@ -101,10 +101,15 @@ defmodule ArgusWeb.UserLive.Login do
     # form reads the "email" key (flash :email), the password form reads
     # "identifier" (flash :identifier). Both fall back to the current user's
     # email when reauthenticating.
-    current_email = get_in(socket.assigns, [:current_scope, Access.key(:user), Access.key(:email)])
-    prefill = fn flash_key -> Phoenix.Flash.get(socket.assigns.flash, flash_key) || current_email end
+    current_email =
+      get_in(socket.assigns, [:current_scope, Access.key(:user), Access.key(:email)])
 
-    form = to_form(%{"email" => prefill.(:email), "identifier" => prefill.(:identifier)}, as: "user")
+    prefill = fn flash_key ->
+      Phoenix.Flash.get(socket.assigns.flash, flash_key) || current_email
+    end
+
+    form =
+      to_form(%{"email" => prefill.(:email), "identifier" => prefill.(:identifier)}, as: "user")
 
     {:ok, assign(socket, form: form, trigger_submit: false)}
   end

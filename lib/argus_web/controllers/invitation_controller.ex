@@ -29,7 +29,10 @@ defmodule ArgusWeb.InvitationController do
         # Keep this generic — a field-level "username has already been taken"
         # message would leak which usernames exist (user enumeration).
         conn
-        |> put_flash(:error, "Couldn't create your account — check your username (3+ letters/numbers) and password (12+ characters), then try again.")
+        |> put_flash(
+          :error,
+          "Couldn't create your account — check your username (3+ letters/numbers) and password (12+ characters), then try again."
+        )
         |> redirect(to: ~p"/invitations/#{token}")
 
       {:error, :seat_limit_reached} ->

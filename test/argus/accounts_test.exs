@@ -414,7 +414,9 @@ defmodule Argus.AccountsTest do
 
   describe "register_invited_user/1" do
     test "creates a confirmed user with a hashed password and no email" do
-      {:ok, user} = Accounts.register_invited_user(%{username: "joiner1", password: "supersecret12"})
+      {:ok, user} =
+        Accounts.register_invited_user(%{username: "joiner1", password: "supersecret12"})
+
       assert user.username == "joiner1"
       assert user.confirmed_at
       assert user.hashed_password
@@ -431,14 +433,19 @@ defmodule Argus.AccountsTest do
   describe "get_user_by_login_and_password/2" do
     test "finds by username and verifies the password" do
       user = username_user_fixture(%{username: "loginme"})
-      assert %Accounts.User{id: id} = Accounts.get_user_by_login_and_password("loginme", valid_user_password())
+
+      assert %Accounts.User{id: id} =
+               Accounts.get_user_by_login_and_password("loginme", valid_user_password())
+
       assert id == user.id
     end
 
     test "finds by email when the user has one" do
       user = user_fixture() |> set_password()
+
       assert %Accounts.User{id: id} =
                Accounts.get_user_by_login_and_password(user.email, valid_user_password())
+
       assert id == user.id
     end
 
@@ -475,13 +482,25 @@ defmodule Argus.AccountsTest do
     end
 
     test "validates email format only when an email is given" do
-      cs = User.registration_changeset(%User{}, %{username: "n2", password: "supersecret12", email: "bad"})
+      cs =
+        User.registration_changeset(%User{}, %{
+          username: "n2",
+          password: "supersecret12",
+          email: "bad"
+        })
+
       refute cs.valid?
       assert %{email: ["must have the @ sign and no spaces"]} = errors_on(cs)
     end
 
     test "treats a blank email as absent (stored as nil, not \"\")" do
-      cs = User.registration_changeset(%User{}, %{username: "blankmail", password: "supersecret12", email: ""})
+      cs =
+        User.registration_changeset(%User{}, %{
+          username: "blankmail",
+          password: "supersecret12",
+          email: ""
+        })
+
       assert cs.valid?
       assert get_field(cs, :email) == nil
     end
