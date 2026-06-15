@@ -4,6 +4,7 @@ defmodule Argus.AccountsTest do
   alias Argus.Accounts
 
   import Argus.AccountsFixtures
+  import Ecto.Changeset
   alias Argus.Accounts.{User, UserToken}
 
   describe "get_user_by_email/1" do
@@ -408,6 +409,41 @@ defmodule Argus.AccountsTest do
         |> Ecto.Changeset.change(%{locale: "en"})
         |> Argus.Repo.insert!()
       end
+    end
+  end
+
+  describe "registration_changeset/3" do
+    alias Argus.Accounts.User
+
+    test "is valid with username + password and no email" do
+      cs = User.registration_changeset(%User{}, %{username: "newbie", password: "supersecret12"})
+      assert cs.valid?
+      assert get_change(cs, :hashed_password)
+      refute get_change(cs, :password)
+    end
+
+    test "requires a username" do
+      cs = User.registration_changeset(%User{}, %{password: "supersecret12"})
+      refute cs.valid?
+      assert %{username: ["can't be blank"]} = errors_on(cs)
+    end
+
+    test "rejects a short password" do
+      cs = User.registration_changeset(%User{}, %{username: "newbie", password: "short"})
+      refute cs.valid?
+      assert %{password: ["should be at least 12 character(s)"]} = errors_on(cs)
+    end
+
+    test "validates email format only when an email is given" do
+      cs = User.registration_changeset(%User{}, %{username: "n2", password: "supersecret12", email: "bad"})
+      refute cs.valid?
+      assert %{email: ["must have the @ sign and no spaces"]} = errors_on(cs)
+    end
+
+    test "treats a blank email as absent (stored as nil, not \"\")" do
+      cs = User.registration_changeset(%User{}, %{username: "blankmail", password: "supersecret12", email: ""})
+      assert cs.valid?
+      assert get_field(cs, :email) == nil
     end
   end
 end

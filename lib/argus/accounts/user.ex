@@ -35,10 +35,7 @@ defmodule Argus.Accounts.User do
     changeset =
       changeset
       |> validate_required([:email])
-      |> validate_format(:email, ~r/^[^@,;\s]+@[^@,;\s]+$/,
-        message: "must have the @ sign and no spaces"
-      )
-      |> validate_length(:email, max: 160)
+      |> validate_email_format()
       |> put_default_locale()
 
     if Keyword.get(opts, :validate_unique, true) do
@@ -51,6 +48,14 @@ defmodule Argus.Accounts.User do
     end
   end
 
+  defp validate_email_format(changeset) do
+    changeset
+    |> validate_format(:email, ~r/^[^@,;\s]+@[^@,;\s]+$/,
+      message: "must have the @ sign and no spaces"
+    )
+    |> validate_length(:email, max: 160)
+  end
+
   defp put_default_locale(changeset) do
     case get_field(changeset, :locale) do
       nil -> put_change(changeset, :locale, "en")
@@ -61,6 +66,64 @@ defmodule Argus.Accounts.User do
   defp validate_email_changed(changeset) do
     if get_field(changeset, :email) && get_change(changeset, :email) == nil do
       add_error(changeset, :email, "did not change")
+    else
+      changeset
+    end
+  end
+
+  @doc """
+  Registers an invited member from a username + password, with an optional
+  email. Username is required (it's their login handle); email is optional.
+  """
+  def registration_changeset(user, attrs, opts \\ []) do
+    user
+    |> cast(attrs, [:username, :email, :password, :locale])
+    |> normalize_blank_email()
+    |> validate_username(opts)
+    |> maybe_validate_email(opts)
+    |> validate_password(opts)
+    |> put_default_locale()
+  end
+
+  # A blank email from an optional form field must be stored as NULL, not "",
+  # otherwise two username-only users would collide on the unique email index.
+  defp normalize_blank_email(changeset) do
+    case get_change(changeset, :email) do
+      email when is_binary(email) ->
+        if String.trim(email) == "", do: delete_change(changeset, :email), else: changeset
+
+      _ ->
+        changeset
+    end
+  end
+
+  defp validate_username(changeset, opts) do
+    changeset =
+      changeset
+      |> validate_required([:username])
+      |> validate_format(:username, ~r/^[a-zA-Z0-9_]+$/,
+        message: "only letters, numbers, and underscores"
+      )
+      |> validate_length(:username, min: 3, max: 30)
+
+    if Keyword.get(opts, :validate_unique, true) do
+      changeset
+      |> unsafe_validate_unique(:username, Argus.Repo)
+      |> unique_constraint(:username)
+    else
+      changeset
+    end
+  end
+
+  defp maybe_validate_email(changeset, opts) do
+    if get_field(changeset, :email) not in [nil, ""] do
+      changeset = validate_email_format(changeset)
+
+      if Keyword.get(opts, :validate_unique, true) do
+        changeset |> unsafe_validate_unique(:email, Argus.Repo) |> unique_constraint(:email)
+      else
+        changeset
+      end
     else
       changeset
     end
