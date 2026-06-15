@@ -30,10 +30,12 @@ defmodule ArgusWeb.MembershipLive.Index do
               class="flex items-center gap-3 p-3"
             >
               <div class="flex-1 min-w-0">
-                <div class="font-medium truncate">{user.email}</div>
-                <div :if={user.id == @current_scope.user.id} class="text-xs text-base-content/50">
-                  you
-                </div>
+                <span :if={user.email} class="font-medium truncate">{user.email}
+                <span :if={user.username} class="mx-4">♦</span>
+                <span :if={user.username} class="text-base-content/70 truncate">{user.username}</span>
+                <span :if={user.id == @current_scope.user.id} class="mx-4">♦</span>
+                <span :if={user.id == @current_scope.user.id} class="text-base-content/40">you</span>
+                </span>
               </div>
               <form :if={@can_manage?} id={"role-form-#{membership.id}"} phx-change="change_role">
                 <input type="hidden" name="membership_id" value={membership.id} />
