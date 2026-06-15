@@ -69,9 +69,9 @@ defmodule ArgusWeb.UserLive.Login do
         >
           <.input
             readonly={!!@current_scope}
-            field={f[:email]}
-            type="email"
-            label="Email"
+            field={f[:identifier]}
+            type="text"
+            label="Email or username"
             autocomplete="username"
             spellcheck="false"
             required
@@ -97,11 +97,14 @@ defmodule ArgusWeb.UserLive.Login do
 
   @impl true
   def mount(_params, _session, socket) do
-    email =
-      Phoenix.Flash.get(socket.assigns.flash, :email) ||
-        get_in(socket.assigns, [:current_scope, Access.key(:user), Access.key(:email)])
+    # The page hosts two subforms that prefill independently: the magic-link
+    # form reads the "email" key (flash :email), the password form reads
+    # "identifier" (flash :identifier). Both fall back to the current user's
+    # email when reauthenticating.
+    current_email = get_in(socket.assigns, [:current_scope, Access.key(:user), Access.key(:email)])
+    prefill = fn flash_key -> Phoenix.Flash.get(socket.assigns.flash, flash_key) || current_email end
 
-    form = to_form(%{"email" => email}, as: "user")
+    form = to_form(%{"email" => prefill.(:email), "identifier" => prefill.(:identifier)}, as: "user")
 
     {:ok, assign(socket, form: form, trigger_submit: false)}
   end

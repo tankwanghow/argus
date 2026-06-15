@@ -14,7 +14,7 @@ defmodule ArgusWeb.UserSessionControllerTest do
 
       conn =
         post(conn, ~p"/users/log-in", %{
-          "user" => %{"email" => user.email, "password" => valid_user_password()}
+          "user" => %{"identifier" => user.email, "password" => valid_user_password()}
         })
 
       assert get_session(conn, :user_token)
@@ -34,7 +34,7 @@ defmodule ArgusWeb.UserSessionControllerTest do
       conn =
         post(conn, ~p"/users/log-in", %{
           "user" => %{
-            "email" => user.email,
+            "identifier" => user.email,
             "password" => valid_user_password(),
             "remember_me" => "true"
           }
@@ -52,7 +52,7 @@ defmodule ArgusWeb.UserSessionControllerTest do
         |> init_test_session(user_return_to: "/foo/bar")
         |> post(~p"/users/log-in", %{
           "user" => %{
-            "email" => user.email,
+            "identifier" => user.email,
             "password" => valid_user_password()
           }
         })
@@ -64,10 +64,10 @@ defmodule ArgusWeb.UserSessionControllerTest do
     test "redirects to login page with invalid credentials", %{conn: conn, user: user} do
       conn =
         post(conn, ~p"/users/log-in?mode=password", %{
-          "user" => %{"email" => user.email, "password" => "invalid_password"}
+          "user" => %{"identifier" => user.email, "password" => "invalid_password"}
         })
 
-      assert Phoenix.Flash.get(conn.assigns.flash, :error) == "Invalid email or password"
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) == "Invalid username/email or password"
       assert redirected_to(conn) == ~p"/users/log-in"
     end
   end
@@ -126,6 +126,20 @@ defmodule ArgusWeb.UserSessionControllerTest do
                "The link is invalid or it has expired."
 
       assert redirected_to(conn) == ~p"/users/log-in"
+    end
+  end
+
+  describe "POST /users/log-in with username" do
+    test "logs in a username+password user", %{conn: conn} do
+      _user = username_user_fixture(%{username: "loginbox"})
+
+      conn =
+        post(conn, ~p"/users/log-in", %{
+          "user" => %{"identifier" => "loginbox", "password" => valid_user_password()}
+        })
+
+      assert get_session(conn, :user_token)
+      assert redirected_to(conn) == ~p"/"
     end
   end
 
