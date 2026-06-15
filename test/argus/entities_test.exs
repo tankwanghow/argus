@@ -148,4 +148,100 @@ defmodule Argus.EntitiesTest do
                Entities.revoke_invitation(admin_scope, invitation.id)
     end
   end
+
+  describe "invite_member/4 email delivery" do
+    import Swoosh.TestAssertions
+
+    alias Argus.Entities.Invitation
+
+    # Building fixtures sends login emails into this process's mailbox; drain
+    # them so the assertions below target only the invite email.
+    defp flush_emails do
+      receive do
+        {:email, _} -> flush_emails()
+      after
+        0 -> :ok
+      end
+    end
+
+    test "delivers an invite email containing the accept URL built from the encoded token" do
+      admin_scope = Argus.EntitiesFixtures.entity_scope_fixture()
+      flush_emails()
+
+      url_fun = fn encoded -> "https://argus.test/invitations/#{encoded}" end
+
+      {:ok, invitation} =
+        Entities.invite_member(admin_scope, "invitee@example.com", "member", url_fun)
+
+      expected_url = "https://argus.test/invitations/#{Invitation.encode_token(invitation.token)}"
+
+      assert_email_sent(fn email ->
+        assert {_, "invitee@example.com"} = hd(email.to)
+        assert email.text_body =~ expected_url
+        assert email.text_body =~ admin_scope.entity.name
+      end)
+    end
+
+    test "without a url_fun (3-arity) it creates the invitation and sends no email" do
+      admin_scope = Argus.EntitiesFixtures.entity_scope_fixture()
+      flush_emails()
+
+      assert {:ok, _invitation} =
+               Entities.invite_member(admin_scope, "invitee@example.com", "member")
+
+      assert_no_email_sent()
+    end
+  end
+
+  describe "invite_member/4 without an email (QR invite)" do
+    test "creates a pending invitation with no email and sends nothing" do
+      scope = Argus.EntitiesFixtures.entity_scope_fixture()
+
+      assert {:ok, invitation} =
+               Entities.invite_member(scope, nil, "member", fn _enc -> "http://x/" end)
+
+      assert is_nil(invitation.email)
+      assert invitation.role == "member"
+    end
+
+    test "treats a blank email as no email" do
+      scope = Argus.EntitiesFixtures.entity_scope_fixture()
+      assert {:ok, invitation} = Entities.invite_member(scope, "", "member")
+      assert is_nil(invitation.email)
+    end
+  end
+
+  describe "get_invitation_by_encoded_token/1" do
+    alias Argus.Entities.Invitation
+
+    test "returns the pending invitation (entity preloaded) for a valid encoded token" do
+      admin_scope = Argus.EntitiesFixtures.entity_scope_fixture()
+
+      {:ok, invitation} =
+        Entities.invite_member(admin_scope, "invitee@example.com", "member")
+
+      encoded = Invitation.encode_token(invitation.token)
+
+      assert {:ok, fetched} = Entities.get_invitation_by_encoded_token(encoded)
+      assert fetched.id == invitation.id
+      assert fetched.entity.id == admin_scope.entity.id
+    end
+
+    test "returns :error for a garbage token" do
+      assert :error = Entities.get_invitation_by_encoded_token("garbage!!!")
+    end
+
+    test "returns :error for an already-accepted invitation" do
+      admin_scope = Argus.EntitiesFixtures.entity_scope_fixture()
+
+      {:ok, invitation} =
+        Entities.invite_member(admin_scope, "member@example.com", "member")
+
+      member = user_fixture(%{email: "member@example.com"})
+      {:ok, _} = Entities.accept_invitation(member, invitation.token)
+
+      assert :error =
+               Entities.get_invitation_by_encoded_token(Invitation.encode_token(invitation.token))
+    end
+  end
 end

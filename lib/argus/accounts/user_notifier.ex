@@ -21,6 +21,29 @@ defmodule Argus.Accounts.UserNotifier do
   end
 
   @doc """
+  Deliver an entity invitation to a (possibly unregistered) recipient.
+  """
+  def deliver_entity_invitation(email, entity_name, role, url) do
+    deliver(email, "You're invited to #{entity_name} on Argus", """
+
+    ==============================
+
+    Hi,
+
+    You've been invited to join "#{entity_name}" on Argus as #{role}.
+
+    Accept the invitation by visiting the URL below. If you don't have an
+    account yet, you'll be asked to register first.
+
+    #{url}
+
+    If you didn't expect this email, you can safely ignore it.
+
+    ==============================
+    """)
+  end
+
+  @doc """
   Deliver instructions to update a user email.
   """
   def deliver_update_email_instructions(user, url) do

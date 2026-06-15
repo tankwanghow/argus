@@ -6,6 +6,7 @@ defmodule Argus.Entities do
   import Ecto.Query, warn: false
 
   alias Argus.Accounts.{Scope, User}
+  alias Argus.Accounts.UserNotifier
   alias Argus.Authorization
   alias Argus.Entities.{Entity, Invitation, Membership}
   alias Argus.Obligations.SampleTypes
@@ -98,11 +99,34 @@ defmodule Argus.Entities do
     count < entity.seat_limit
   end
 
-  def invite_member(%Scope{user: inviter, entity: entity} = scope, email, role) do
+  @doc """
+  Creates a pending invitation. When `url_fun` is given, also emails the
+  invitee a link to accept it; `url_fun.(encoded_token)` builds the URL.
+  """
+  def invite_member(%Scope{user: inviter, entity: entity} = scope, email, role, url_fun \\ nil)
+      when is_function(url_fun, 1) or is_nil(url_fun) do
     cond do
-      not Authorization.can?(scope, :manage_entity) -> :not_authorise
-      not seats_available?(entity) -> {:error, :seat_limit_reached}
-      true -> insert_invitation(entity, inviter, email, role)
+      not Authorization.can?(scope, :manage_entity) ->
+        :not_authorise
+
+      not seats_available?(entity) ->
+        {:error, :seat_limit_reached}
+
+      true ->
+        email = if email in [nil, ""], do: nil, else: email
+
+        with {:ok, invitation} <- insert_invitation(entity, inviter, email, role) do
+          if url_fun && invitation.email do
+            UserNotifier.deliver_entity_invitation(
+              invitation.email,
+              entity.name,
+              invitation.role,
+              url_fun.(Invitation.encode_token(invitation.token))
+            )
+          end
+
+          {:ok, invitation}
+        end
     end
   end
 
@@ -145,6 +169,20 @@ defmodule Argus.Entities do
       |> Repo.update()
     else
       :not_authorise
+    end
+  end
+
+  @doc """
+  Fetches a pending, non-expired invitation by its URL-safe encoded token,
+  with `:entity` preloaded. Returns `:error` for malformed/unknown/expired/
+  already-accepted tokens.
+  """
+  def get_invitation_by_encoded_token(encoded) when is_binary(encoded) do
+    with {:ok, token} <- Invitation.decode_token(encoded),
+         {:ok, invitation} <- fetch_pending_invitation(token) do
+      {:ok, invitation}
+    else
+      _ -> :error
     end
   end
 
