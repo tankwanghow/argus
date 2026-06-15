@@ -400,4 +400,14 @@ defmodule Argus.AccountsTest do
       refute inspect(%User{password: "123456"}) =~ "password: \"123456\""
     end
   end
+
+  describe "identity constraints" do
+    test "rejects a user with neither email nor username" do
+      assert_raise Ecto.ConstraintError, ~r/users_email_or_username_required/, fn ->
+        %Argus.Accounts.User{}
+        |> Ecto.Changeset.change(%{locale: "en"})
+        |> Argus.Repo.insert!()
+      end
+    end
+  end
 end

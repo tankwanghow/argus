@@ -4,6 +4,7 @@ defmodule Argus.Accounts.User do
 
   schema "users" do
     field :email, :string
+    field :username, :string
     field :locale, :string, default: "en"
     field :password, :string, virtual: true, redact: true
     field :hashed_password, :string, redact: true
