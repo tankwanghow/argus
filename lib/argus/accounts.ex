@@ -117,21 +117,6 @@ defmodule Argus.Accounts do
     end
   end
 
-  @doc """
-  Returns a confirmed user for an invited `email`, registering one if needed.
-
-  Used by the invitation-accept flow: possession of the emailed invitation
-  token proves control of the address, so the account is confirmed immediately
-  (the same justification as a magic-link login).
-  """
-  def get_or_register_invited_user(email) when is_binary(email) do
-    case get_user_by_email(email) do
-      %User{confirmed_at: nil} = user -> confirm_user(user)
-      %User{} = user -> {:ok, user}
-      nil -> with {:ok, user} <- register_user(%{email: email}), do: confirm_user(user)
-    end
-  end
-
   defp confirm_user(%User{} = user) do
     user |> User.confirm_changeset() |> Repo.update()
   end
