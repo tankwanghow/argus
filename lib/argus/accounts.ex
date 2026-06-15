@@ -80,6 +80,62 @@ defmodule Argus.Accounts do
     |> Repo.insert()
   end
 
+  @doc """
+  Gets a user by username.
+  """
+  def get_user_by_username(username) when is_binary(username) do
+    Repo.get_by(User, username: username)
+  end
+
+  @doc """
+  Gets a user by a login handle (email or username) and password.
+
+  Resolves the handle against `email` first, then `username` (both citext, so
+  matching is case-insensitive), then verifies the password.
+  """
+  def get_user_by_login_and_password(login, password)
+      when is_binary(login) and is_binary(password) do
+    # email and username share one namespace (a user can't have both equal to
+    # another's), so a single OR query is safe and avoids a wasted round-trip
+    # on the username-only login path.
+    user = Repo.one(from(u in User, where: u.email == ^login or u.username == ^login, limit: 1))
+    if User.valid_password?(user, password), do: user
+  end
+
+  @doc """
+  Registers an invited member from `%{username, password, email?}` and confirms
+  them immediately — possession of the single-use invite token proves the invite
+  was for them (same justification as a magic-link login).
+  """
+  def register_invited_user(attrs) do
+    %User{}
+    |> User.registration_changeset(attrs)
+    |> Repo.insert()
+    |> case do
+      {:ok, user} -> confirm_user(user)
+      other -> other
+    end
+  end
+
+  @doc """
+  Returns a confirmed user for an invited `email`, registering one if needed.
+
+  Used by the invitation-accept flow: possession of the emailed invitation
+  token proves control of the address, so the account is confirmed immediately
+  (the same justification as a magic-link login).
+  """
+  def get_or_register_invited_user(email) when is_binary(email) do
+    case get_user_by_email(email) do
+      %User{confirmed_at: nil} = user -> confirm_user(user)
+      %User{} = user -> {:ok, user}
+      nil -> with {:ok, user} <- register_user(%{email: email}), do: confirm_user(user)
+    end
+  end
+
+  defp confirm_user(%User{} = user) do
+    user |> User.confirm_changeset() |> Repo.update()
+  end
+
   ## Settings
 
   @doc """

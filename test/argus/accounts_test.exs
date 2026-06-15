@@ -412,6 +412,46 @@ defmodule Argus.AccountsTest do
     end
   end
 
+  describe "register_invited_user/1" do
+    test "creates a confirmed user with a hashed password and no email" do
+      {:ok, user} = Accounts.register_invited_user(%{username: "joiner1", password: "supersecret12"})
+      assert user.username == "joiner1"
+      assert user.confirmed_at
+      assert user.hashed_password
+      assert is_nil(user.email)
+    end
+
+    test "rejects a duplicate username (case-insensitive)" do
+      {:ok, _} = Accounts.register_invited_user(%{username: "dup", password: "supersecret12"})
+      {:error, cs} = Accounts.register_invited_user(%{username: "DUP", password: "supersecret12"})
+      assert %{username: ["has already been taken"]} = errors_on(cs)
+    end
+  end
+
+  describe "get_user_by_login_and_password/2" do
+    test "finds by username and verifies the password" do
+      user = username_user_fixture(%{username: "loginme"})
+      assert %Accounts.User{id: id} = Accounts.get_user_by_login_and_password("loginme", valid_user_password())
+      assert id == user.id
+    end
+
+    test "finds by email when the user has one" do
+      user = user_fixture() |> set_password()
+      assert %Accounts.User{id: id} =
+               Accounts.get_user_by_login_and_password(user.email, valid_user_password())
+      assert id == user.id
+    end
+
+    test "returns nil on wrong password" do
+      username_user_fixture(%{username: "wrongpw"})
+      refute Accounts.get_user_by_login_and_password("wrongpw", "not the password")
+    end
+
+    test "returns nil on unknown handle" do
+      refute Accounts.get_user_by_login_and_password("nobody", valid_user_password())
+    end
+  end
+
   describe "registration_changeset/3" do
     alias Argus.Accounts.User
 
