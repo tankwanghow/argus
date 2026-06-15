@@ -244,4 +244,45 @@ defmodule Argus.EntitiesTest do
                Entities.get_invitation_by_encoded_token(Invitation.encode_token(invitation.token))
     end
   end
+
+  describe "reusable invite sessions" do
+    import Argus.AccountsFixtures
+
+    defp open_session(role \\ "member") do
+      admin = Argus.EntitiesFixtures.entity_scope_fixture()
+      {:ok, inv} = Entities.open_invite_session(admin, role)
+      %{admin: admin, inv: inv}
+    end
+
+    test "two different users can accept the same reusable token" do
+      %{admin: admin, inv: inv} = open_session()
+      u1 = username_user_fixture()
+      u2 = username_user_fixture()
+
+      assert {:ok, m1} = Entities.accept_invitation(u1, inv.token)
+      assert m1.role == "member"
+      assert {:ok, _m2} = Entities.accept_invitation(u2, inv.token)
+
+      assert {:ok, _} =
+               Entities.get_invitation_by_encoded_token(
+                 Argus.Entities.Invitation.encode_token(inv.token)
+               )
+
+      assert Entities.list_entity_members(admin.entity) |> length() == 3
+    end
+
+    test "a re-accept by an existing member is a no-op success" do
+      %{inv: inv} = open_session()
+      u1 = username_user_fixture()
+      {:ok, _} = Entities.accept_invitation(u1, inv.token)
+      assert {:ok, :already_member} = Entities.accept_invitation(u1, inv.token)
+    end
+
+    test "a closed session rejects new accepts" do
+      %{admin: admin, inv: inv} = open_session()
+      {:ok, _} = Entities.close_invite_session(admin, inv.id)
+      u = username_user_fixture()
+      assert {:error, :closed} = Entities.accept_invitation(u, inv.token)
+    end
+  end
 end

@@ -131,6 +131,53 @@ defmodule Argus.Entities do
   end
 
   @doc """
+  Opens a reusable, admin-supervised invite session for `role` ("manager" or
+  "member"). Auto-expires 30 minutes from now; close early with
+  `close_invite_session/2`.
+  """
+  def open_invite_session(%Scope{user: inviter, entity: entity} = scope, role) do
+    cond do
+      not Authorization.can?(scope, :manage_entity) ->
+        :not_authorise
+
+      role not in ["manager", "member"] ->
+        {:error, :invalid_role}
+
+      true ->
+        token = :crypto.strong_rand_bytes(32)
+        expires_at = DateTime.add(DateTime.utc_now(:second), 30 * 60, :second)
+
+        %Invitation{entity_id: entity.id, invited_by_id: inviter.id}
+        |> Invitation.changeset(%{
+          role: role,
+          token: token,
+          expires_at: expires_at,
+          reusable: true
+        })
+        |> Repo.insert()
+    end
+  end
+
+  @doc """
+  Closes a reusable invite session (admin-only). Stamps `closed_at`.
+  """
+  def close_invite_session(%Scope{} = scope, invitation_id) do
+    if Authorization.can?(scope, :manage_entity) do
+      case Repo.get_by(Invitation, id: invitation_id, entity_id: scope.entity.id, reusable: true) do
+        nil ->
+          {:error, :not_found}
+
+        invitation ->
+          invitation
+          |> Invitation.changeset(%{closed_at: DateTime.utc_now(:second)})
+          |> Repo.update()
+      end
+    else
+      :not_authorise
+    end
+  end
+
+  @doc """
   Pending (un-accepted, un-expired) invitations for an entity.
   """
   def list_pending_invitations(%Entity{} = entity) do
@@ -222,42 +269,82 @@ defmodule Argus.Entities do
 
   defp fetch_pending_invitation(token) do
     case Repo.get_by(Invitation, token: token) do
-      %Invitation{accepted_at: nil, expires_at: expires_at} = invitation ->
-        if DateTime.compare(DateTime.utc_now(:second), expires_at) == :lt do
-          {:ok, Repo.preload(invitation, :entity)}
-        else
-          {:error, :expired}
-        end
-
-      %Invitation{} ->
-        {:error, :already_accepted}
-
-      nil ->
-        {:error, :not_found}
+      %Invitation{} = invitation -> validate_invitation_live(invitation)
+      nil -> {:error, :not_found}
     end
+  end
+
+  defp validate_invitation_live(%Invitation{reusable: true} = inv) do
+    cond do
+      not is_nil(inv.closed_at) -> {:error, :closed}
+      invitation_expired?(inv) -> {:error, :expired}
+      true -> {:ok, Repo.preload(inv, :entity)}
+    end
+  end
+
+  defp validate_invitation_live(%Invitation{reusable: false} = inv) do
+    cond do
+      not is_nil(inv.accepted_at) -> {:error, :already_accepted}
+      invitation_expired?(inv) -> {:error, :expired}
+      true -> {:ok, Repo.preload(inv, :entity)}
+    end
+  end
+
+  defp invitation_expired?(%Invitation{expires_at: expires_at}) do
+    DateTime.compare(DateTime.utc_now(:second), expires_at) != :lt
   end
 
   defp accept_invitation_multi(user, %Invitation{} = invitation) do
     now = DateTime.utc_now(:second)
 
-    Ecto.Multi.new()
-    |> Ecto.Multi.insert(:membership, fn _ ->
-      %Membership{
-        user_id: user.id,
-        entity_id: invitation.entity_id,
-        role: invitation.role,
-        invited_by_id: invitation.invited_by_id,
-        accepted_at: now,
-        is_default: first_entity_for_user?(user)
-      }
-      |> Membership.changeset(%{})
-    end)
-    |> Ecto.Multi.update(:invitation, Invitation.changeset(invitation, %{accepted_at: now}))
+    multi =
+      Ecto.Multi.new()
+      |> Ecto.Multi.insert(:membership, fn _ ->
+        %Membership{
+          user_id: user.id,
+          entity_id: invitation.entity_id,
+          role: invitation.role,
+          invited_by_id: invitation.invited_by_id,
+          accepted_at: now,
+          is_default: first_entity_for_user?(user)
+        }
+        |> Membership.changeset(%{})
+      end)
+
+    multi =
+      if invitation.reusable do
+        multi
+      else
+        Ecto.Multi.update(
+          multi,
+          :invitation,
+          Invitation.changeset(invitation, %{accepted_at: now})
+        )
+      end
+
+    multi
     |> Repo.transaction()
     |> case do
-      {:ok, %{membership: membership}} -> {:ok, membership}
-      {:error, :membership, changeset, _} -> {:error, changeset}
-      {:error, :invitation, changeset, _} -> {:error, changeset}
+      {:ok, %{membership: membership}} ->
+        membership = Repo.preload(membership, :user)
+
+        Phoenix.PubSub.broadcast(
+          Argus.PubSub,
+          "entity:#{invitation.entity_id}:members",
+          {:member_joined, membership}
+        )
+
+        {:ok, membership}
+
+      {:error, :membership, %Ecto.Changeset{} = changeset, _} ->
+        if Enum.any?(changeset.errors, fn {_f, {_m, opts}} -> opts[:constraint] == :unique end) do
+          {:ok, :already_member}
+        else
+          {:error, changeset}
+        end
+
+      {:error, :invitation, changeset, _} ->
+        {:error, changeset}
     end
   end
 
