@@ -61,6 +61,7 @@ defmodule ArgusWeb.Router do
       live "/entities/:entity_slug/obligations/:id", ObligationLive.Show, :show
       live "/entities/:entity_slug/obligation-types", ObligationTypeLive.Index, :index
       live "/entities/:entity_slug/members", MembershipLive.Index, :index
+      live "/entities/:entity_slug/invite-session/:role", MembershipLive.InviteSession, :show
 
       live "/m/:entity_slug", MobileLive.Dashboard, :show
       live "/m/:entity_slug/obligations", MobileLive.Obligations, :index
@@ -84,8 +85,10 @@ defmodule ArgusWeb.Router do
       live "/users/register", UserLive.Registration, :new
       live "/users/log-in", UserLive.Login, :new
       live "/users/log-in/:token", UserLive.Confirmation, :new
+      live "/invitations/:token", InvitationLive.Show, :show
     end
 
+    post "/invitations/:token/accept", InvitationController, :accept
     post "/users/log-in", UserSessionController, :create
     delete "/users/log-out", UserSessionController, :delete
   end
