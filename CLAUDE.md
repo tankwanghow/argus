@@ -188,6 +188,10 @@ Oban reminder jobs, REST API/mobile, billing beyond `plan`/`seat_limit` fields.
 
 ## Deployment (Linode + Docker, peggy parity)
 
+Monorepo asset tooling: `~/Projects/elixir/.global_assets/setup.sh` (once), then see
+`~/Projects/elixir/shared_config/WORKSPACE_ASSETS.md`. Deploy scripts build from the
+**monorepo root** with local esbuild/tailwind/heroicons — no download during `mix assets.deploy`.
+
 Argus ships the **same self-hosted Docker-on-Debian/Linode flow as peggy** (no Fly/Gigalixir).
 A two-stage `Dockerfile` builds a Mix release; `mix release` picks up `rel/overlays/bin/server`
 (boots with `PHX_SERVER=true`) and `rel/overlays/bin/migrate` (`./argus eval
