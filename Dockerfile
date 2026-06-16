@@ -12,30 +12,33 @@ RUN apt-get update -y && apt-get install -y \
     git \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
+WORKDIR /app/argus
 
 RUN mix local.hex --force && mix local.rebar --force
 
 ENV MIX_ENV="prod"
 
-COPY mix.exs mix.lock ./
+COPY shared_config /app/shared_config
+COPY .global_assets /app/.global_assets
+
+COPY argus/mix.exs argus/mix.lock ./
 RUN HEX_HTTP_CONCURRENCY=8 HEX_HTTP_TIMEOUT=240 mix deps.get --only $MIX_ENV
 RUN mkdir config
 
-COPY config/config.exs config/${MIX_ENV}.exs config/
+COPY argus/config/config.exs argus/config/${MIX_ENV}.exs config/
 RUN mix deps.compile
 
-COPY priv priv
-COPY lib lib
-COPY assets assets
+COPY argus/priv priv
+COPY argus/lib lib
+COPY argus/assets assets
 
 RUN mix assets.deploy
 
 RUN mix compile
 
-COPY config/runtime.exs config/
+COPY argus/config/runtime.exs config/
 
-COPY rel rel
+COPY argus/rel rel
 RUN mix release
 
 FROM ${RUNNER_IMAGE}
@@ -59,7 +62,7 @@ RUN chown nobody /app
 
 ENV MIX_ENV="prod"
 
-COPY --from=builder --chown=nobody:root /app/_build/${MIX_ENV}/rel/argus ./
+COPY --from=builder --chown=nobody:root /app/argus/_build/${MIX_ENV}/rel/argus ./
 
 USER nobody
 

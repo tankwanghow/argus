@@ -3,6 +3,9 @@ set -eo pipefail
 
 SETUP_FILE=$1
 script_path="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=../../shared_config/docker_deploy.sh
+source "$(cd "$script_path/../.." && pwd)/shared_config/docker_deploy.sh"
+docker_deploy_init "$script_path"
 
 if [ ! -f "$SETUP_FILE" ]; then
     echo "Error: Setup file $SETUP_FILE not found."
@@ -24,13 +27,19 @@ read LINODE_PWD
 stty echo
 echo
 
+ensure_global_assets
+stage_dockerignore
+
 IMAGE_TAG="latest"
-GIT_SHA=$(git -C "$script_path/.." rev-parse --short HEAD)
+GIT_SHA=$(git -C "$PROJECT_ROOT" rev-parse --short HEAD)
 FULL_IMAGE="$DOCKER_HUB_USERNAME/$IMAGE_NAME:$IMAGE_TAG"
 SHA_IMAGE="$DOCKER_HUB_USERNAME/$IMAGE_NAME:$GIT_SHA"
 
-echo "Building Docker image..."
-docker build --builder default -t $FULL_IMAGE -t $SHA_IMAGE -f $script_path/../Dockerfile $script_path/..
+echo "Building Docker image (monorepo context: $MONOREPO_ROOT)..."
+docker build --builder default \
+    -t $FULL_IMAGE -t $SHA_IMAGE \
+    -f "$PROJECT_ROOT/Dockerfile" \
+    "$MONOREPO_ROOT"
 
 NEW_IMAGE_ID=$(docker image inspect $FULL_IMAGE --format='{{.ID}}')
 echo "Built image ID: $NEW_IMAGE_ID"
