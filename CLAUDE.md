@@ -114,7 +114,7 @@ series with a rolling `due_by`. A recurrence chain is linked by a shared `series
 
 - `Argus.Obligations.Obligation` — one cycle. `status` is `active | cancelled`; **done-ness is a separate `completed_at` timestamp**, not a status value (a completed cycle keeps `status = active`). A cycle is **live** while `status = active AND completed_at IS NULL` — that's the set dashboards show and that can be worked/completed/cancelled. This predicate is defined **once** as `Obligations.live/1` (a composable query builder) and every list/dashboard/report composes it — never hand-write it. A partial unique index on `series_id` (where live) enforces **one live cycle per series**. `series_ended_at` (when set) blocks future spawning. The row also **snapshots** `complete_documents` from the type at creation (see rule 1). `primary_assignee_id` is **nullable** (unassigned obligations).
 - `Argus.Obligations.Event` (`obligation_events`) — **append-only forward-only** status steps: `open → in_progress → done | cancelled`. New status = new row; rows are never deleted and status is never rewritten. The step `note` lives here (open context, done comment, cancel reason). `start_progress` is guarded — it only steps an `open` cycle forward, so double-clicks can't create duplicate `in_progress` rows.
-- `Argus.Obligations.EventDocument` — file uploads attached to an event; the per-file column is **`file`** (a `%{filename, original, path}` map), not `documents`. Wrong files are **voided** (`voided_at`/`voided_by_id`/`void_reason`), never deleted. `document_slot` matches a name in the obligation's snapshotted `complete_documents` for Done validation.
+- `Argus.Obligations.EventDocument` — file uploads attached to an event; the per-file column is **`file`** (a `%{filename, original, path}` map), not `documents`. A live file may be hard-**deleted within 48h** (`document_deletable?`); after that (or for admin-on-locked-cycle) it is **voided** (`voided_at`/`voided_by_id`/`void_reason`) — voided files are kept for audit and **remain downloadable**. `document_slot` matches a name in the obligation's snapshotted `complete_documents` for Done validation, and is **immutable after upload** — there is no Replace and no slot-editing; to change a slot's file, delete/void it and re-upload (uploading is only offered for an unsatisfied slot). A document is classified **required** when its `document_slot` is in the obligation's current snapshot `complete_documents`, otherwise **supporting** (no slot, or a slot no longer in the set).
 - `Argus.Obligations.AuditLog` — field-level before/after for **corrections** (title, due_by, assignee, note edits).
 - `Argus.Obligations.Type` — **per-entity only** (`entity_id` is **NOT NULL**). There are no
   global system presets; instead, when an entity is created, `Argus.Obligations.SampleTypes`
@@ -122,6 +122,29 @@ series with a rolling `due_by`. A recurrence chain is linked by a shared `series
   `create_entity` `Ecto.Multi`). Every entity therefore owns and can edit its full type set —
   `list_types`/`get_type!` filter strictly by `entity_id`, and there is no "immutable preset"
   case any more.
+
+### Documents UI — two surfaces
+
+The obligation Documents UI is split by what a file is **for**, with each file shown
+in exactly one place (no duplication):
+
+- **Completion Documents** (`ObligationCompletionDocuments`) — **cycle-level**, one
+  modal per obligation: a row per required slot (live file inline, or an inline
+  uploader if unsatisfied) plus a voided-required section. Slot uploads attach to the
+  cycle's current workable event (`DocumentHelpers.upload_event/1`: `in_progress`
+  else `open`).
+- **Step Files** (`ObligationStepFiles`) — **per-step**, a modal per timeline event:
+  that step's supporting (no-slot/stale-slot) files + a voided-other section + an
+  additional-file uploader.
+
+Classification and partitioning live in `ArgusWeb.ObligationLive.DocumentHelpers`
+(`completion_view/2`, `step_files/2`, `parse_slots/1`). When an admin edits a type's
+`complete_documents`, `propagate_complete_documents_to_live/3` updates **live**
+obligations' snapshot only (completed/cancelled stay frozen); a file whose slot was
+removed/renamed is thereby **reclassified** required → supporting (no row mutation, so
+re-adding the slot re-links it). Create-form uploads are **consumed on save** (no
+disk staging). The old `ObligationDocumentUpload`/`ObligationDocumentList` components
+were removed.
 
 ### Three rules that are easy to get wrong
 
@@ -184,7 +207,9 @@ Oban reminder jobs, REST API/mobile, billing beyond `plan`/`seat_limit` fields.
 - File uploads (v1) go to the local filesystem under a **configurable** `:uploads_dir`
   (`config :argus, :uploads_dir`), laid out `:entity_id/:obligation_id/`; it defaults to the priv
   path in dev but must point at a persistent volume in prod (`:code.priv_dir` is not writable in a
-  release). Reads are served by a scope-gated controller, never a static route.
+  release). Reads are served by a scope-gated controller (`DocumentController`), never a static
+  route; it serves voided files too (they stay downloadable for audit). Create-form attachments are
+  held as LiveView upload entries and **consumed on save**, not staged to disk first.
 
 ## Deployment (Linode + Docker, peggy parity)
 

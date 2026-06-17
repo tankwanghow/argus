@@ -164,6 +164,38 @@ Two UIs share the same contexts/schemas, each with its own LiveViews and layout:
   input; predicates end in `?`; `Enum.at` not `list[i]`; direct field access on structs (no
   `struct[:field]`).
 
+## Documents (uploads UI)
+
+Obligation documents live in **two surfaces**, split by purpose; each file appears in
+exactly one place (no duplicated rows/checklists):
+
+- **Completion Documents** — `ArgusWeb.ObligationCompletionDocuments`, cycle-level
+  (one modal per obligation). A row per **required** slot: the live file inline
+  (download + Delete/Void) or an inline uploader if the slot is unsatisfied, plus a
+  voided-required section. Slot uploads attach to the cycle's current workable event
+  (`DocumentHelpers.upload_event/1` → `in_progress` else `open`).
+- **Step Files** — `ArgusWeb.ObligationStepFiles`, per-step (a modal per timeline
+  event). That event's **supporting** files (no-slot or stale-slot) + a voided-other
+  section + an additional-file uploader.
+
+Rules:
+- Classification/partitioning is pure and lives in
+  `ArgusWeb.ObligationLive.DocumentHelpers` (`completion_view/2`, `step_files/2`,
+  `parse_slots/1`). A doc is **required** iff its `document_slot` is in the
+  obligation's **current snapshot** `complete_documents`, else **supporting**.
+- **Slots are immutable after upload; there is no Replace and no slot editing.** To
+  change a slot's file, delete (within 48h) or void it, then re-upload — uploading is
+  only offered for an unsatisfied slot.
+- **Voided files are kept and remain downloadable** (`DocumentController` serves them;
+  do not reintroduce a voided→404 guard).
+- Admin type edits: `Obligations.propagate_complete_documents_to_live/3` updates the
+  snapshot of **live** obligations only (completed/cancelled frozen); a removed/renamed
+  slot reclassifies its file required → supporting **without mutating the row** (re-adding
+  the slot re-links it).
+- Create-form attachments are LiveView upload entries **consumed on save** (no disk
+  staging). One `:document` `allow_upload` config per LiveView; only one Documents
+  modal is open at a time.
+
 ## Before finishing
 
 - Run `mix precommit` (compile `--warnings-as-errors`, `deps.unlock --unused`, `format`, `test`)
