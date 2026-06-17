@@ -147,7 +147,7 @@ defmodule ArgusWeb.MobileLiveTest do
 
     {:ok, view, _html} = live(conn, ~p"/m/#{scope.entity.slug}")
 
-    assert has_element?(view, "a[href='/m/entities?pick=1']", "All entities")
+    assert has_element?(view, "a[href='/entities?pick=1']", "Switch entity")
   end
 
   test "mobile UA is redirected from desktop dashboard to /m", %{conn: conn} do
@@ -160,5 +160,36 @@ defmodule ArgusWeb.MobileLiveTest do
       |> get(~p"/entities/#{scope.entity.slug}")
 
     assert redirected_to(conn) == ~p"/m/#{scope.entity.slug}"
+  end
+
+  test "mobile completion modal uploads into a slot", %{conn: conn} do
+    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    conn = mobile_conn(conn, manager)
+    type = type_fixture(manager.entity, complete_documents: "receipt")
+
+    {:ok, obligation} =
+      Obligations.create_obligation(manager, %{
+        title: "EPF",
+        obligation_type_id: type.id,
+        due_by: ~D[2026-06-30],
+        open_note: "open"
+      })
+
+    {:ok, view, _html} =
+      live(conn, ~p"/m/#{manager.entity.slug}/obligations/#{obligation.id}")
+
+    view |> element("#m-open-completion-modal") |> render_click()
+    view |> element("#m-select-slot-receipt") |> render_click()
+
+    file =
+      file_input(view, "#m-completion-upload-form", :document, [
+        %{name: "receipt.pdf", content: "x", type: "application/pdf"}
+      ])
+
+    render_upload(file, "receipt.pdf")
+    view |> form("#m-completion-upload-form", %{"picker_slot" => "receipt"}) |> render_change()
+    view |> element("#m-upload-slot-receipt") |> render_click()
+
+    assert has_element?(view, "#m-completion-slot-receipt", "receipt.pdf")
   end
 end

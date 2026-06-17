@@ -4,7 +4,6 @@ defmodule ArgusWeb.ObligationLive.Form do
   alias Argus.Entities
   alias Argus.Obligations
   alias Argus.Obligations.Obligation
-  alias Argus.Uploads
 
   @impl true
   def render(assigns) do
@@ -62,37 +61,48 @@ defmodule ArgusWeb.ObligationLive.Form do
           <p class="text-xs text-base-content/50 mb-2">
             Add supporting files to the opening step. Completion documents can be uploaded after creation.
           </p>
-          <.obligation_document_upload_forms
-            event={%{id: "new"}}
-            required_docs={[]}
-            uploads={@uploads}
-            uploadable?={true}
-            upload_slot_target={@upload_slot_target}
-            id_prefix="create-"
-            create_mode?={true}
-          />
+          <form
+            id="create-document-form"
+            phx-change="validate_create_upload"
+            phx-submit="validate_create_upload"
+          >
+            <label class="btn btn-primary btn-sm cursor-pointer">
+              <.icon name="hero-paper-clip-mini" class="size-4" /> Choose files
+              <.live_file_input upload={@uploads.document} class="sr-only" />
+            </label>
+          </form>
+
           <ul
-            :if={@staged_documents != []}
+            :if={@uploads.document.entries != []}
             id="staged-documents"
             class="mt-3 space-y-1.5 text-sm"
           >
             <li
-              :for={doc <- @staged_documents}
-              id={"staged-document-#{doc.ref}"}
+              :for={entry <- @uploads.document.entries}
+              id={"staged-document-#{entry.ref}"}
               class="flex flex-wrap items-center gap-2 rounded-box border border-base-300 px-2.5 py-1.5"
             >
               <.icon name="hero-paper-clip-mini" class="size-3.5 text-base-content/50" />
-              <span class="font-medium">{doc.original}</span>
+              <span class="font-medium truncate min-w-0 flex-1">{entry.client_name}</span>
               <button
                 type="button"
-                phx-click="remove_staged_document"
-                phx-value-ref={doc.ref}
+                phx-click="cancel_create_upload"
+                phx-value-ref={entry.ref}
                 class="btn btn-ghost btn-xs ml-auto"
               >
                 Remove
               </button>
+              <p
+                :for={err <- upload_errors(@uploads.document, entry)}
+                class="basis-full text-xs text-error"
+              >
+                {upload_error_to_string(err)}
+              </p>
             </li>
           </ul>
+          <p :for={err <- upload_errors(@uploads.document)} class="text-xs text-error mt-1">
+            {upload_error_to_string(err)}
+          </p>
         </section>
 
         <button
@@ -113,9 +123,12 @@ defmodule ArgusWeb.ObligationLive.Form do
     if Argus.Authorization.can?(socket.assigns.current_scope, :create_obligation) do
       {:ok,
        socket
-       |> assign(:upload_slot_target, nil)
-       |> assign(:staged_documents, [])
-       |> allow_upload(:document, accept: :any, max_entries: 1, max_file_size: 20_000_000)
+       |> allow_upload(:document,
+         accept: :any,
+         max_entries: ArgusWeb.LiveUpload.max_document_entries(),
+         max_file_size: 20_000_000,
+         auto_upload: true
+       )
        |> load_form()}
     else
       {:ok,
@@ -140,19 +153,23 @@ defmodule ArgusWeb.ObligationLive.Form do
 
     case Obligations.create_obligation(scope, map_create_params(params)) do
       {:ok, obligation} ->
-        case attach_staged_documents(scope, socket.assigns.staged_documents, obligation) do
-          {:ok, _} ->
-            {:noreply,
-             socket
-             |> put_flash(:info, "Obligation created.")
-             |> push_navigate(to: ~p"/entities/#{scope.entity.slug}/obligations/#{obligation.id}")}
+        socket =
+          case attach_uploaded_documents(socket, scope, obligation) do
+            :ok ->
+              put_flash(socket, :info, "Obligation created.")
 
-          {:error, _} ->
-            {:noreply,
-             socket
-             |> put_flash(:error, "Obligation created, but some files could not be attached.")
-             |> push_navigate(to: ~p"/entities/#{scope.entity.slug}/obligations/#{obligation.id}")}
-        end
+            :partial ->
+              put_flash(
+                socket,
+                :error,
+                "Obligation created, but some files could not be attached."
+              )
+          end
+
+        {:noreply,
+         push_navigate(socket,
+           to: ~p"/entities/#{scope.entity.slug}/obligations/#{obligation.id}"
+         )}
 
       {:error, %Ecto.Changeset{} = changeset} ->
         {:noreply, assign_form(socket, changeset)}
@@ -165,42 +182,21 @@ defmodule ArgusWeb.ObligationLive.Form do
     end
   end
 
-  def handle_event("select_create_upload_slot", %{"slot" => "additional"}, socket) do
-    {:noreply, assign(socket, :upload_slot_target, :additional)}
-  end
-
-  def handle_event("select_create_upload_slot", _params, socket) do
-    {:noreply, put_flash(socket, :error, "Completion documents can be added after creation.")}
-  end
-
-  def handle_event("clear_create_upload_slot", _params, socket) do
-    {:noreply, assign(socket, :upload_slot_target, nil)}
-  end
-
   def handle_event("validate_create_upload", _params, socket) do
     {:noreply, socket}
   end
 
-  def handle_event("stage_create_document", params, socket) do
-    scope = socket.assigns.current_scope
-
-    if completion_slot?(params["document_slot"]) do
-      {:noreply, put_flash(socket, :error, "Completion documents can be added after creation.")}
-    else
-      stage_general_document(socket, scope)
-    end
+  def handle_event("cancel_create_upload", %{"ref" => ref}, socket) do
+    {:noreply, cancel_upload(socket, :document, ref)}
   end
 
-  def handle_event("remove_staged_document", %{"ref" => ref}, socket) do
-    {removed, kept} =
-      Enum.split_with(socket.assigns.staged_documents, &(to_string(&1.ref) == to_string(ref)))
+  # Attaches files chosen on the create form to the new obligation's open event.
+  # LiveView holds the temp files until consumed here (or garbage-collects them on
+  # disconnect), so abandoning the form leaks nothing.
+  defp attach_uploaded_documents(socket, scope, obligation) do
+    obligation = Obligations.get_obligation!(scope, obligation.id)
+    open_event = open_event!(obligation)
 
-    Enum.each(removed, &Uploads.delete_staged/1)
-
-    {:noreply, assign(socket, :staged_documents, kept)}
-  end
-
-  defp stage_general_document(socket, scope) do
     results =
       consume_uploaded_entries(socket, :document, fn %{path: path}, entry ->
         upload = %Plug.Upload{
@@ -209,61 +205,10 @@ defmodule ArgusWeb.ObligationLive.Form do
           content_type: entry.client_type
         }
 
-        staged = Uploads.stage(upload, scope.entity.id)
-
-        {:ok,
-         %{
-           ref: Ecto.UUID.generate(),
-           slot: nil,
-           path: staged.path,
-           original: staged.original,
-           content_type: staged.content_type
-         }}
+        {:ok, Obligations.add_document(scope, obligation, open_event, upload, nil)}
       end)
 
-    case results do
-      [staged | _] ->
-        {:noreply,
-         socket
-         |> assign(:staged_documents, socket.assigns.staged_documents ++ [staged])
-         |> assign(:upload_slot_target, nil)}
-
-      [] ->
-        {:noreply, put_flash(socket, :error, "Choose a file to upload.")}
-    end
-  end
-
-  defp attach_staged_documents(_scope, [], obligation), do: {:ok, obligation}
-
-  defp attach_staged_documents(scope, staged_documents, obligation) do
-    obligation = Obligations.get_obligation!(scope, obligation.id)
-    open_event = open_event!(obligation)
-
-    result =
-      Enum.reduce_while(staged_documents, {:ok, obligation}, fn doc, {:ok, ob} ->
-        upload = %Plug.Upload{
-          path: doc.path,
-          filename: doc.original,
-          content_type: doc.content_type
-        }
-
-        case Obligations.add_document(scope, ob, open_event, upload, nil) do
-          {:ok, _} ->
-            Uploads.delete_staged(doc)
-            {:cont, {:ok, ob}}
-
-          {:error, _} = error ->
-            {:halt, error}
-
-          :not_authorise ->
-            {:halt, :not_authorise}
-        end
-      end)
-
-    case result do
-      {:ok, obligation} -> {:ok, obligation}
-      other -> other
-    end
+    if Enum.all?(results, &match?({:ok, _}, &1)), do: :ok, else: :partial
   end
 
   defp open_event!(%Obligation{} = obligation) do
@@ -273,10 +218,10 @@ defmodule ArgusWeb.ObligationLive.Form do
     end
   end
 
-  defp completion_slot?(nil), do: false
-  defp completion_slot?(""), do: false
-  defp completion_slot?("additional"), do: false
-  defp completion_slot?(_), do: true
+  defp upload_error_to_string(:too_large), do: "File is too large (max 20 MB)."
+  defp upload_error_to_string(:too_many_files), do: "Too many files selected (max 10)."
+  defp upload_error_to_string(:not_accepted), do: "This file type is not accepted."
+  defp upload_error_to_string(_), do: "Invalid file."
 
   defp load_form(socket) do
     scope = socket.assigns.current_scope

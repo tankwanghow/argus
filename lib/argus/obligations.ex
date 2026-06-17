@@ -56,9 +56,35 @@ defmodule Argus.Obligations do
 
   def update_type(%Scope{entity: entity} = scope, %Type{} = type, attrs) do
     if Authorization.can?(scope, :manage_types) and type.entity_id == entity.id do
-      type
-      |> Type.changeset(attrs)
-      |> Repo.update()
+      changeset = Type.changeset(type, attrs)
+
+      cond do
+        not changeset.valid? ->
+          {:error, changeset}
+
+        changeset.changes == %{} ->
+          {:ok, type}
+
+        true ->
+          old_complete_documents = type.complete_documents
+
+          Ecto.Multi.new()
+          |> Ecto.Multi.update(:type, changeset)
+          |> Ecto.Multi.run(:propagate, fn repo, %{type: updated} ->
+            if normalize_slot_csv(old_complete_documents) !=
+                 normalize_slot_csv(updated.complete_documents) do
+              propagate_complete_documents_to_live(repo, scope, updated)
+            else
+              {:ok, 0}
+            end
+          end)
+          |> Repo.transaction()
+          |> case do
+            {:ok, %{type: updated}} -> {:ok, updated}
+            {:error, :type, changeset, _} -> {:error, changeset}
+            {:error, _, reason, _} -> {:error, reason}
+          end
+      end
     else
       :not_authorise
     end
@@ -416,6 +442,20 @@ defmodule Argus.Obligations do
   end
 
   @doc """
+  True when `scope` may hard-delete a non-voided document within 48 hours on a live cycle.
+  """
+  def document_deletable?(
+        %Scope{} = scope,
+        %Obligation{} = obligation,
+        %EventDocument{} = document
+      ) do
+    is_nil(document.voided_at) and
+      live_cycle?(obligation) and
+      within_document_window?(document) and
+      can_void_document?(scope, obligation, document)
+  end
+
+  @doc """
   True when `scope` may void a non-voided document on this obligation cycle.
   """
   def document_voidable?(
@@ -423,7 +463,8 @@ defmodule Argus.Obligations do
         %Obligation{} = obligation,
         %EventDocument{} = document
       ) do
-    is_nil(document.voided_at) and can_void_document?(scope, obligation, document)
+    is_nil(document.voided_at) and can_void_document?(scope, obligation, document) and
+      (locked_cycle?(obligation) or not within_document_window?(document))
   end
 
   @doc """
@@ -467,10 +508,25 @@ defmodule Argus.Obligations do
       ) do
     reason = Map.get(attrs, :reason) || Map.get(attrs, "reason")
 
-    with true <- can_void_document?(scope, obligation, document),
+    with true <- document_voidable?(scope, obligation, document),
          :ok <- validate_void_reason(obligation, reason),
          {:ok, voided} <- void_document_row(scope, document, reason) do
       {:ok, voided}
+    else
+      false -> :not_authorise
+      {:error, _} = error -> error
+    end
+  end
+
+  def delete_document(
+        %Scope{} = scope,
+        %Obligation{} = obligation,
+        %EventDocument{} = document
+      ) do
+    with true <- document_deletable?(scope, obligation, document),
+         :ok <- ensure_document_on_cycle(obligation, document),
+         {:ok, deleted} <- delete_document_row(document) do
+      {:ok, deleted}
     else
       false -> :not_authorise
       {:error, _} = error -> error
@@ -893,6 +949,14 @@ defmodule Argus.Obligations do
   end
 
   defp within_note_window?(%Event{inserted_at: inserted_at}) do
+    within_hours_window?(inserted_at)
+  end
+
+  defp within_document_window?(%EventDocument{inserted_at: inserted_at}) do
+    within_hours_window?(inserted_at)
+  end
+
+  defp within_hours_window?(inserted_at) do
     DateTime.diff(DateTime.utc_now(:second), inserted_at, :second) <= 48 * 3600
   end
 
@@ -915,6 +979,11 @@ defmodule Argus.Obligations do
     |> Repo.update()
   end
 
+  defp delete_document_row(%EventDocument{} = document) do
+    Uploads.delete(document)
+    Repo.delete(document)
+  end
+
   defp can_add_document?(scope, obligation) do
     live_cycle?(obligation) and
       (Authorization.can?(scope, :edit_obligation) or
@@ -935,6 +1004,60 @@ defmodule Argus.Obligations do
       true ->
         false
     end
+  end
+
+  defp propagate_complete_documents_to_live(repo, %Scope{} = scope, %Type{} = type) do
+    new_slots = type.complete_documents
+    now = DateTime.utc_now(:second)
+
+    obligations =
+      live(Obligation)
+      |> where([o], o.obligation_type_id == ^type.id and o.entity_id == ^type.entity_id)
+      |> where([o], o.complete_documents != ^new_slots)
+      |> repo.all()
+
+    {count, _} =
+      live(Obligation)
+      |> where([o], o.obligation_type_id == ^type.id and o.entity_id == ^type.entity_id)
+      |> where([o], o.complete_documents != ^new_slots)
+      |> repo.update_all(set: [complete_documents: new_slots, updated_at: now])
+
+    Enum.each(obligations, fn obligation ->
+      insert_audit_log!(
+        repo,
+        scope,
+        obligation,
+        "complete_documents",
+        obligation.complete_documents,
+        new_slots
+      )
+    end)
+
+    {:ok, count}
+  end
+
+  defp ensure_document_on_cycle(%Obligation{} = obligation, %EventDocument{} = document) do
+    exists? =
+      EventDocument
+      |> join(:inner, [d], e in Event, on: d.obligation_event_id == e.id)
+      |> where([d, e], d.id == ^document.id and e.obligation_id == ^obligation.id)
+      |> Repo.exists?()
+
+    if exists?, do: :ok, else: {:error, :not_found}
+  end
+
+  defp normalize_slot_csv(csv) do
+    csv |> parse_slot_csv() |> Enum.sort() |> Enum.join(",")
+  end
+
+  defp parse_slot_csv(nil), do: []
+  defp parse_slot_csv(""), do: []
+
+  defp parse_slot_csv(csv) do
+    csv
+    |> String.split(",")
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
   end
 
   defp validate_void_reason(obligation, reason) do

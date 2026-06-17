@@ -14,7 +14,7 @@ defmodule ArgusWeb.DocumentController do
     obligation = get_obligation!(obligation_id, entity.id)
     document = get_document!(id, obligation.id)
 
-    if is_nil(document.voided_at) and File.exists?(Uploads.path(document)) do
+    if File.exists?(Uploads.path(document)) do
       send_download(conn, {:file, Uploads.path(document)},
         filename: original_filename(document),
         disposition: :inline

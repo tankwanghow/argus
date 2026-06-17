@@ -1,13 +1,16 @@
 defmodule ArgusWeb.ObligationLive.Show do
   use ArgusWeb, :live_view
 
+  import ArgusWeb.ObligationCompletionDocuments
+  import ArgusWeb.ObligationStepFiles
+
   alias ArgusWeb.ModalEscape
   alias ArgusWeb.ObligationLive.DocumentHelpers
   alias ArgusWeb.ObligationLive.IndexHelpers, as: Index
   alias Argus.Authorization
   alias Argus.Entities
   alias Argus.Obligations
-  alias Argus.Obligations.{Obligation, Recurrence, Urgency}
+  alias Argus.Obligations.{Event, Obligation, Recurrence, Urgency}
 
   @impl true
   def render(assigns) do
@@ -153,6 +156,15 @@ defmodule ArgusWeb.ObligationLive.Show do
           </div>
         </section>
 
+        <button
+          id="open-completion-modal"
+          type="button"
+          phx-click="open_completion_modal"
+          class="btn btn-outline btn-sm gap-1"
+        >
+          <.icon name="hero-paper-clip-mini" class="size-4" /> Completion documents
+        </button>
+
         <section class="argus-section">
           <div class="argus-section-head">Timeline</div>
           <ol id="event-timeline">
@@ -169,14 +181,14 @@ defmodule ArgusWeb.ObligationLive.Show do
                   · {event.status_by.email}
                 </span>
                 <button
-                  id={"documents-btn-#{event.id}"}
+                  id={"step-files-btn-#{event.id}"}
                   type="button"
-                  phx-click="open_documents_modal"
+                  phx-click="open_step_files"
                   phx-value-event_id={event.id}
                   class="btn btn-ghost btn-xs h-6 min-h-6 px-1.5 gap-1 ml-auto"
                 >
                   <.icon name="hero-paper-clip-mini" class="size-3.5" />
-                  Docs ({length(event.documents)})
+                  Files ({length(other_file_count(event, @doc_slots))})
                 </button>
               </div>
               <div
@@ -335,44 +347,66 @@ defmodule ArgusWeb.ObligationLive.Show do
         </form>
       </div>
 
-      <div
-        :if={@documents_modal_event}
-        id={"document-modal-#{@documents_modal_event.id}"}
-        class="modal modal-open"
-      >
+      <div :if={@show_completion_modal} id="completion-modal" class="modal modal-open">
         <div class="modal-box max-w-lg">
-          <h3 class="font-bold text-lg">
-            Documents — {humanize_status(@documents_modal_event.status)}
-          </h3>
-
-          <div class="mt-3 space-y-4">
-            <.obligation_document_upload_forms
-              event={@documents_modal_event}
-              required_docs={@required_docs}
-              uploads={@uploads}
-              uploadable?={event_uploadable?(@documents_modal_event, assigns)}
-              upload_slot_target={@upload_slot_target}
-            />
-
-            <.obligation_document_list
-              documents={@documents_modal_event.documents}
-              event_id={@documents_modal_event.id}
-              obligation_id={@obligation.id}
-              entity_slug={@current_scope.entity.slug}
-              current_scope={@current_scope}
+          <h3 class="font-bold text-lg">Completion documents</h3>
+          <div class="mt-3">
+            <.completion_documents
               obligation={@obligation}
+              current_scope={@current_scope}
+              entity_slug={@current_scope.entity.slug}
+              documents={cycle_documents(@obligation)}
+              required_slots={@doc_slots}
+              uploads={@uploads}
+              upload_slot_target={@upload_slot_target}
+              upload_slot_entries={@upload_slot_entries}
+              uploadable?={@can_add_document? and @live?}
               voiding_document_id={@voiding_document_id}
               void_reason_required?={@void_reason_required?}
-              list_id={"document-list-#{@documents_modal_event.id}"}
             />
           </div>
-
           <div class="modal-action mt-2">
-            <button type="button" class="btn" phx-click="close_documents_modal">Close</button>
+            <button
+              id="close-completion-modal"
+              type="button"
+              class="btn"
+              phx-click="close_completion_modal"
+            >Close</button>
           </div>
         </div>
         <form method="dialog" class="modal-backdrop">
-          <button type="button" phx-click="close_documents_modal">close</button>
+          <button type="button" phx-click="close_completion_modal">close</button>
+        </form>
+      </div>
+
+      <div
+        :if={@step_files_modal_event}
+        id={"step-files-modal-#{@step_files_modal_event.id}"}
+        class="modal modal-open"
+      >
+        <div class="modal-box max-w-lg">
+          <h3 class="font-bold text-lg">Files — {humanize_status(@step_files_modal_event.status)}</h3>
+          <div class="mt-3">
+            <.step_files
+              event={@step_files_modal_event}
+              obligation={@obligation}
+              current_scope={@current_scope}
+              entity_slug={@current_scope.entity.slug}
+              required_slots={@doc_slots}
+              uploads={@uploads}
+              upload_slot_target={@upload_slot_target}
+              upload_slot_entries={@upload_slot_entries}
+              uploadable?={event_uploadable?(@step_files_modal_event, assigns)}
+              voiding_document_id={@voiding_document_id}
+              void_reason_required?={@void_reason_required?}
+            />
+          </div>
+          <div class="modal-action mt-2">
+            <button type="button" class="btn" phx-click="close_step_files">Close</button>
+          </div>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+          <button type="button" phx-click="close_step_files">close</button>
         </form>
       </div>
 
@@ -544,9 +578,11 @@ defmodule ArgusWeb.ObligationLive.Show do
      |> assign(:show_skip_modal, false)
      |> assign(:show_end_series_modal, false)
      |> assign(:show_edit_modal, false)
-     |> assign(:documents_modal_event_id, nil)
-     |> assign(:documents_modal_event, nil)
+     |> assign(:show_completion_modal, false)
+     |> assign(:step_files_modal_event_id, nil)
+     |> assign(:step_files_modal_event, nil)
      |> assign(:upload_slot_target, nil)
+     |> assign(:upload_slot_entries, %{})
      |> assign(:voiding_document_id, nil)
      |> assign(:show_corrections?, false)
      |> assign(:editing_note_id, nil)
@@ -557,7 +593,12 @@ defmodule ArgusWeb.ObligationLive.Show do
      |> assign(:cycle_status, Index.cycle_status(obligation))
      |> assign(:live?, live?)
      |> assign(:member_options, member_options(scope))
-     |> allow_upload(:document, accept: :any, max_entries: 1, max_file_size: 20_000_000)
+     |> allow_upload(:document,
+       accept: :any,
+       max_entries: ArgusWeb.LiveUpload.max_document_entries(),
+       max_file_size: 20_000_000,
+       auto_upload: true
+     )
      |> assign_obligation(obligation)
      |> assign_done_form(obligation)
      |> assign_progress_form()
@@ -707,18 +748,11 @@ defmodule ArgusWeb.ObligationLive.Show do
   end
 
   def handle_event("open_documents_from_done", _params, socket) do
-    case DocumentHelpers.upload_event(socket.assigns.obligation.events) do
-      nil ->
-        {:noreply, put_flash(socket, :error, "No open step to attach documents to.")}
-
-      event ->
-        {:noreply,
-         socket
-         |> assign(:show_done_modal, false)
-         |> assign(:documents_modal_event_id, event.id)
-         |> assign(:documents_modal_event, event)
-         |> assign(:upload_slot_target, nil)}
-    end
+    {:noreply,
+     socket
+     |> assign(:show_done_modal, false)
+     |> assign(:show_completion_modal, true)
+     |> assign(:upload_slot_target, nil)}
   end
 
   def handle_event("close_done_modal", _params, socket) do
@@ -857,41 +891,79 @@ defmodule ArgusWeb.ObligationLive.Show do
     end
   end
 
-  def handle_event("open_documents_modal", %{"event_id" => event_id}, socket) do
+  def handle_event("open_step_files", %{"event_id" => event_id}, socket) do
     case find_event(socket.assigns.obligation.events, event_id) do
       nil ->
-        {:noreply, put_flash(socket, :error, "Event not found.")}
+        {:noreply, put_flash(socket, :error, "Step not found.")}
 
       event ->
         {:noreply,
          socket
-         |> assign(:documents_modal_event_id, event.id)
-         |> assign(:documents_modal_event, event)
+         |> assign(:step_files_modal_event_id, event.id)
+         |> assign(:step_files_modal_event, event)
          |> assign(:upload_slot_target, nil)}
     end
   end
 
-  def handle_event("close_documents_modal", _params, socket) do
+  def handle_event("close_step_files", _params, socket) do
     {:noreply,
      socket
-     |> assign(:documents_modal_event_id, nil)
-     |> assign(:documents_modal_event, nil)
+     |> assign(:step_files_modal_event_id, nil)
+     |> assign(:step_files_modal_event, nil)
      |> assign(:upload_slot_target, nil)
+     |> ArgusWeb.LiveUpload.clear_all_slot_entries()
      |> assign(:voiding_document_id, nil)}
   end
 
-  def handle_event("select_upload_slot", %{"event_id" => event_id, "slot" => slot}, socket) do
-    if socket.assigns.documents_modal_event_id == event_id or
-         to_string(socket.assigns.documents_modal_event_id) == event_id do
-      target = if slot == "additional", do: :additional, else: slot
-      {:noreply, assign(socket, :upload_slot_target, target)}
-    else
-      {:noreply, socket}
-    end
+  def handle_event("open_completion_modal", _params, socket) do
+    {:noreply, assign(socket, :show_completion_modal, true)}
   end
 
-  def handle_event("clear_upload_slot", _params, socket) do
-    {:noreply, assign(socket, :upload_slot_target, nil)}
+  def handle_event("close_completion_modal", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:show_completion_modal, false)
+     |> assign(:upload_slot_target, nil)
+     |> ArgusWeb.LiveUpload.clear_all_slot_entries()
+     |> assign(:voiding_document_id, nil)}
+  end
+
+  def handle_event("select_upload_slot", %{"slot" => slot}, socket) do
+    target = if slot == "additional", do: :additional, else: slot
+    {:noreply, assign(socket, :upload_slot_target, target)}
+  end
+
+  def handle_event("clear_upload_slot", %{"slot" => slot}, socket) do
+    {:noreply,
+     socket
+     |> ArgusWeb.LiveUpload.clear_slot_entry(slot)
+     |> assign(:upload_slot_target, nil)}
+  end
+
+  def handle_event("delete_document", %{"document_id" => document_id} = params, socket) do
+    scope = socket.assigns.current_scope
+    obligation = socket.assigns.obligation
+    event_id = params["event_id"]
+
+    case find_event_document(obligation.events, event_id, document_id) do
+      nil ->
+        {:noreply, put_flash(socket, :error, "Document not found.")}
+
+      document ->
+        case Obligations.delete_document(scope, obligation, document) do
+          {:ok, _} ->
+            {:noreply,
+             socket
+             |> reload()
+             |> put_flash(:info, "Document deleted.")}
+
+          :not_authorise ->
+            {:noreply, put_flash(socket, :error, "Not authorized.")}
+
+          {:error, _} ->
+            {:noreply, put_flash(socket, :error, "Could not delete document.")}
+        end
+    end
   end
 
   def handle_event("void_document", %{"document_id" => document_id}, socket) do
@@ -906,7 +978,7 @@ defmodule ArgusWeb.ObligationLive.Show do
     scope = socket.assigns.current_scope
     obligation = socket.assigns.obligation
     reason = Map.get(params, "reason")
-    event_id = Map.get(params, "event_id", socket.assigns.documents_modal_event_id)
+    event_id = Map.get(params, "event_id")
 
     case find_event_document(socket.assigns.obligation.events, event_id, document_id) do
       nil ->
@@ -920,7 +992,7 @@ defmodule ArgusWeb.ObligationLive.Show do
              |> reload()
              |> assign(:voiding_document_id, nil)
              |> assign(:upload_slot_target, nil)
-             |> reopen_documents_modal(event_id)
+             |> ArgusWeb.LiveUpload.clear_all_slot_entries()
              |> put_flash(:info, "Document voided.")}
 
           :not_authorise ->
@@ -935,56 +1007,84 @@ defmodule ArgusWeb.ObligationLive.Show do
     end
   end
 
-  def handle_event("validate_upload", _params, socket) do
-    {:noreply, socket}
+  def handle_event("validate_upload", params, socket) do
+    {:noreply, ArgusWeb.UploadValidate.assign_picked_upload(socket, params)}
   end
 
-  def handle_event("add_document", %{"event_id" => event_id} = params, socket) do
+  def handle_event("add_document", params, socket) do
     scope = socket.assigns.current_scope
     obligation = socket.assigns.obligation
-    slot = blank_to_nil(params["document_slot"])
+    slot = params["slot"]
+    document_slot = if slot in [nil, "additional"], do: nil, else: slot
 
-    case find_event(obligation.events, event_id) do
-      nil ->
-        {:noreply, put_flash(socket, :error, "Event not found.")}
+    ref =
+      Map.get(
+        socket.assigns.upload_slot_entries,
+        ArgusWeb.LiveUpload.slot_key(slot || "additional")
+      )
 
-      event ->
-        results =
-          consume_uploaded_entries(socket, :document, fn %{path: path}, entry ->
-            upload = %Plug.Upload{
-              path: path,
-              filename: entry.client_name,
-              content_type: entry.client_type
-            }
+    event =
+      case params["event_id"] do
+        nil -> DocumentHelpers.upload_event(obligation.events)
+        id -> find_event(obligation.events, id)
+      end
 
-            {:ok, Obligations.add_document(scope, obligation, event, upload, slot)}
-          end)
+    with %Event{} = event <- event,
+         ref when not is_nil(ref) <- ref do
+      case consume_slot_upload(socket, ref, scope, obligation, event, document_slot) do
+        {:ok, _document} ->
+          {:noreply,
+           socket
+           |> ArgusWeb.LiveUpload.clear_slot_entry(slot || "additional")
+           |> assign(:upload_slot_target, nil)
+           |> reload()
+           |> put_flash(:info, "Document added.")}
 
-        case results do
-          [{:ok, _document}] ->
-            {:noreply,
-             socket
-             |> reload()
-             |> assign(:upload_slot_target, nil)
-             |> reopen_documents_modal(event_id)
-             |> put_flash(:info, "Document added.")}
+        {:error, :not_authorise} ->
+          {:noreply, put_flash(socket, :error, "Not authorized.")}
 
-          [:not_authorise] ->
-            {:noreply, put_flash(socket, :error, "Not authorized.")}
+        {:error, :upload_failed} ->
+          {:noreply, put_flash(socket, :error, "Could not add document.")}
 
-          [{:error, _}] ->
-            {:noreply, put_flash(socket, :error, "Could not add document.")}
+        {:error, :no_entry} ->
+          {:noreply, put_flash(socket, :error, "Choose a file to upload.")}
 
-          [] ->
-            {:noreply, put_flash(socket, :error, "Choose a file to upload.")}
-        end
+        {:error, :not_ready} ->
+          {:noreply,
+           put_flash(socket, :error, "File is still uploading. Wait a moment and try again.")}
+      end
+    else
+      nil -> {:noreply, put_flash(socket, :error, "No step available to attach documents to.")}
+      _ -> {:noreply, put_flash(socket, :error, "Choose a file to upload.")}
     end
+  end
+
+  defp cycle_documents(obligation) do
+    Enum.flat_map(obligation.events, & &1.documents)
+  end
+
+  defp other_file_count(event, required_slots) do
+    {live_other, _voided} = DocumentHelpers.step_files(event.documents, required_slots)
+    live_other
+  end
+
+  defp event_uploadable?(event, assigns) do
+    assigns[:live?] and assigns[:can_add_document?] and event.status in ~w(open in_progress)
   end
 
   defp reload(socket) do
     scope = socket.assigns.current_scope
     obligation = Obligations.get_obligation!(scope, socket.assigns.obligation.id)
-    assign_obligation(socket, obligation)
+
+    socket = assign_obligation(socket, obligation)
+
+    case socket.assigns.step_files_modal_event_id do
+      nil ->
+        socket
+
+      event_id ->
+        assign(socket, :step_files_modal_event, find_event(obligation.events, event_id))
+    end
   end
 
   defp assign_obligation(socket, obligation) do
@@ -993,27 +1093,21 @@ defmodule ArgusWeb.ObligationLive.Show do
 
     required_docs = Enum.map(doc_slots, fn slot -> {slot, MapSet.member?(satisfied, slot)} end)
 
+    scope = socket.assigns.current_scope
+
     socket
     |> assign(:obligation, obligation)
     |> assign(:doc_slots, doc_slots)
     |> assign(:required_docs, required_docs)
     |> assign(:void_reason_required?, Obligations.document_void_reason_required?(obligation))
     |> assign(:audit_logs, Obligations.list_audit_logs(obligation))
-    |> assign(:can_add_document?, can_add_document?(socket.assigns.current_scope, obligation))
+    |> assign(:can_add_document?, can_add_document?(scope, obligation))
   end
 
-  defp reopen_documents_modal(socket, nil), do: socket
-
-  defp reopen_documents_modal(socket, event_id) do
-    case find_event(socket.assigns.obligation.events, event_id) do
-      nil ->
-        assign(socket, :documents_modal_event, nil)
-
-      event ->
-        socket
-        |> assign(:documents_modal_event_id, event.id)
-        |> assign(:documents_modal_event, event)
-    end
+  defp find_event_document(events, nil, document_id) do
+    events
+    |> Enum.flat_map(& &1.documents)
+    |> Enum.find(&(to_string(&1.id) == to_string(document_id)))
   end
 
   defp find_event_document(events, event_id, document_id) do
@@ -1026,9 +1120,29 @@ defmodule ArgusWeb.ObligationLive.Show do
     end
   end
 
-  defp event_uploadable?(event, assigns) do
-    assigns.live? and assigns.can_add_document? and event.status in ["open", "in_progress"]
+  defp consume_slot_upload(socket, ref, scope, obligation, event, document_slot) do
+    ArgusWeb.LiveUpload.consume_slot_entry(socket, ref, fn %{path: path}, entry ->
+      upload = %Plug.Upload{
+        path: path,
+        filename: entry.client_name,
+        content_type: entry.client_type
+      }
+
+      case Obligations.add_document(scope, obligation, event, upload, document_slot) do
+        {:ok, document} -> {:ok, document}
+        :not_authorise -> {:ok, :not_authorise}
+        {:error, _} = error -> {:ok, error}
+      end
+    end)
+    |> normalize_upload_result()
   end
+
+  defp normalize_upload_result({:error, :no_entry}), do: {:error, :no_entry}
+  defp normalize_upload_result({:error, :not_ready}), do: {:error, :not_ready}
+  defp normalize_upload_result(%Argus.Obligations.EventDocument{} = document), do: {:ok, document}
+  defp normalize_upload_result(:not_authorise), do: {:error, :not_authorise}
+  defp normalize_upload_result({:error, _}), do: {:error, :upload_failed}
+  defp normalize_upload_result(_), do: {:error, :upload_failed}
 
   defp find_event(events, event_id) do
     Enum.find(events, &(to_string(&1.id) == to_string(event_id)))

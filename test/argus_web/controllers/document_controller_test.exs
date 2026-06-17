@@ -44,4 +44,52 @@ defmodule ArgusWeb.DocumentControllerTest do
 
     assert response(conn, 200)
   end
+
+  test "serves a voided document so it can still be downloaded", %{conn: conn} do
+    manager = manager_scope_fixture()
+    conn = log_in_user(conn, manager.user)
+    type = type_fixture(manager.entity, complete_documents: "receipt")
+
+    {:ok, obligation} =
+      Obligations.create_obligation(manager, %{
+        title: "EPF",
+        obligation_type_id: type.id,
+        due_by: ~D[2026-06-30],
+        open_note: "open"
+      })
+
+    event = hd(Obligations.list_events(obligation))
+
+    path = Path.join(System.tmp_dir!(), "receipt_#{System.unique_integer()}.pdf")
+    File.write!(path, "receipt contents")
+
+    upload = %Plug.Upload{
+      path: path,
+      filename: "receipt.pdf",
+      content_type: "application/pdf"
+    }
+
+    {:ok, document} =
+      Obligations.add_document(manager, obligation, event, upload, "receipt")
+
+    # Make it old enough to be voidable (past 48 hour window)
+    old_document =
+      document
+      |> Ecto.Changeset.change(
+        inserted_at: DateTime.add(DateTime.utc_now(:second), -49 * 3600, :second)
+      )
+      |> Argus.Repo.update!()
+
+    # Void it (admin, with reason).
+    {:ok, _} =
+      Obligations.void_document(manager, obligation, old_document, %{reason: "wrong file"})
+
+    conn =
+      get(
+        conn,
+        ~p"/entities/#{manager.entity.slug}/obligations/#{obligation.id}/documents/#{old_document.id}"
+      )
+
+    assert response(conn, 200)
+  end
 end
