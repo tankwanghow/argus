@@ -23,16 +23,15 @@ defmodule ArgusWeb.ObligationLive.Index do
 
         <div class="argus-page-toolbar flex flex-col gap-2 sm:flex-row sm:items-center">
           <div id="obligation-status-filters" class="tabs tabs-box tabs-wrap flex-1 min-w-0">
-            <button
+            <.link
               :for={status <- Index.statuses()}
               id={"filter-#{status}"}
-              type="button"
               phx-click="filter_status"
               phx-value-status={status}
-              class={["tab tab-sm", @status == Index.parse_status(status) && "tab-active"]}
+              class={["tab", @status == Index.parse_status(status) && "tab-active font-bold text-xl"]}
             >
               {Index.status_label(Index.parse_status(status))}
-            </button>
+            </.link>
           </div>
           <input
             id="obligation-search"

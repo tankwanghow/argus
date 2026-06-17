@@ -11,7 +11,7 @@ defmodule ArgusWeb.MobileLive.Dashboard do
   def render(assigns) do
     ~H"""
     <Layouts.mobile_app flash={@flash} current_scope={@current_scope} active={:home}>
-      <div class="sticky top-0 z-30 -mx-4 px-4 py-3 bg-base-100/95 backdrop-blur border-b border-base-200">
+      <div class="sticky top-0 z-30  px-4 py-3 bg-base-100/95 backdrop-blur border-b border-base-200">
         <h1 class="text-lg font-semibold truncate">{@current_scope.entity.name}</h1>
         <div class="mt-2 tabs tabs-box w-full">
           <button

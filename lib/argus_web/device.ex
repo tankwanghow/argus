@@ -21,6 +21,10 @@ defmodule ArgusWeb.Device do
   @doc "True when the user-agent header looks like a mobile device."
   def mobile_ua?(conn) do
     ua = conn |> get_req_header("user-agent") |> List.first() |> Kernel.||("")
-    String.match?(ua, @mobile_ua)
+    mobile_user_agent?(ua)
   end
+
+  @doc "True when a raw user-agent string looks like a mobile device."
+  def mobile_user_agent?(ua) when is_binary(ua), do: String.match?(ua, @mobile_ua)
+  def mobile_user_agent?(_), do: false
 end

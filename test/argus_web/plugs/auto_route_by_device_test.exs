@@ -112,7 +112,7 @@ defmodule ArgusWeb.Plugs.AutoRouteByDeviceTest do
       assert conn.halted
     end
 
-    test "redirects mobile UA from desktop entity picker to mobile picker", %{conn: conn} do
+    test "does not redirect mobile UA on entity picker alone", %{conn: conn} do
       conn =
         conn
         |> put_req_header("user-agent", @mobile_ua)
@@ -121,21 +121,7 @@ defmodule ArgusWeb.Plugs.AutoRouteByDeviceTest do
         |> Map.put(:query_string, "pick=1")
         |> AutoRouteByDevice.call([])
 
-      assert redirected_to(conn) == "/m/entities?pick=1"
-      assert conn.halted
-    end
-
-    test "redirects desktop UA from mobile entity picker to desktop picker", %{conn: conn} do
-      conn =
-        conn
-        |> put_req_header("user-agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X)")
-        |> Map.put(:request_path, "/m/entities")
-        |> Map.put(:path_info, ["m", "entities"])
-        |> Map.put(:query_string, "pick=1")
-        |> AutoRouteByDevice.call([])
-
-      assert redirected_to(conn) == "/entities?pick=1"
-      assert conn.halted
+      refute conn.halted
     end
 
     test "argus_view=mobile cookie forces mobile from desktop", %{conn: conn} do
@@ -150,6 +136,71 @@ defmodule ArgusWeb.Plugs.AutoRouteByDeviceTest do
 
       assert redirected_to(conn) == "/m/acme"
       assert conn.halted
+    end
+
+    test "redirects mobile UA from desktop invitation landing to mobile", %{conn: conn} do
+      conn =
+        conn
+        |> put_req_header("user-agent", @mobile_ua)
+        |> Map.put(:request_path, "/invitations/sometoken")
+        |> Map.put(:path_info, ["invitations", "sometoken"])
+        |> Map.put(:query_string, "")
+        |> AutoRouteByDevice.call([])
+
+      assert redirected_to(conn) == "/m/invitations/sometoken"
+      assert conn.halted
+    end
+
+    test "redirects desktop UA from mobile invitation landing to desktop", %{conn: conn} do
+      conn =
+        conn
+        |> put_req_header("user-agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X)")
+        |> Map.put(:request_path, "/m/invitations/sometoken")
+        |> Map.put(:path_info, ["m", "invitations", "sometoken"])
+        |> Map.put(:query_string, "")
+        |> AutoRouteByDevice.call([])
+
+      assert redirected_to(conn) == "/invitations/sometoken"
+      assert conn.halted
+    end
+
+    test "redirects malformed /entities/m/:slug paths to /m/:slug", %{conn: conn} do
+      conn =
+        conn
+        |> put_req_header("user-agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X)")
+        |> Map.put(:request_path, "/entities/m/acme")
+        |> Map.put(:path_info, ["entities", "m", "acme"])
+        |> Map.put(:query_string, "")
+        |> AutoRouteByDevice.call([])
+
+      assert redirected_to(conn) == "/m/acme"
+      assert conn.halted
+    end
+
+    test "redirects mobile UA from desktop invite session to mobile", %{conn: conn} do
+      conn =
+        conn
+        |> put_req_header("user-agent", @mobile_ua)
+        |> Map.put(:request_path, "/entities/acme/invite-session/member")
+        |> Map.put(:path_info, ["entities", "acme", "invite-session", "member"])
+        |> Map.put(:query_string, "")
+        |> AutoRouteByDevice.call([])
+
+      assert redirected_to(conn) == "/m/acme/invite-session/member"
+      assert conn.halted
+    end
+
+    test "does not redirect POST requests", %{conn: conn} do
+      conn =
+        conn
+        |> put_req_header("user-agent", @mobile_ua)
+        |> Map.put(:method, "POST")
+        |> Map.put(:request_path, "/invitations/sometoken/accept")
+        |> Map.put(:path_info, ["invitations", "sometoken", "accept"])
+        |> Map.put(:query_string, "")
+        |> AutoRouteByDevice.call([])
+
+      refute conn.halted
     end
   end
 end

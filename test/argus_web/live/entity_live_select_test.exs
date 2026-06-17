@@ -46,7 +46,7 @@ defmodule ArgusWeb.EntityLiveSelectTest do
     assert html =~ scope.entity.name
   end
 
-  test "mobile picker uses mobile shell and links to /m routes", %{conn: conn} do
+  test "mobile UA picker uses mobile shell and href enter links", %{conn: conn} do
     scope = Argus.EntitiesFixtures.manager_scope_fixture()
 
     {:ok, other} =
@@ -54,19 +54,20 @@ defmodule ArgusWeb.EntityLiveSelectTest do
 
     conn = mobile_conn(conn, scope)
 
-    {:ok, view, html} = live(conn, ~p"/m/entities?pick=1")
+    {:ok, view, html} = live(conn, ~p"/entities?pick=1")
 
     assert html =~ "Your entities"
     assert html =~ "Beta Corp"
-    assert has_element?(view, "a[href='/m/#{other.slug}']", "Enter")
-    refute has_element?(view, "#more-sheet")
+    assert has_element?(view, "a[href='/entities/#{other.slug}']", "Enter")
   end
 
-  test "mobile UA is redirected from desktop picker to mobile picker", %{conn: conn} do
+  test "enter links use desktop paths so AutoRoute can redirect mobile UAs", %{conn: conn} do
     scope = Argus.EntitiesFixtures.manager_scope_fixture()
     conn = mobile_conn(conn, scope)
 
-    conn = get(conn, ~p"/entities?pick=1")
-    assert redirected_to(conn) == "/m/entities?pick=1"
+    {:ok, view, _html} = live(conn, ~p"/entities?pick=1")
+
+    assert has_element?(view, "a[href='/entities/#{scope.entity.slug}']", "Enter")
+    refute render(view) =~ ~s|href="/m/#{scope.entity.slug}"|
   end
 end

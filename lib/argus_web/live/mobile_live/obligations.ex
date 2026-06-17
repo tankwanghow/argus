@@ -8,7 +8,7 @@ defmodule ArgusWeb.MobileLive.Obligations do
   def render(assigns) do
     ~H"""
     <Layouts.mobile_app flash={@flash} current_scope={@current_scope} active={:obligations}>
-      <div class="sticky top-0 z-30 -mx-4 px-4 py-3 bg-base-100/95 backdrop-blur border-b border-base-200 space-y-2">
+      <div class="sticky top-0 z-30 px-4 py-3 bg-base-100/95 backdrop-blur border-b border-base-200 space-y-2">
         <h1 class="text-lg font-semibold">Obligations</h1>
         <input
           id="m-obligation-search"

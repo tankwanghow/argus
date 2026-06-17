@@ -188,6 +188,13 @@ defmodule Argus.Accounts do
     User.password_changeset(user, attrs, opts)
   end
 
+  @doc "Updates a user's UI locale. Returns `{:ok, user}` or `{:error, changeset}`."
+  def update_user_locale(%User{} = user, locale) do
+    user
+    |> User.locale_changeset(%{locale: locale})
+    |> Repo.update()
+  end
+
   @doc """
   Updates the user password.
 

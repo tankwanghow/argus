@@ -42,6 +42,42 @@ defmodule Argus.Obligations.TypeTest do
 
       assert :not_authorise = Obligations.update_type(manager, type, %{name: "Hacked"})
     end
+
+    test "updating complete_documents propagates to all live obligations of the type" do
+      manager = Argus.EntitiesFixtures.manager_scope_fixture()
+      member_scope = member_scope_on_entity(manager.entity)
+
+      type = type_fixture(manager.entity, complete_documents: "")
+
+      {:ok, live_one} =
+        Obligations.create_obligation(manager, %{
+          title: "EPF Jan",
+          obligation_type_id: type.id,
+          primary_assignee_id: member_scope.user.id,
+          due_by: ~D[2026-01-15],
+          open_note: "Open"
+        })
+
+      {:ok, live_two} =
+        Obligations.create_obligation(manager, %{
+          title: "EPF Feb",
+          obligation_type_id: type.id,
+          primary_assignee_id: member_scope.user.id,
+          due_by: ~D[2026-02-15],
+          open_note: "Open"
+        })
+
+      assert {:ok, done, _} =
+               Obligations.complete(member_scope, live_one, %{note: "Done"})
+
+      assert {:ok, _type} =
+               Obligations.update_type(manager, type, %{complete_documents: "payment_receipt"})
+
+      assert Argus.Repo.get!(Argus.Obligations.Obligation, live_two.id).complete_documents ==
+               "payment_receipt"
+
+      assert Argus.Repo.get!(Argus.Obligations.Obligation, done.id).complete_documents == ""
+    end
   end
 
   describe "changeset/2" do

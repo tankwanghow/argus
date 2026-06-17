@@ -282,12 +282,32 @@ defmodule ArgusWeb.UserAuth do
   end
 
   @doc "Returns the path to redirect to after log in."
-  # the user was already logged in, redirect to settings
-  def signed_in_path(%Plug.Conn{assigns: %{current_scope: %Scope{user: %Accounts.User{}}}}) do
-    ~p"/entities"
+  def signed_in_path(%Plug.Conn{assigns: %{current_scope: %Scope{user: %Accounts.User{} = user}}}) do
+    default_entity_path(user)
   end
 
   def signed_in_path(_), do: ~p"/"
+
+  @doc """
+  If the user belongs to exactly one entity, returns that entity's dashboard path;
+  otherwise returns the entities picker.
+  """
+  def default_entity_path(%Accounts.User{} = user) do
+    memberships = Entities.list_entity_memberships(user)
+
+    cond do
+      default = Enum.find(memberships, fn {_, m} -> m.is_default end) ->
+        {entity, _} = default
+        ~p"/entities/#{entity.slug}"
+
+      match?([{_entity, _}], memberships) ->
+        [{entity, _}] = memberships
+        ~p"/entities/#{entity.slug}"
+
+      true ->
+        ~p"/entities"
+    end
+  end
 
   @doc """
   Plug for routes that require the user to be authenticated.

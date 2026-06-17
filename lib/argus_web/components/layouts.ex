@@ -41,64 +41,54 @@ defmodule ArgusWeb.Layouts do
       phx-key="Escape"
       class="argus-app min-h-screen flex flex-col"
     >
-      <header class="sticky top-0 z-40 bg-base-100 border-b border-base-300 shadow-sm">
-        <div class="flex items-center gap-4 px-4 sm:px-6 lg:px-8 h-12">
-          <a href="/" class="flex items-center gap-1.5 shrink-0">
-            <img src={~p"/images/logo.svg"} width="24" height="24" alt="" />
-            <span class="text-sm font-semibold tracking-tight hidden sm:inline">Argus</span>
-          </a>
-
-          <.link
-            :if={entity_scope?(@current_scope)}
-            href={~p"/entities?pick=1"}
-            class="text-sm font-semibold truncate max-w-[12rem] sm:max-w-xs hover:text-primary transition-colors"
-            title="Switch entity"
-          >
-            {@current_scope.entity.name}
+      <header class="navbar px-4 sm:px-6 lg:px-8 border-b border-base-300">
+        <div class="flex-1">
+          <.link navigate={~p"/"} class="flex items-center gap-2 font-bold text-lg">
+            <img src={~p"/images/logo.svg"} width="32" height="32" alt="" class="shrink-0" />
+            <span>Argus</span>
+            <span
+              :if={entity_scope?(@current_scope)}
+              class="text-base-content/60"
+            >
+              {@current_scope.entity.name}<span class="text-sm ml-2 font-mono">({@current_scope.entity.slug})</span>
+            </span>
           </.link>
-
-          <nav :if={entity_scope?(@current_scope)} class="hidden md:flex items-center gap-4 ml-2">
-            <.nav_tab navigate={~p"/entities/#{@current_scope.entity.slug}"} label="Dashboard" />
-            <.nav_tab
-              navigate={~p"/entities/#{@current_scope.entity.slug}/obligations"}
-              label="Obligations"
-            />
-            <.nav_tab
-              navigate={~p"/entities/#{@current_scope.entity.slug}/obligation-types"}
-              label="Types"
-            />
-            <.nav_tab
-              navigate={~p"/entities/#{@current_scope.entity.slug}/members"}
-              label="Members"
-            />
-          </nav>
-
-          <div class="flex-1" />
-
-          <nav :if={!account_scope?(@current_scope)} class="flex items-center gap-2 text-sm">
-            <.link href={~p"/users/log-in"} class="hover:text-primary transition-colors">
-              Log in
-            </.link>
-            <.link href={~p"/users/register"} class="btn btn-primary btn-xs">Get started</.link>
-          </nav>
-
-          <div :if={account_scope?(@current_scope)} class="flex items-center gap-2">
-            <.theme_toggle compact />
-
-            <details class="dropdown dropdown-end">
-              <summary class="btn btn-ghost btn-xs btn-circle list-none [&::-webkit-details-marker]:hidden">
-                <.icon name="hero-user-circle" class="size-5" />
-              </summary>
-              <ul class="dropdown-content menu bg-base-100 rounded-box shadow z-50 w-56 p-2 mt-2 border border-base-300">
-                <li class="menu-title truncate text-xs">{@current_scope.user.email}</li>
-                <li><.link href={~p"/users/settings"}>Settings</.link></li>
-                <li><.link href={~p"/entities?pick=1"}>All entities</.link></li>
-                <li><.link href={~p"/users/log-out"} method="delete">Log out</.link></li>
-              </ul>
-            </details>
-          </div>
+        </div>
+        <div class="flex-none">
+          <ul class="flex items-center gap-2">
+            <%= if account_scope?(@current_scope) do %>
+              <li :if={entity_scope?(@current_scope)}>
+                <a
+                  href={ArgusWeb.Paths.view_mode("mobile", "/m/#{@current_scope.entity.slug}")}
+                  class="btn btn-ghost btn-sm"
+                  title="Mobile view"
+                >
+                  <.icon name="hero-device-phone-mobile-micro" class="size-4" />
+                  <span class="hidden sm:inline ml-1">Mobile</span>
+                </a>
+              </li>
+              <li>
+                <.user_dropdown current_scope={@current_scope} />
+              </li>
+            <% else %>
+              <li><.language_switcher current_scope={@current_scope} anonymous={true} /></li>
+              <li><.theme_toggle /></li>
+              <li>
+                <.link navigate={~p"/users/log-in"} class="btn btn-ghost btn-sm">
+                  Log in
+                </.link>
+              </li>
+              <li>
+                <.link navigate={~p"/users/register"} class="btn btn-primary btn-sm">
+                  Get started
+                </.link>
+              </li>
+            <% end %>
+          </ul>
         </div>
       </header>
+
+      <.entity_nav :if={entity_scope?(@current_scope)} current_scope={@current_scope} />
 
       <main class="flex-1 px-4 py-5 sm:px-6 lg:px-8">
         <div class="mx-auto max-w-4xl space-y-3">
@@ -111,17 +101,200 @@ defmodule ArgusWeb.Layouts do
     """
   end
 
-  attr :navigate, :string, required: true
+  attr :current_scope, :map, required: true
+
+  defp entity_nav(assigns) do
+    ~H"""
+    <nav class="border-b border-base-300 bg-base-200/50 px-4 sm:px-6 lg:px-8 overflow-visible">
+      <div class="mx-auto max-w-4xl flex items-center justify-center gap-1 flex-wrap text-sm overflow-visible">
+        <.entity_nav_link
+          href={~p"/entities/#{@current_scope.entity.slug}"}
+          icon="hero-home-micro"
+          label="Dashboard"
+        />
+        <.entity_nav_link
+          href={~p"/entities/#{@current_scope.entity.slug}/obligations"}
+          icon="hero-clipboard-document-list-micro"
+          label="Obligations"
+        />
+        <.entity_nav_link
+          href={~p"/entities/#{@current_scope.entity.slug}/obligation-types"}
+          icon="hero-tag-micro"
+          label="Types"
+        />
+      </div>
+    </nav>
+    """
+  end
+
+  attr :href, :string, required: true
+  attr :icon, :string, required: true
   attr :label, :string, required: true
 
-  defp nav_tab(assigns) do
+  defp entity_nav_link(assigns) do
     ~H"""
     <.link
-      navigate={@navigate}
-      class="text-sm text-base-content/70 hover:text-base-content transition-colors"
+      navigate={@href}
+      class="flex items-center gap-1.5 px-3 py-2.5 rounded-md text-base-content/70 hover:text-base-content hover:bg-base-300/50 transition-colors whitespace-nowrap"
     >
+      <.icon name={@icon} class="size-4" />
       {@label}
     </.link>
+    """
+  end
+
+  @doc "Language picker. Renders for logged-in users, or when `anonymous: true`."
+  attr :current_scope, :map, default: nil
+  attr :anonymous, :boolean, default: false
+
+  def language_switcher(assigns) do
+    assigns = assign(assigns, :current, Gettext.get_locale(ArgusWeb.Gettext))
+
+    ~H"""
+    <div
+      :if={@anonymous || (@current_scope && @current_scope.user)}
+      class="dropdown dropdown-end"
+    >
+      <div tabindex="0" role="button" class="btn btn-ghost btn-sm gap-1" title="Language">
+        <.icon name="hero-language-micro" class="size-4" />
+        <span class="hidden sm:inline">{language_label(@current)}</span>
+      </div>
+      <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-50 w-44 p-2 shadow">
+        <li :for={{code, label} <- language_options()}>
+          <.link href={~p"/locale/#{code}"} class={@current == code && "menu-active"}>
+            {label}
+          </.link>
+        </li>
+      </ul>
+    </div>
+    """
+  end
+
+  defp language_options, do: [{"en", "English"}, {"ms", "Bahasa Malaysia"}, {"zh", "中文"}]
+
+  defp language_label(code) do
+    {_, label} = Enum.find(language_options(), {code, code}, fn {c, _} -> c == code end)
+    label
+  end
+
+  defp display_name(%{username: u}) when is_binary(u) and u != "", do: u
+  defp display_name(%{email: e}), do: e || "?"
+
+  attr :current_scope, :map, required: true
+
+  defp user_dropdown(assigns) do
+    assigns = assign(assigns, :current_locale, Gettext.get_locale(ArgusWeb.Gettext))
+
+    ~H"""
+    <div id="user-dropdown" class="dropdown dropdown-end">
+      <div
+        tabindex="0"
+        role="button"
+        class="flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 pl-1 pr-3 py-1 cursor-pointer hover:bg-primary/20 transition-colors"
+      >
+        <div class="size-7 rounded-full bg-primary flex items-center justify-center text-primary-content text-xs font-bold flex-shrink-0 select-none">
+          {String.upcase(String.first(display_name(@current_scope.user)))}
+        </div>
+        <span class="hidden sm:block text-sm font-medium truncate max-w-[160px]">
+          {display_name(@current_scope.user)}
+        </span>
+        <.icon name="hero-chevron-down-micro" class="size-3 text-base-content/50" />
+      </div>
+
+      <div
+        tabindex="0"
+        class="dropdown-content z-50 mt-2 w-60 rounded-xl border border-base-300 bg-base-100 shadow-xl"
+      >
+        <div class="px-4 py-3 border-b border-base-200 bg-base-200/40">
+          <div class="flex items-center gap-3">
+            <div class="size-9 rounded-full bg-primary flex items-center justify-center text-primary-content text-sm font-bold flex-shrink-0 select-none">
+              {String.upcase(String.first(display_name(@current_scope.user)))}
+            </div>
+            <div class="min-w-0">
+              <div class="font-semibold text-sm truncate">{display_name(@current_scope.user)}</div>
+              <div
+                :if={entity_scope?(@current_scope)}
+                class="text-xs text-base-content/50 font-mono truncate"
+              >
+                {@current_scope.entity.slug}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="py-1">
+          <p class="px-3 pt-2 pb-1 text-[10px] uppercase tracking-widest text-base-content/40 font-semibold">
+            Preferences
+          </p>
+          <div class="flex items-center justify-between px-3 py-2">
+            <span class="flex items-center gap-2 text-sm">
+              <.icon name="hero-language-micro" class="size-4 text-base-content/50" /> Language
+            </span>
+            <div class="flex gap-0.5">
+              <.link
+                :for={{code, _label} <- language_options()}
+                href={~p"/locale/#{code}"}
+                class={[
+                  "px-1.5 py-0.5 rounded text-xs font-mono",
+                  @current_locale == code &&
+                    "bg-primary text-primary-content font-semibold",
+                  @current_locale != code &&
+                    "text-base-content/50 hover:text-base-content hover:bg-base-200"
+                ]}
+              >
+                {String.upcase(code)}
+              </.link>
+            </div>
+          </div>
+          <div class="flex items-center justify-between px-3 py-2">
+            <span class="flex items-center gap-2 text-sm">
+              <.icon name="hero-swatch-micro" class="size-4 text-base-content/50" /> Theme
+            </span>
+            <.theme_toggle />
+          </div>
+        </div>
+
+        <div class="border-t border-base-200 py-1">
+          <p class="px-3 pt-2 pb-1 text-[10px] uppercase tracking-widest text-base-content/40 font-semibold">
+            Entity
+          </p>
+          <.link
+            navigate={~p"/entities?pick=1"}
+            class="flex items-center gap-2 px-3 py-2 text-sm hover:bg-base-200 rounded transition-colors"
+          >
+            <.icon name="hero-building-office-2-micro" class="size-4 text-base-content/50" />
+            All entities
+          </.link>
+          <.link
+            :if={entity_scope?(@current_scope)}
+            navigate={~p"/entities/#{@current_scope.entity.slug}/members"}
+            class="flex items-center gap-2 px-3 py-2 text-sm hover:bg-base-200 rounded transition-colors"
+          >
+            <.icon name="hero-users-micro" class="size-4 text-base-content/50" /> Members
+          </.link>
+        </div>
+
+        <div class="border-t border-base-200 py-1">
+          <p class="px-3 pt-2 pb-1 text-[10px] uppercase tracking-widest text-base-content/40 font-semibold">
+            Account
+          </p>
+          <.link
+            navigate={~p"/users/settings"}
+            class="flex items-center gap-2 px-3 py-2 text-sm hover:bg-base-200 rounded transition-colors"
+          >
+            <.icon name="hero-user-circle-micro" class="size-4 text-base-content/50" />
+            Account settings
+          </.link>
+          <.link
+            href={~p"/users/log-out"}
+            method="delete"
+            class="flex items-center gap-2 px-3 py-2 text-sm text-error hover:bg-error/10 rounded transition-colors"
+          >
+            <.icon name="hero-power" class="size-4" /> Log out
+          </.link>
+        </div>
+      </div>
+    </div>
     """
   end
 
@@ -145,6 +318,22 @@ defmodule ArgusWeb.Layouts do
   end
 
   @doc """
+  Centered mobile shell for flows outside entity context (e.g. invitation acceptance).
+  """
+  attr :flash, :map, required: true
+  slot :inner_block, required: true
+
+  def mobile_standalone(assigns) do
+    ~H"""
+    <.flash_group flash={@flash} />
+    <div class="min-h-screen bg-base-200 flex flex-col items-center justify-center p-6 gap-6">
+      <div class="text-2xl font-bold tracking-tight">Argus</div>
+      {render_slot(@inner_block)}
+    </div>
+    """
+  end
+
+  @doc """
   The mobile shell — bottom-nav layout for the `/m/:entity_slug` field-work UI.
   """
   attr :flash, :map, required: true
@@ -160,75 +349,147 @@ defmodule ArgusWeb.Layouts do
       phx-key="Escape"
       class="min-h-screen bg-base-100 pb-20"
     >
-      <main class="px-4 py-4">
-        {render_slot(@inner_block)}
-      </main>
+      {render_slot(@inner_block)}
     </div>
 
-    <.mobile_bottom_nav active={@active} slug={@current_scope.entity.slug} />
+    <.mobile_bottom_nav active={@active} current_scope={@current_scope} />
+    <.mobile_more_sheet current_scope={@current_scope} />
     <.flash_group flash={@flash} />
     """
   end
 
   attr :active, :atom, required: true
-  attr :slug, :string, required: true
+  attr :current_scope, :map, required: true
 
   defp mobile_bottom_nav(assigns) do
     ~H"""
-    <nav class="fixed bottom-0 inset-x-0 z-40 bg-base-100 border-t border-base-200 pb-[env(safe-area-inset-bottom)]">
-      <div class="grid grid-cols-3">
-        <.link
-          navigate={~p"/m/#{@slug}"}
-          class={["flex flex-col items-center gap-1 py-2 text-xs", @active == :home && "text-primary"]}
-        >
-          <.icon name="hero-home" class="size-6" /> Dashboard
-        </.link>
-        <.link
-          navigate={~p"/m/#{@slug}/obligations"}
-          class={[
-            "flex flex-col items-center gap-1 py-2 text-xs",
-            @active == :obligations && "text-primary"
-          ]}
-        >
-          <.icon name="hero-clipboard-document-list" class="size-6" /> Tasks
-        </.link>
-        <label for="more-sheet" class="flex flex-col items-center gap-1 py-2 text-xs cursor-pointer">
-          <.icon name="hero-ellipsis-horizontal-circle" class="size-6" /> More
-        </label>
-      </div>
+    <nav class="fixed bottom-0 inset-x-0 z-30 bg-base-100 border-t border-base-300 pb-[env(safe-area-inset-bottom)]">
+      <ul class="grid grid-cols-3">
+        <li>
+          <.link
+            navigate={~p"/m/#{@current_scope.entity.slug}"}
+            class={[
+              "flex flex-col items-center gap-1 py-3 active:bg-base-200",
+              @active == :home && "text-primary",
+              @active != :home && "text-base-content/60"
+            ]}
+          >
+            <.icon name="hero-home" class="size-6" />
+            <span class="text-[11px]">Dashboard</span>
+          </.link>
+        </li>
+        <li>
+          <.link
+            navigate={~p"/m/#{@current_scope.entity.slug}/obligations"}
+            class={[
+              "flex flex-col items-center gap-1 py-3 active:bg-base-200",
+              @active == :obligations && "text-primary",
+              @active != :obligations && "text-base-content/60"
+            ]}
+          >
+            <.icon name="hero-clipboard-document-list" class="size-6" />
+            <span class="text-[11px]">Tasks</span>
+          </.link>
+        </li>
+        <li>
+          <button
+            type="button"
+            phx-click={JS.show(to: "#mobile-more-sheet", display: "flex")}
+            class={[
+              "w-full flex flex-col items-center gap-1 py-3 active:bg-base-200",
+              @active == :more && "text-primary",
+              @active != :more && "text-base-content/60"
+            ]}
+          >
+            <.icon name="hero-bars-3" class="size-6" />
+            <span class="text-[11px]">More</span>
+          </button>
+        </li>
+      </ul>
     </nav>
+    """
+  end
 
-    <input type="checkbox" id="more-sheet" class="modal-toggle" />
-    <div class="modal modal-bottom" role="dialog">
-      <div class="modal-box">
-        <h3 class="font-bold text-lg">More</h3>
-        <ul class="menu mt-2">
-          <li>
-            <a href={~p"/set-view?#{[view: "desktop", to: "/entities/#{@slug}"]}"}>
-              <.icon name="hero-computer-desktop" class="size-5" /> Switch to desktop
+  defp mobile_more_sheet(assigns) do
+    ~H"""
+    <div id="mobile-more-sheet" class="hidden fixed inset-0 z-40 flex items-end">
+      <div class="absolute inset-0 bg-black/40" phx-click={JS.hide(to: "#mobile-more-sheet")}></div>
+      <div class="relative w-full bg-base-100 rounded-t-2xl pb-[env(safe-area-inset-bottom)]">
+        <div class="flex justify-center pt-2 pb-1">
+          <div class="w-10 h-1 rounded-full bg-base-300"></div>
+        </div>
+        <div :if={@current_scope && @current_scope.user} class="px-4 py-2 border-b border-base-200">
+          <div class="text-sm font-semibold">{@current_scope.user.email}</div>
+          <div :if={@current_scope.entity} class="text-xs text-base-content/60">
+            {@current_scope.entity.name} <span class="font-mono">({@current_scope.entity.slug})</span>
+          </div>
+        </div>
+        <ul class="divide-y divide-base-200">
+          <li class="flex items-center justify-between gap-3 px-4 py-3">
+            <span class="flex items-center gap-3">
+              <.icon name="hero-swatch" class="size-5 text-base-content/60" />
+              <span>Theme</span>
+            </span>
+            <.theme_toggle />
+          </li>
+          <li :if={
+            @current_scope && @current_scope.entity &&
+              Argus.Authorization.can?(@current_scope, :manage_entity)
+          }>
+            <.link
+              navigate={~p"/m/#{@current_scope.entity.slug}/invite-session/member"}
+              class="flex items-center gap-3 px-4 py-4 active:bg-base-200"
+            >
+              <.icon name="hero-user-plus" class="size-5 text-base-content/60" />
+              <span>Invite members</span>
+            </.link>
+          </li>
+          <li :if={@current_scope && @current_scope.entity}>
+            <a
+              href={ArgusWeb.Paths.view_mode("desktop", "/entities/#{@current_scope.entity.slug}")}
+              class="flex items-center gap-3 px-4 py-4 active:bg-base-200"
+            >
+              <.icon name="hero-computer-desktop" class="size-5 text-base-content/60" />
+              <span>Open desktop view</span>
             </a>
           </li>
           <li>
-            <.link href={~p"/m/entities?pick=1"}>
-              <.icon name="hero-building-office-2" class="size-5" /> All entities
+            <.link
+              href={~p"/entities?pick=1"}
+              class="flex items-center gap-3 px-4 py-4 active:bg-base-200"
+            >
+              <.icon name="hero-arrows-right-left" class="size-5 text-base-content/60" />
+              <span>Switch entity</span>
             </.link>
           </li>
           <li>
-            <.link navigate={~p"/users/settings"}>
-              <.icon name="hero-cog-6-tooth" class="size-5" /> Settings
+            <.link
+              navigate={~p"/users/settings"}
+              class="flex items-center gap-3 px-4 py-4 active:bg-base-200"
+            >
+              <.icon name="hero-cog-6-tooth" class="size-5 text-base-content/60" />
+              <span>Account settings</span>
             </.link>
           </li>
           <li>
-            <.link href={~p"/users/log-out"} method="delete">
-              <.icon name="hero-arrow-right-start-on-rectangle" class="size-5" /> Log out
+            <.link
+              href={~p"/users/log-out"}
+              method="delete"
+              class="flex items-center gap-3 px-4 py-4 active:bg-error/10 text-error"
+            >
+              <.icon name="hero-arrow-left-start-on-rectangle" class="size-5" />
+              <span>Log out</span>
             </.link>
           </li>
         </ul>
-        <div class="mt-4 flex justify-center">
-          <.theme_toggle />
-        </div>
+        <button
+          type="button"
+          phx-click={JS.hide(to: "#mobile-more-sheet")}
+          class="w-full py-3 text-sm text-base-content/60 border-t border-base-200"
+        >
+          Close
+        </button>
       </div>
-      <label class="modal-backdrop" for="more-sheet">Close</label>
     </div>
     """
   end
