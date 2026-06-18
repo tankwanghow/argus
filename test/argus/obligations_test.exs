@@ -593,5 +593,128 @@ defmodule Argus.ObligationsTest do
 
       assert completed_replacement.completed_at
     end
+
+    test "a recurring original's auto-spawned successor is untouched" do
+      manager = Argus.EntitiesFixtures.manager_scope_fixture()
+      type = type_fixture(manager.entity, recurring_interval: "monthly")
+
+      {:ok, obligation} =
+        Obligations.create_obligation(manager, %{
+          title: "EPF",
+          obligation_type_id: type.id,
+          due_by: ~D[2026-06-15],
+          open_note: "open"
+        })
+
+      {:ok, done, spawned} =
+        Obligations.complete(manager, obligation, %{note: "Done", next_due_by: ~D[2026-07-15]})
+
+      {:ok, _original, replacement} =
+        Obligations.mark_completed_in_error(manager, done, %{reason: "redo"})
+
+      # The recurring successor still lives, still in the original series, unchanged.
+      reloaded = Obligations.get_obligation!(manager, spawned.id)
+      assert reloaded.completed_at == nil
+      assert reloaded.status == "active"
+      assert reloaded.series_id == done.series_id
+      assert reloaded.replaces_id == nil
+
+      # The replacement is in its own series, separate from the recurring chain.
+      assert replacement.series_id != done.series_id
+      assert spawned.id in Enum.map(Obligations.list_series(done.series_id), & &1.id)
+      refute replacement.id in Enum.map(Obligations.list_series(done.series_id), & &1.id)
+    end
+
+    test "rejects a live (not completed) cycle" do
+      manager = Argus.EntitiesFixtures.manager_scope_fixture()
+      type = type_fixture(manager.entity)
+
+      {:ok, obligation} =
+        Obligations.create_obligation(manager, %{
+          title: "EPF",
+          obligation_type_id: type.id,
+          due_by: ~D[2026-06-15],
+          open_note: "open"
+        })
+
+      assert {:error, :not_correctable} =
+               Obligations.mark_completed_in_error(manager, obligation, %{reason: "x"})
+    end
+
+    test "rejects a cancelled cycle" do
+      manager = Argus.EntitiesFixtures.manager_scope_fixture()
+      type = type_fixture(manager.entity)
+
+      {:ok, obligation} =
+        Obligations.create_obligation(manager, %{
+          title: "EPF",
+          obligation_type_id: type.id,
+          due_by: ~D[2026-06-15],
+          open_note: "open"
+        })
+
+      {:ok, cancelled} = Obligations.cancel_obligation(manager, obligation, %{note: "drop"})
+
+      assert {:error, :not_correctable} =
+               Obligations.mark_completed_in_error(manager, cancelled, %{reason: "x"})
+    end
+
+    test "rejects double-correction" do
+      manager = Argus.EntitiesFixtures.manager_scope_fixture()
+      type = type_fixture(manager.entity)
+
+      {:ok, obligation} =
+        Obligations.create_obligation(manager, %{
+          title: "EPF",
+          obligation_type_id: type.id,
+          due_by: ~D[2026-06-15],
+          open_note: "open"
+        })
+
+      {:ok, done, _} = Obligations.complete(manager, obligation, %{note: "Done"})
+      {:ok, original, _replacement} =
+        Obligations.mark_completed_in_error(manager, done, %{reason: "first"})
+
+      assert {:error, :already_corrected} =
+               Obligations.mark_completed_in_error(manager, original, %{reason: "second"})
+    end
+
+    test "requires a reason" do
+      manager = Argus.EntitiesFixtures.manager_scope_fixture()
+      type = type_fixture(manager.entity)
+
+      {:ok, obligation} =
+        Obligations.create_obligation(manager, %{
+          title: "EPF",
+          obligation_type_id: type.id,
+          due_by: ~D[2026-06-15],
+          open_note: "open"
+        })
+
+      {:ok, done, _} = Obligations.complete(manager, obligation, %{note: "Done"})
+
+      assert {:error, :note_required} =
+               Obligations.mark_completed_in_error(manager, done, %{reason: ""})
+    end
+
+    test "members may not correct" do
+      manager = Argus.EntitiesFixtures.manager_scope_fixture()
+      member = member_scope_on_entity(manager.entity)
+      type = type_fixture(manager.entity)
+
+      {:ok, obligation} =
+        Obligations.create_obligation(manager, %{
+          title: "EPF",
+          obligation_type_id: type.id,
+          primary_assignee_id: member.user.id,
+          due_by: ~D[2026-06-15],
+          open_note: "open"
+        })
+
+      {:ok, done, _} = Obligations.complete(manager, obligation, %{note: "Done"})
+
+      assert :not_authorise =
+               Obligations.mark_completed_in_error(member, done, %{reason: "x"})
+    end
   end
 end
