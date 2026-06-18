@@ -318,8 +318,10 @@ defmodule ArgusWeb.ObligationLiveTest do
     assert has_element?(view, "#delete-doc-#{document.id}")
     refute has_element?(view, "#select-slot-receipt")
 
-    # Deleting the file reopens the slot's uploader.
+    # Deleting requires confirmation, then reopens the slot's uploader.
     view |> element("#delete-doc-#{document.id}") |> render_click()
+    assert has_element?(view, "#confirm-delete-doc-#{document.id}")
+    view |> element("#confirm-delete-doc-#{document.id}") |> render_click()
     assert render(view) =~ "Document deleted"
     assert has_element?(view, "#select-slot-receipt")
   end
@@ -507,9 +509,7 @@ defmodule ArgusWeb.ObligationLiveTest do
     assert render(view) =~ "A reason is required"
   end
 
-  test "done modal shows document checklist and opens completion modal for missing slots", %{
-    conn: conn
-  } do
+  test "mark done is hidden while a required document is missing", %{conn: conn} do
     manager = Argus.EntitiesFixtures.manager_scope_fixture()
     member_scope = member_scope_on_entity(manager.entity)
     type = type_fixture(manager.entity, complete_documents: "receipt")
@@ -528,43 +528,89 @@ defmodule ArgusWeb.ObligationLiveTest do
     {:ok, view, _html} =
       live(conn, ~p"/entities/#{manager.entity.slug}/obligations/#{obligation.id}")
 
-    view |> element("#done-btn") |> render_click()
-    assert has_element?(view, "#done-document-checklist")
-    assert has_element?(view, "#done-document-checklist-receipt", "Missing")
-    assert has_element?(view, "#done-doc-upload-now")
-
-    view |> element("#done-doc-upload-now") |> render_click()
-    refute has_element?(view, "#done-modal")
-    assert has_element?(view, "#completion-modal")
-    assert has_element?(view, "#completion-docs")
+    # Required "receipt" is missing → no Mark done, but the completion path is offered.
+    refute has_element?(view, "#done-btn")
+    assert has_element?(view, "#open-completion-modal")
   end
 
-  test "done modal reports missing document on submit", %{conn: conn} do
+  test "mark done appears once required documents are fulfilled", %{conn: conn} do
     manager = Argus.EntitiesFixtures.manager_scope_fixture()
-    member_scope = member_scope_on_entity(manager.entity)
+    conn = log_in_user(conn, manager.user)
     type = type_fixture(manager.entity, complete_documents: "receipt")
 
     {:ok, obligation} =
       Obligations.create_obligation(manager, %{
         title: "EPF Jan",
         obligation_type_id: type.id,
-        primary_assignee_id: member_scope.user.id,
+        primary_assignee_id: manager.user.id,
         due_by: ~D[2026-06-15],
         open_note: "Open"
       })
 
-    conn = log_in_user(conn, member_scope.user)
+    {:ok, view, _html} =
+      live(conn, ~p"/entities/#{manager.entity.slug}/obligations/#{obligation.id}")
+
+    refute has_element?(view, "#done-btn")
+
+    # Upload the required receipt via the completion modal.
+    view |> element("#open-completion-modal") |> render_click()
+    view |> element("#select-slot-receipt") |> render_click()
+
+    file =
+      file_input(view, "#completion-upload-form", :document, [
+        %{name: "receipt.pdf", content: "scan", type: "application/pdf"}
+      ])
+
+    render_upload(file, "receipt.pdf")
+    view |> form("#completion-upload-form", %{"picker_slot" => "receipt"}) |> render_change()
+    view |> element("#upload-slot-receipt") |> render_click()
+
+    # Slot satisfied → Mark done becomes available.
+    assert has_element?(view, "#done-btn")
+  end
+
+  test "completion files show in the summary, not under timeline events", %{conn: conn} do
+    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    conn = log_in_user(conn, manager.user)
+    type = type_fixture(manager.entity, complete_documents: "receipt")
+
+    {:ok, obligation} =
+      Obligations.create_obligation(manager, %{
+        title: "EPF Jan",
+        obligation_type_id: type.id,
+        primary_assignee_id: manager.user.id,
+        due_by: ~D[2026-06-15],
+        open_note: "Open"
+      })
 
     {:ok, view, _html} =
       live(conn, ~p"/entities/#{manager.entity.slug}/obligations/#{obligation.id}")
 
-    view |> element("#done-btn") |> render_click()
+    # Move to in_progress so the workable event is the in_progress one.
+    view |> element("#start-progress-btn") |> render_click()
+    view |> form("#progress-form", %{"progress" => %{"note" => "Working"}}) |> render_submit()
 
-    view
-    |> form("#done-form", %{"done" => %{"note" => "Done"}})
-    |> render_submit()
+    # Upload the required receipt — it physically attaches to the in_progress event.
+    view |> element("#open-completion-modal") |> render_click()
+    view |> element("#select-slot-receipt") |> render_click()
 
-    assert render(view) =~ "Missing required document: receipt"
+    file =
+      file_input(view, "#completion-upload-form", :document, [
+        %{name: "receipt.pdf", content: "scan", type: "application/pdf"}
+      ])
+
+    render_upload(file, "receipt.pdf")
+    view |> form("#completion-upload-form", %{"picker_slot" => "receipt"}) |> render_change()
+    view |> element("#upload-slot-receipt") |> render_click()
+
+    # The completion file shows beside the slot in the summary, not in the timeline.
+    assert has_element?(view, "#completion-summary", "receipt.pdf")
+
+    obligation = Obligations.get_obligation!(manager, obligation.id)
+
+    for event <- obligation.events do
+      refute has_element?(view, "#event-files-#{event.id}", "receipt.pdf")
+    end
   end
 
   test "done modal requires next due for recurring obligations", %{conn: conn} do
@@ -807,6 +853,42 @@ defmodule ArgusWeb.ObligationLiveTest do
 
     assert has_element?(view, "#completion-voided", "r.pdf")
     assert has_element?(view, "#voided-doc-#{doc.id} a[href*='/documents/#{doc.id}']")
+  end
+
+  test "completion modal: void button hidden once the cycle is completed", %{conn: conn} do
+    # Entity creator is admin — for whom voiding a locked-cycle file is otherwise allowed.
+    admin = Argus.EntitiesFixtures.entity_scope_fixture()
+    conn = log_in_user(conn, admin.user)
+    type = type_fixture(admin.entity, complete_documents: "receipt")
+
+    {:ok, obligation} =
+      Obligations.create_obligation(admin, %{
+        title: "EPF",
+        obligation_type_id: type.id,
+        primary_assignee_id: admin.user.id,
+        due_by: ~D[2026-06-30],
+        open_note: "open"
+      })
+
+    event = hd(Obligations.list_events(obligation))
+
+    {:ok, doc} =
+      Obligations.add_document(admin, obligation, event, upload_fixture("r.pdf"), "receipt")
+
+    obligation = Obligations.get_obligation!(admin, obligation.id)
+    {:ok, completed, _} = Obligations.complete(admin, obligation, %{note: "Done"})
+
+    # Admin could void this locked-cycle file at the context level...
+    assert Obligations.document_voidable?(admin, completed, doc)
+
+    {:ok, view, _html} =
+      live(conn, ~p"/entities/#{admin.entity.slug}/obligations/#{completed.id}")
+
+    view |> element("#open-completion-modal") |> render_click()
+
+    # ...but the modal hides the Void button for a non-live cycle.
+    assert has_element?(view, "#completion-slot-receipt", "r.pdf")
+    refute has_element?(view, "#void-doc-#{doc.id}")
   end
 
   test "step files modal: additional (no-slot) file appears per step, not in completion view", %{

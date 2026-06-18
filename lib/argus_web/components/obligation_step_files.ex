@@ -20,7 +20,9 @@ defmodule ArgusWeb.ObligationStepFiles do
   attr :upload_slot_entries, :map, default: %{}
   attr :uploadable?, :boolean, required: true
   attr :voiding_document_id, :any, default: nil
+  attr :deleting_document_id, :any, default: nil
   attr :void_reason_required?, :boolean, default: false
+  attr :show_dates?, :boolean, default: true
   attr :id_prefix, :string, default: ""
 
   def step_files(assigns) do
@@ -49,41 +51,68 @@ defmodule ArgusWeb.ObligationStepFiles do
           id={"#{@id_prefix}doc-row-#{doc.id}"}
           class="px-2.5 py-2 text-sm"
         >
-          <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <div class="flex items-center gap-x-2">
             <.icon name="hero-paper-clip-mini" class="size-3.5 text-base-content/40 shrink-0" />
             <.link
               href={"/entities/#{@entity_slug}/obligations/#{@obligation.id}/documents/#{doc.id}"}
               target="_blank"
-              class="link link-hover truncate max-w-[12rem]"
+              class="link link-hover truncate min-w-0 flex-1"
             >
               {file_name(doc)}
             </.link>
-            <span class="text-xs text-base-content/50">{format_datetime(doc.inserted_at)}</span>
-            <div class="ml-auto flex items-center gap-1">
-              <button
-                :if={Obligations.document_deletable?(@current_scope, @obligation, doc)}
-                id={"#{@id_prefix}delete-doc-#{doc.id}"}
-                type="button"
-                phx-click="delete_document"
-                phx-value-document_id={doc.id}
-                phx-value-event_id={@event.id}
-                class="btn btn-ghost btn-xs h-6 min-h-6 px-1.5 text-error"
-              >
-                Delete
-              </button>
-              <button
-                :if={
-                  @voiding_document_id != doc.id &&
-                    Obligations.document_voidable?(@current_scope, @obligation, doc)
-                }
-                id={"#{@id_prefix}void-doc-#{doc.id}"}
-                type="button"
-                phx-click="void_document"
-                phx-value-document_id={doc.id}
-                class="btn btn-ghost btn-xs h-6 min-h-6 px-1.5 text-error"
-              >
-                Void
-              </button>
+            <span
+              :if={@show_dates?}
+              class="text-xs text-base-content/50 shrink-0 whitespace-nowrap"
+            >{format_datetime(doc.inserted_at)}</span>
+            <div class="flex items-center gap-1 shrink-0">
+              <%= if @deleting_document_id == doc.id do %>
+                <button
+                  id={"#{@id_prefix}confirm-delete-doc-#{doc.id}"}
+                  type="button"
+                  phx-click="delete_document"
+                  phx-value-document_id={doc.id}
+                  phx-value-event_id={@event.id}
+                  phx-disable-with="Deleting…"
+                  class="text-xl cursor-pointer"
+                >
+                  ✅
+                </button>
+                <button
+                  type="button"
+                  phx-click="cancel_delete_document"
+                  class="text-xl cursor-pointer"
+                >
+                  ❌
+                </button>
+              <% else %>
+                <button
+                  :if={
+                    @voiding_document_id != doc.id &&
+                      Obligations.document_deletable?(@current_scope, @obligation, doc)
+                  }
+                  id={"#{@id_prefix}delete-doc-#{doc.id}"}
+                  type="button"
+                  phx-click="request_delete_document"
+                  phx-value-document_id={doc.id}
+                  phx-value-event_id={@event.id}
+                  class="btn btn-ghost btn-xs h-6 min-h-6 px-1.5 text-error"
+                >
+                  Delete
+                </button>
+                <button
+                  :if={
+                    cycle_live?(@obligation) && @voiding_document_id != doc.id &&
+                      Obligations.document_voidable?(@current_scope, @obligation, doc)
+                  }
+                  id={"#{@id_prefix}void-doc-#{doc.id}"}
+                  type="button"
+                  phx-click="void_document"
+                  phx-value-document_id={doc.id}
+                  class="btn btn-ghost btn-xs h-6 min-h-6 px-1.5 text-error"
+                >
+                  Void
+                </button>
+              <% end %>
             </div>
           </div>
           <.void_form
@@ -95,6 +124,14 @@ defmodule ArgusWeb.ObligationStepFiles do
           />
         </li>
       </ul>
+
+      <div :if={@uploadable?} class="rounded-box border border-dashed border-base-300 p-2.5">
+        <.additional_uploader
+          event={@event}
+          id_prefix={@id_prefix}
+          pending_entry={LiveUpload.entry_for_slot(@uploads, @upload_slot_entries, "additional")}
+        />
+      </div>
 
       <section
         :if={@voided_other != []}
@@ -108,17 +145,20 @@ defmodule ArgusWeb.ObligationStepFiles do
             id={"#{@id_prefix}voided-doc-#{doc.id}"}
             class="px-2.5 py-2 text-sm"
           >
-            <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <div class="flex items-center gap-x-2">
               <.icon name="hero-paper-clip-mini" class="size-3.5 text-base-content/40 shrink-0" />
               <.link
                 href={"/entities/#{@entity_slug}/obligations/#{@obligation.id}/documents/#{doc.id}"}
                 target="_blank"
-                class="link link-hover truncate max-w-[12rem] line-through text-base-content/40"
+                class="link link-hover truncate min-w-0 flex-1 line-through text-base-content/40"
               >
                 {file_name(doc)}
               </.link>
-              <span class="badge badge-xs badge-error">voided</span>
-              <span class="text-xs text-base-content/50">{format_datetime(doc.inserted_at)}</span>
+              <span class="badge badge-xs badge-error shrink-0">voided</span>
+              <span
+                :if={@show_dates?}
+                class="text-xs text-base-content/50 shrink-0 whitespace-nowrap"
+              >{format_datetime(doc.inserted_at)}</span>
             </div>
             <p :if={doc.void_reason} class="text-xs text-base-content/50 mt-1 pl-5">
               Void reason: {doc.void_reason}
@@ -126,15 +166,6 @@ defmodule ArgusWeb.ObligationStepFiles do
           </li>
         </ul>
       </section>
-
-      <div :if={@uploadable?} class="rounded-box border border-dashed border-base-300 p-2.5">
-        <span class="text-sm text-base-content/70">Additional file</span>
-        <.additional_uploader
-          event={@event}
-          id_prefix={@id_prefix}
-          pending_entry={LiveUpload.entry_for_slot(@uploads, @upload_slot_entries, "additional")}
-        />
-      </div>
 
       <.form
         :if={@uploadable?}
@@ -179,30 +210,33 @@ defmodule ArgusWeb.ObligationStepFiles do
     assigns = assign(assigns, :ready?, LiveUpload.entry_ready?(assigns.pending_entry))
 
     ~H"""
-    <div class="mt-2 flex flex-wrap items-center gap-2 border-t border-base-300/80 pt-2">
+    <div class="flex items-center gap-1 justify-between min-w-0">
       <%= if @pending_entry do %>
-        <span class="text-sm font-medium truncate min-w-0 flex-1">{@pending_entry.client_name}</span>
-        <button
-          id={"#{@id_prefix}upload-additional-#{@event.id}"}
-          type="button"
-          phx-click="add_document"
-          phx-value-event_id={@event.id}
-          phx-value-slot="additional"
-          disabled={not @ready?}
-          class={["btn btn-primary btn-xs h-7 min-h-7 shrink-0", not @ready? && "btn-disabled"]}
-          phx-disable-with="Saving…"
-        >
-          Upload
-        </button>
-        <button
-          type="button"
-          phx-click="clear_upload_slot"
-          phx-value-slot="additional"
-          class="btn btn-ghost btn-xs h-7 min-h-7 shrink-0"
-        >
-          Cancel
-        </button>
+        <span class="text-sm font-medium truncate min-w-0">{@pending_entry.client_name}</span>
+        <div class="shrink-0">
+          <button
+            id={"#{@id_prefix}upload-additional-#{@event.id}"}
+            type="button"
+            phx-click="add_document"
+            phx-value-event_id={@event.id}
+            phx-value-slot="additional"
+            disabled={not @ready?}
+            class={["cursor-pointer text-xl", not @ready? && "btn-disabled"]}
+            phx-disable-with="Saving…"
+          >
+            ✅
+          </button>
+          <button
+            type="button"
+            phx-click="clear_upload_slot"
+            phx-value-slot="additional"
+            class="cursor-pointer text-xl"
+          >
+            ❌
+          </button>
+        </div>
       <% else %>
+        <span class="text-sm text-base-content/70">Additional file</span>
         <button
           id={"#{@id_prefix}select-additional-#{@event.id}"}
           type="button"
@@ -256,4 +290,7 @@ defmodule ArgusWeb.ObligationStepFiles do
   defp file_name(%{file: file}) when is_map(file) do
     Map.get(file, "original") || Map.get(file, :original) || "file"
   end
+
+  defp cycle_live?(%{status: "active", completed_at: nil}), do: true
+  defp cycle_live?(_), do: false
 end

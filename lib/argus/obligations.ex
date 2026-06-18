@@ -764,6 +764,13 @@ defmodule Argus.Obligations do
     collaborators =
       Repo.all(from c in Collaborator, where: c.obligation_id == ^done_obligation.id)
 
+    open_note =
+      repo.one(
+        from e in Event,
+          where: e.obligation_id == ^done_obligation.id and e.status == "open",
+          select: e.note
+      ) || "Next cycle opened"
+
     now = DateTime.utc_now(:second)
 
     obligation_changeset =
@@ -797,7 +804,7 @@ defmodule Argus.Obligations do
         obligation_id: obligation.id,
         status_by_id: done_obligation.primary_assignee_id || actor_id
       }
-      |> Event.changeset(%{status: "open", note: "Next cycle opened"})
+      |> Event.changeset(%{status: "open", note: open_note})
     end)
     |> repo.transaction()
     |> case do

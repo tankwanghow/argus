@@ -119,6 +119,20 @@ defmodule Argus.ObligationsTest do
       assert new_obligation.series_id == obligation.series_id
     end
 
+    test "spawned next cycle inherits the completed cycle's opening note" do
+      {scope, obligation} = recurring_primary_scope_fixture(interval: "monthly")
+
+      assert {:ok, _done, spawned} =
+               Obligations.complete(scope, obligation, %{
+                 note: "Filed on time",
+                 next_due_by: ~D[2026-02-15]
+               })
+
+      open_event = Obligations.latest_event(spawned)
+      assert open_event.status == "open"
+      assert open_event.note == "Recurring task opened"
+    end
+
     test "requires next_due_by for a recurring, not-ended series" do
       {scope, obligation} = recurring_primary_scope_fixture(interval: "monthly")
 

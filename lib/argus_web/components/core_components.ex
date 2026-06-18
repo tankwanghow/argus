@@ -456,6 +456,7 @@ defmodule ArgusWeb.CoreComponents do
   """
   def format_datetime(nil), do: ""
   def format_datetime(%DateTime{} = dt), do: Calendar.strftime(dt, "%d %b %Y, %H:%M")
+  def format_datetime(%DateTime{} = dt, :short), do: Calendar.strftime(dt, "%Y-%m-%d %H:%M")
 
   @doc """
   A human-friendly relative label for a due date against `today`,

@@ -83,15 +83,36 @@ defmodule ArgusWeb.ObligationLive.Show do
           </div>
           <div
             :if={@required_docs != []}
+            id="completion-summary"
             class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm"
           >
-            <span class="argus-meta-label">Docs</span>
-            <span :for={{slot, satisfied?} <- @required_docs} class="inline-flex items-center gap-1">
-              <.icon
-                name={if satisfied?, do: "hero-check-circle-mini", else: "hero-x-circle-mini"}
-                class={["size-3.5", if(satisfied?, do: "text-success", else: "text-base-content/40")]}
-              />
-              <span class={if satisfied?, do: "", else: "text-base-content/60"}>{slot}</span>
+            <button
+              id="open-completion-modal"
+              type="button"
+              phx-click="open_completion_modal"
+              class="btn btn-outline gap-1"
+            >
+              <.icon name="hero-paper-clip-mini" class="size-3.5" /> Completion documents
+            </button>
+            <span
+              :for={{slot, live} <- @required_docs}
+              class="border rounded-xl p-1 text-sm inline-flex items-center gap-2"
+            >
+              <div class="shrink-0">
+                <.icon
+                  name={if live, do: "hero-check-circle-mini", else: "hero-x-circle-mini"}
+                  class={["size-3.5", if(live, do: "text-success", else: "text-base-content/40")]}
+                />
+                <span class={if live, do: "", else: "text-base-content/60"}>{slot}</span>
+              </div>
+              <.link
+                :if={live}
+                href={"/entities/#{@current_scope.entity.slug}/obligations/#{@obligation.id}/documents/#{live.id}"}
+                target="_blank"
+                class="link link-hover truncate max-w-[8rem] text-base-content/70"
+              >
+                {file_name(live)}
+              </.link>
             </span>
           </div>
           <div
@@ -115,7 +136,7 @@ defmodule ArgusWeb.ObligationLive.Show do
               class="argus-inline-actions flex-1 flex justify-center min-w-[6rem]"
             >
               <button
-                :if={Authorization.can?(@current_scope, :mark_done, @obligation)}
+                :if={@docs_complete? and Authorization.can?(@current_scope, :mark_done, @obligation)}
                 id="done-btn"
                 type="button"
                 phx-click="open_done_modal"
@@ -155,15 +176,6 @@ defmodule ArgusWeb.ObligationLive.Show do
             </div>
           </div>
         </section>
-
-        <button
-          id="open-completion-modal"
-          type="button"
-          phx-click="open_completion_modal"
-          class="btn btn-outline btn-sm gap-1"
-        >
-          <.icon name="hero-paper-clip-mini" class="size-4" /> Completion documents
-        </button>
 
         <section class="argus-section">
           <div class="argus-section-head">Timeline</div>
@@ -231,11 +243,14 @@ defmodule ArgusWeb.ObligationLive.Show do
                 </div>
               </.form>
               <ul
-                :if={event.documents != []}
+                :if={timeline_files(event, @doc_slots) != []}
                 id={"event-files-#{event.id}"}
                 class="argus-event-attachments"
               >
-                <li :for={doc <- event.documents} class="argus-event-attachment-chip">
+                <li
+                  :for={doc <- timeline_files(event, @doc_slots)}
+                  class="argus-event-attachment-chip"
+                >
                   <.icon name="hero-paper-clip-mini" class="size-3.5 shrink-0 text-base-content/40" />
                   <span :if={doc.document_slot} class="badge badge-xs badge-ghost shrink-0">
                     {doc.document_slot}
@@ -245,14 +260,10 @@ defmodule ArgusWeb.ObligationLive.Show do
                       ~p"/entities/#{@current_scope.entity.slug}/obligations/#{@obligation.id}/documents/#{doc.id}"
                     }
                     target="_blank"
-                    class={[
-                      "link link-hover truncate max-w-[12rem] sm:max-w-[16rem]",
-                      doc.voided_at && "line-through text-base-content/40"
-                    ]}
+                    class="link link-hover truncate min-w-0 flex-1"
                   >
                     {file_name(doc)}
                   </.link>
-                  <span :if={doc.voided_at} class="badge badge-xs badge-error shrink-0">voided</span>
                 </li>
               </ul>
             </li>
@@ -362,6 +373,7 @@ defmodule ArgusWeb.ObligationLive.Show do
               upload_slot_entries={@upload_slot_entries}
               uploadable?={@can_add_document? and @live?}
               voiding_document_id={@voiding_document_id}
+              deleting_document_id={@deleting_document_id}
               void_reason_required?={@void_reason_required?}
             />
           </div>
@@ -398,6 +410,7 @@ defmodule ArgusWeb.ObligationLive.Show do
               upload_slot_entries={@upload_slot_entries}
               uploadable?={event_uploadable?(@step_files_modal_event, assigns)}
               voiding_document_id={@voiding_document_id}
+              deleting_document_id={@deleting_document_id}
               void_reason_required?={@void_reason_required?}
             />
           </div>
@@ -584,6 +597,7 @@ defmodule ArgusWeb.ObligationLive.Show do
      |> assign(:upload_slot_target, nil)
      |> assign(:upload_slot_entries, %{})
      |> assign(:voiding_document_id, nil)
+     |> assign(:deleting_document_id, nil)
      |> assign(:show_corrections?, false)
      |> assign(:editing_note_id, nil)
      |> assign(:note_form, nil)
@@ -940,6 +954,17 @@ defmodule ArgusWeb.ObligationLive.Show do
      |> assign(:upload_slot_target, nil)}
   end
 
+  def handle_event("request_delete_document", %{"document_id" => document_id}, socket) do
+    {:noreply,
+     socket
+     |> assign(:deleting_document_id, document_id)
+     |> assign(:voiding_document_id, nil)}
+  end
+
+  def handle_event("cancel_delete_document", _params, socket) do
+    {:noreply, assign(socket, :deleting_document_id, nil)}
+  end
+
   def handle_event("delete_document", %{"document_id" => document_id} = params, socket) do
     scope = socket.assigns.current_scope
     obligation = socket.assigns.obligation
@@ -955,6 +980,7 @@ defmodule ArgusWeb.ObligationLive.Show do
             {:noreply,
              socket
              |> reload()
+             |> assign(:deleting_document_id, nil)
              |> put_flash(:info, "Document deleted.")}
 
           :not_authorise ->
@@ -967,7 +993,10 @@ defmodule ArgusWeb.ObligationLive.Show do
   end
 
   def handle_event("void_document", %{"document_id" => document_id}, socket) do
-    {:noreply, assign(socket, :voiding_document_id, document_id)}
+    {:noreply,
+     socket
+     |> assign(:voiding_document_id, document_id)
+     |> assign(:deleting_document_id, nil)}
   end
 
   def handle_event("cancel_void_document", _params, socket) do
@@ -1068,6 +1097,14 @@ defmodule ArgusWeb.ObligationLive.Show do
     live_other
   end
 
+  # Files shown inline under a timeline event: that event's own supporting
+  # (non-required-slot) files. Required completion files live in the summary,
+  # beside the slot badges — never in the timeline.
+  defp timeline_files(event, required_slots) do
+    {supporting, _voided} = DocumentHelpers.step_files(event.documents, required_slots)
+    supporting
+  end
+
   defp event_uploadable?(event, assigns) do
     assigns[:live?] and assigns[:can_add_document?] and event.status in ~w(open in_progress)
   end
@@ -1089,16 +1126,17 @@ defmodule ArgusWeb.ObligationLive.Show do
 
   defp assign_obligation(socket, obligation) do
     doc_slots = parse_slots(obligation.complete_documents)
-    satisfied = satisfied_slots(obligation)
 
-    required_docs = Enum.map(doc_slots, fn slot -> {slot, MapSet.member?(satisfied, slot)} end)
+    {slot_rows, _voided} =
+      DocumentHelpers.completion_view(cycle_documents(obligation), doc_slots)
 
     scope = socket.assigns.current_scope
 
     socket
     |> assign(:obligation, obligation)
     |> assign(:doc_slots, doc_slots)
-    |> assign(:required_docs, required_docs)
+    |> assign(:required_docs, slot_rows)
+    |> assign(:docs_complete?, Enum.all?(slot_rows, fn {_slot, live} -> live end))
     |> assign(:void_reason_required?, Obligations.document_void_reason_required?(obligation))
     |> assign(:audit_logs, Obligations.list_audit_logs(obligation))
     |> assign(:can_add_document?, can_add_document?(scope, obligation))
@@ -1186,15 +1224,6 @@ defmodule ArgusWeb.ObligationLive.Show do
   defp can_add_document?(scope, obligation) do
     Authorization.can?(scope, :edit_obligation) or
       Authorization.can?(scope, :start_progress, obligation)
-  end
-
-  defp satisfied_slots(obligation) do
-    obligation.events
-    |> Enum.flat_map(& &1.documents)
-    |> Enum.reject(& &1.voided_at)
-    |> Enum.map(& &1.document_slot)
-    |> Enum.reject(&is_nil/1)
-    |> MapSet.new()
   end
 
   defp parse_slots(nil), do: []

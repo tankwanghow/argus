@@ -63,29 +63,29 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
               </div>
             </div>
           </div>
-          <div class="mt-2 flex flex-wrap items-center gap-1.5">
-            <span class="argus-meta-label">Collaborators</span>
-            <span
-              :if={@obligation.primary_assignee}
-              class="badge badge-sm badge-primary badge-soft gap-1"
+          <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+            <button
+              id="m-open-completion-modal"
+              type="button"
+              phx-click="open_completion_modal"
+              class="btn btn-outline btn-sm gap-1"
             >
-              <.icon name="hero-user-mini" class="size-3" />
-              {@obligation.primary_assignee.email}
-              <span class="text-[0.65rem] font-semibold uppercase tracking-wide opacity-70">
-                Primary
-              </span>
-            </span>
-            <span
-              :if={is_nil(@obligation.primary_assignee)}
-              class="badge badge-sm badge-secondary badge-soft"
-            >
-              Unassigned
-            </span>
-            <span
-              :for={c <- other_collaborators(@obligation)}
-              class="badge badge-sm badge-ghost gap-1"
-            >
-              {c.user.email}
+              <.icon name="hero-paper-clip-mini" class="size-4" /> Completion documents
+            </button>
+            <span :for={{slot, live} <- @required_docs} class="inline-flex items-center gap-1 text-sm">
+              <.icon
+                name={if live, do: "hero-check-circle-mini", else: "hero-x-circle-mini"}
+                class={["size-3.5", if(live, do: "text-success", else: "text-base-content/40")]}
+              />
+              <span class={if live, do: "", else: "text-base-content/60"}>{slot}</span>
+              <.link
+                :if={live}
+                href={"/entities/#{@current_scope.entity.slug}/obligations/#{@obligation.id}/documents/#{live.id}"}
+                target="_blank"
+                class="link link-hover truncate max-w-[9rem] text-base-content/70"
+              >
+                {file_name(live)}
+              </.link>
             </span>
           </div>
           <div
@@ -106,7 +106,7 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
             </div>
             <div id="obligation-done-actions" class="argus-inline-actions flex-1 min-w-0">
               <button
-                :if={Authorization.can?(@current_scope, :mark_done, @obligation)}
+                :if={@docs_complete? and Authorization.can?(@current_scope, :mark_done, @obligation)}
                 id="m-done-btn"
                 type="button"
                 phx-click="open_done_modal"
@@ -137,15 +137,6 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
             </div>
           </div>
         </section>
-
-        <button
-          id="m-open-completion-modal"
-          type="button"
-          phx-click="open_completion_modal"
-          class="btn btn-outline btn-sm gap-1"
-        >
-          <.icon name="hero-paper-clip-mini" class="size-4" /> Completion documents
-        </button>
 
         <section class="argus-section">
           <div class="argus-section-head">Timeline</div>
@@ -210,11 +201,14 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
                 </div>
               </.form>
               <ul
-                :if={event.documents != []}
+                :if={timeline_files(event, @doc_slots) != []}
                 id={"m-event-files-#{event.id}"}
                 class="argus-event-attachments"
               >
-                <li :for={doc <- event.documents} class="argus-event-attachment-chip">
+                <li
+                  :for={doc <- timeline_files(event, @doc_slots)}
+                  class="argus-event-attachment-chip"
+                >
                   <.icon name="hero-paper-clip-mini" class="size-3.5 shrink-0 text-base-content/40" />
                   <span :if={doc.document_slot} class="badge badge-xs badge-ghost shrink-0">
                     {doc.document_slot}
@@ -224,14 +218,10 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
                       ~p"/entities/#{@current_scope.entity.slug}/obligations/#{@obligation.id}/documents/#{doc.id}"
                     }
                     target="_blank"
-                    class={[
-                      "link link-hover truncate max-w-[10rem]",
-                      doc.voided_at && "line-through text-base-content/40"
-                    ]}
+                    class="link link-hover truncate min-w-0 flex-1"
                   >
                     {file_name(doc)}
                   </.link>
-                  <span :if={doc.voided_at} class="badge badge-xs badge-error shrink-0">voided</span>
                 </li>
               </ul>
             </li>
@@ -302,7 +292,9 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
               upload_slot_entries={@upload_slot_entries}
               uploadable?={@can_add_document? and @live?}
               voiding_document_id={@voiding_document_id}
+              deleting_document_id={@deleting_document_id}
               void_reason_required?={@void_reason_required?}
+              show_dates?={false}
             />
           </div>
           <div class="modal-action mt-2">
@@ -336,7 +328,9 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
               upload_slot_entries={@upload_slot_entries}
               uploadable?={event_uploadable?(@step_files_modal_event, assigns)}
               voiding_document_id={@voiding_document_id}
+              deleting_document_id={@deleting_document_id}
               void_reason_required?={@void_reason_required?}
+              show_dates?={false}
             />
           </div>
           <div class="modal-action mt-2">
@@ -475,6 +469,7 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
      |> assign(:upload_slot_target, nil)
      |> assign(:upload_slot_entries, %{})
      |> assign(:voiding_document_id, nil)
+     |> assign(:deleting_document_id, nil)
      |> assign(:editing_note_id, nil)
      |> assign(:note_form, nil)
      |> assign(:member_options, member_options(scope))
@@ -798,6 +793,17 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
      |> assign(:upload_slot_target, nil)}
   end
 
+  def handle_event("request_delete_document", %{"document_id" => document_id}, socket) do
+    {:noreply,
+     socket
+     |> assign(:deleting_document_id, document_id)
+     |> assign(:voiding_document_id, nil)}
+  end
+
+  def handle_event("cancel_delete_document", _params, socket) do
+    {:noreply, assign(socket, :deleting_document_id, nil)}
+  end
+
   def handle_event("delete_document", %{"document_id" => document_id} = params, socket) do
     scope = socket.assigns.current_scope
     obligation = socket.assigns.obligation
@@ -813,6 +819,7 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
             {:noreply,
              socket
              |> reload()
+             |> assign(:deleting_document_id, nil)
              |> put_flash(:info, "Document deleted.")}
 
           :not_authorise ->
@@ -825,7 +832,10 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
   end
 
   def handle_event("void_document", %{"document_id" => document_id}, socket) do
-    {:noreply, assign(socket, :voiding_document_id, document_id)}
+    {:noreply,
+     socket
+     |> assign(:voiding_document_id, document_id)
+     |> assign(:deleting_document_id, nil)}
   end
 
   def handle_event("cancel_void_document", _params, socket) do
@@ -926,6 +936,14 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
     live_other
   end
 
+  # Files shown inline under a timeline event: that event's own supporting
+  # (non-required-slot) files. Required completion files live in the summary,
+  # beside the slot badges — never in the timeline.
+  defp timeline_files(event, required_slots) do
+    {supporting, _voided} = DocumentHelpers.step_files(event.documents, required_slots)
+    supporting
+  end
+
   defp load(socket, id, scope) do
     obligation =
       scope
@@ -938,8 +956,9 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
       Recurrence.recurring?(obligation.obligation_type) and is_nil(obligation.series_ended_at)
 
     doc_slots = parse_slots(obligation.complete_documents)
-    satisfied = satisfied_slots(obligation)
-    required_docs = Enum.map(doc_slots, fn slot -> {slot, MapSet.member?(satisfied, slot)} end)
+
+    {slot_rows, _voided} =
+      DocumentHelpers.completion_view(cycle_documents(obligation), doc_slots)
 
     socket
     |> assign(:obligation, obligation)
@@ -949,7 +968,8 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
     |> assign(:live?, live_cycle?(obligation))
     |> assign(:recurring?, recurring?)
     |> assign(:doc_slots, doc_slots)
-    |> assign(:required_docs, required_docs)
+    |> assign(:required_docs, slot_rows)
+    |> assign(:docs_complete?, Enum.all?(slot_rows, fn {_slot, live} -> live end))
     |> assign(:void_reason_required?, Obligations.document_void_reason_required?(obligation))
     |> assign(:can_add_document?, can_add_document?(scope, obligation))
     |> assign(
@@ -996,13 +1016,6 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
         as: "obligation"
       )
     )
-  end
-
-  defp other_collaborators(%{primary_assignee: nil, collaborators: collaborators}),
-    do: collaborators
-
-  defp other_collaborators(%{primary_assignee: assignee, collaborators: collaborators}) do
-    Enum.reject(collaborators, &(&1.user_id == assignee.id))
   end
 
   defp collaborator_selected?(ids, id) do
@@ -1103,15 +1116,6 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
   defp can_add_document?(scope, obligation) do
     Authorization.can?(scope, :edit_obligation) or
       Authorization.can?(scope, :start_progress, obligation)
-  end
-
-  defp satisfied_slots(obligation) do
-    obligation.events
-    |> Enum.flat_map(& &1.documents)
-    |> Enum.reject(& &1.voided_at)
-    |> Enum.map(& &1.document_slot)
-    |> Enum.reject(&is_nil/1)
-    |> MapSet.new()
   end
 
   defp parse_slots(nil), do: []
