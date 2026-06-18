@@ -16,9 +16,15 @@ defmodule Argus.Obligations.Obligation do
     field :complete_documents, :string, default: ""
     field :open_note, :string, virtual: true
 
+    field :completed_in_error_at, :utc_datetime
+    field :completed_in_error_reason, :string
+
     belongs_to :entity, Entity
     belongs_to :obligation_type, Type
     belongs_to :primary_assignee, User, foreign_key: :primary_assignee_id
+    belongs_to :completed_in_error_by, User, foreign_key: :completed_in_error_by_id
+    belongs_to :replaces, __MODULE__, foreign_key: :replaces_id
+    belongs_to :replaced_by, __MODULE__, foreign_key: :replaced_by_id
 
     has_many :events, Event
     has_many :collaborators, Collaborator

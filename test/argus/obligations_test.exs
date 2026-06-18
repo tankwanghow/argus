@@ -79,6 +79,27 @@ defmodule Argus.ObligationsTest do
     end
   end
 
+  describe "completed-in-error schema" do
+    test "new correction fields default to nil on a created obligation" do
+      manager = Argus.EntitiesFixtures.manager_scope_fixture()
+      type = type_fixture(manager.entity)
+
+      {:ok, obligation} =
+        Obligations.create_obligation(manager, %{
+          title: "EPF",
+          obligation_type_id: type.id,
+          due_by: ~D[2026-06-30],
+          open_note: "open"
+        })
+
+      assert obligation.completed_in_error_at == nil
+      assert obligation.completed_in_error_by_id == nil
+      assert obligation.completed_in_error_reason == nil
+      assert obligation.replaces_id == nil
+      assert obligation.replaced_by_id == nil
+    end
+  end
+
   describe "start_progress/3" do
     test "creates in_progress event with note" do
       {scope, obligation} = assigned_member_scope_fixture()
