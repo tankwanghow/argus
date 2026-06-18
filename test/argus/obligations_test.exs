@@ -495,4 +495,103 @@ defmodule Argus.ObligationsTest do
       refute Enum.any?(Obligations.live() |> Argus.Repo.all(), &(&1.id == obligation.id))
     end
   end
+
+  describe "mark_completed_in_error/3" do
+    test "flags the done cycle and spawns a standalone one-off replacement" do
+      manager = Argus.EntitiesFixtures.manager_scope_fixture()
+      member = member_scope_on_entity(manager.entity)
+      type = type_fixture(manager.entity)
+
+      {:ok, obligation} =
+        Obligations.create_obligation(manager, %{
+          title: "EPF Jan",
+          obligation_type_id: type.id,
+          primary_assignee_id: member.user.id,
+          due_by: ~D[2026-06-15],
+          open_note: "open"
+        })
+
+      {:ok, done, _spawned} = Obligations.complete(manager, obligation, %{note: "Done"})
+
+      assert {:ok, original, replacement} =
+               Obligations.mark_completed_in_error(manager, done, %{reason: "Wrong figures filed"})
+
+      # original flagged, not mutated into a live cycle
+      assert original.completed_in_error_at
+      assert original.completed_in_error_by_id == manager.user.id
+      assert original.completed_in_error_reason == "Wrong figures filed"
+      assert original.replaced_by_id == replacement.id
+      assert original.completed_at == done.completed_at
+
+      # replacement is a fresh, live, standalone one-off
+      assert replacement.series_id != original.series_id
+      assert replacement.series_ended_at
+      assert replacement.status == "active"
+      assert replacement.completed_at == nil
+      assert replacement.due_by == ~D[2026-06-15]
+      assert replacement.title == "EPF Jan"
+      assert replacement.primary_assignee_id == member.user.id
+      assert replacement.replaces_id == original.id
+
+      # open event carries the reason
+      open_event = Obligations.latest_event(replacement)
+      assert open_event.status == "open"
+      assert open_event.note == "Wrong figures filed"
+
+      # an audit row was written on the original
+      assert Enum.any?(
+               Obligations.list_audit_logs(original),
+               &(&1.field == "completed_in_error" and &1.new_value == "Wrong figures filed")
+             )
+    end
+
+    test "replacement_due_by overrides the inherited due date" do
+      manager = Argus.EntitiesFixtures.manager_scope_fixture()
+      type = type_fixture(manager.entity)
+
+      {:ok, obligation} =
+        Obligations.create_obligation(manager, %{
+          title: "EPF",
+          obligation_type_id: type.id,
+          due_by: ~D[2026-06-15],
+          open_note: "open"
+        })
+
+      {:ok, done, _} = Obligations.complete(manager, obligation, %{note: "Done"})
+
+      assert {:ok, _original, replacement} =
+               Obligations.mark_completed_in_error(manager, done, %{
+                 reason: "redo",
+                 replacement_due_by: ~D[2026-07-01]
+               })
+
+      assert replacement.due_by == ~D[2026-07-01]
+    end
+
+    test "completing the one-off replacement does not require next_due and does not spawn" do
+      manager = Argus.EntitiesFixtures.manager_scope_fixture()
+      # recurring type — but the replacement must still behave as a one-off
+      type = type_fixture(manager.entity, recurring_interval: "monthly")
+
+      {:ok, obligation} =
+        Obligations.create_obligation(manager, %{
+          title: "EPF",
+          obligation_type_id: type.id,
+          due_by: ~D[2026-06-15],
+          open_note: "open"
+        })
+
+      {:ok, done, _spawned} =
+        Obligations.complete(manager, obligation, %{note: "Done", next_due_by: ~D[2026-07-15]})
+
+      {:ok, _original, replacement} =
+        Obligations.mark_completed_in_error(manager, done, %{reason: "redo"})
+
+      # No next_due required, returns spawned == nil (series already ended on the replacement).
+      assert {:ok, completed_replacement, nil} =
+               Obligations.complete(manager, replacement, %{note: "Redone"})
+
+      assert completed_replacement.completed_at
+    end
+  end
 end

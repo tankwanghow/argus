@@ -588,6 +588,32 @@ defmodule Argus.Obligations do
     end
   end
 
+  @doc """
+  Flags a *completed* cycle as completed-in-error and spawns a standalone one-off
+  replacement (new `series_id`, `series_ended_at` set so it never spawns). Manager/admin
+  only. The wrong cycle is never uncompleted; it is stamped + audited and linked to the
+  replacement. Returns `{:ok, original, replacement}`.
+  """
+  def mark_completed_in_error(%Scope{} = scope, %Obligation{} = obligation, attrs) do
+    obligation = Repo.preload(obligation, [:collaborators, :obligation_type])
+    reason = Map.get(attrs, :reason) || Map.get(attrs, "reason")
+
+    replacement_due_by =
+      Map.get(attrs, :replacement_due_by) || Map.get(attrs, "replacement_due_by") ||
+        obligation.due_by
+
+    with true <- Authorization.can?(scope, :mark_completed_in_error),
+         :ok <- validate_correctable(obligation),
+         :ok <- validate_action_note(reason),
+         {:ok, original, replacement} <-
+           mark_in_error_multi(scope, obligation, reason, replacement_due_by) do
+      {:ok, original, replacement}
+    else
+      false -> :not_authorise
+      {:error, _} = error -> error
+    end
+  end
+
   def skip_cycle(%Scope{} = scope, %Obligation{} = obligation, attrs) do
     obligation = Repo.preload(obligation, [:collaborators, :obligation_type])
     note = Map.get(attrs, :note) || Map.get(attrs, "note")
@@ -817,6 +843,68 @@ defmodule Argus.Obligations do
           else: {:error, :invalid}
 
       {:error, _, reason, _} ->
+        {:error, reason}
+    end
+  end
+
+  defp mark_in_error_multi(scope, obligation, reason, replacement_due_by) do
+    type = obligation.obligation_type
+    now = DateTime.utc_now(:second)
+    series_id = Ecto.UUID.generate()
+
+    replacement_changeset =
+      %Obligation{
+        entity_id: obligation.entity_id,
+        series_id: series_id,
+        status: "active",
+        series_ended_at: now,
+        complete_documents: type.complete_documents
+      }
+      |> Obligation.changeset(%{
+        title: obligation.title,
+        obligation_type_id: obligation.obligation_type_id,
+        primary_assignee_id: obligation.primary_assignee_id,
+        due_by: replacement_due_by
+      })
+      |> Ecto.Changeset.put_change(:replaces_id, obligation.id)
+
+    Ecto.Multi.new()
+    |> Ecto.Multi.insert(:replacement, replacement_changeset)
+    |> Ecto.Multi.insert_all(:collaborators, Collaborator, fn %{replacement: replacement} ->
+      Enum.map(obligation.collaborators, fn c ->
+        %{
+          id: Ecto.UUID.generate(),
+          obligation_id: replacement.id,
+          user_id: c.user_id,
+          inserted_at: now
+        }
+      end)
+    end)
+    |> Ecto.Multi.insert(:open_event, fn %{replacement: replacement} ->
+      %Event{obligation_id: replacement.id, status_by_id: scope.user.id}
+      |> Event.changeset(%{status: "open", note: reason})
+    end)
+    |> Ecto.Multi.update(:original, fn %{replacement: replacement} ->
+      obligation
+      |> Obligation.changeset(%{})
+      |> Ecto.Changeset.put_change(:completed_in_error_at, now)
+      |> Ecto.Changeset.put_change(:completed_in_error_by_id, scope.user.id)
+      |> Ecto.Changeset.put_change(:completed_in_error_reason, reason)
+      |> Ecto.Changeset.put_change(:replaced_by_id, replacement.id)
+    end)
+    |> Ecto.Multi.run(:audit, fn repo, _changes ->
+      insert_audit_log!(repo, scope, obligation, "completed_in_error", nil, reason)
+      {:ok, :logged}
+    end)
+    |> Repo.transaction()
+    |> case do
+      {:ok, %{original: original, replacement: replacement}} ->
+        {:ok, original, replacement}
+
+      {:error, _step, %Ecto.Changeset{} = changeset, _} ->
+        {:error, changeset}
+
+      {:error, _step, reason, _} ->
         {:error, reason}
     end
   end
@@ -1074,6 +1162,14 @@ defmodule Argus.Obligations do
       :ok
     end
   end
+
+  defp validate_correctable(%Obligation{status: "cancelled"}), do: {:error, :not_correctable}
+  defp validate_correctable(%Obligation{completed_at: nil}), do: {:error, :not_correctable}
+
+  defp validate_correctable(%Obligation{completed_in_error_at: %DateTime{}}),
+    do: {:error, :already_corrected}
+
+  defp validate_correctable(%Obligation{}), do: :ok
 
   defp validate_action_note(note) when note in [nil, ""], do: {:error, :note_required}
   defp validate_action_note(_), do: :ok
