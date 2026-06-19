@@ -29,6 +29,33 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
             <h1 class="text-lg font-semibold leading-tight min-w-0 flex-1">{@obligation.title}</h1>
             <.urgency_badge :if={@live?} urgency={@urgency} />
             <.obligation_status_badge :if={!@live?} cycle_status={@cycle_status} />
+            <div :if={@correctable?} class="dropdown dropdown-end">
+              <div
+                tabindex="0"
+                role="button"
+                id="m-completed-actions-menu"
+                class="btn btn-ghost btn-xs px-1"
+                aria-label="Completed cycle actions"
+              >
+                <.icon name="hero-ellipsis-vertical-mini" class="size-4" />
+              </div>
+              <ul
+                tabindex="0"
+                class="dropdown-content menu menu-sm bg-base-100 rounded-box z-10 w-60 p-2 shadow border border-base-300"
+              >
+                <li>
+                  <button
+                    id="m-mark-error-btn"
+                    type="button"
+                    phx-click="open_correct_modal"
+                    class="text-warning"
+                  >
+                    <.icon name="hero-exclamation-triangle-mini" class="size-4" />
+                    Mark completed in error
+                  </button>
+                </li>
+              </ul>
+            </div>
             <button
               :if={@live? and Authorization.can?(@current_scope, :edit_obligation)}
               id="m-edit-obligation-btn"
@@ -149,7 +176,9 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
             <p class="text-base-content/70">{@obligation.completed_in_error_reason}</p>
             <.link
               :if={@obligation.replaced_by_id}
-              navigate={~p"/m/#{@current_scope.entity.slug}/obligations/#{@obligation.replaced_by_id}"}
+              navigate={
+                ~p"/m/#{@current_scope.entity.slug}/obligations/#{@obligation.replaced_by_id}"
+              }
               class="link link-primary"
             >
               View replacement
@@ -168,17 +197,6 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
             >
               View original
             </.link>
-          </div>
-
-          <div :if={@correctable?} class="mt-3">
-            <button
-              id="m-mark-error-btn"
-              type="button"
-              phx-click="open_correct_modal"
-              class="btn btn-outline btn-warning btn-sm w-full gap-1"
-            >
-              <.icon name="hero-exclamation-triangle-mini" class="size-3.5" /> Mark completed in error
-            </button>
           </div>
         </section>
 
@@ -500,7 +518,13 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
             Keeps this cycle for audit and creates a one-off replacement to redo the work.
           </p>
           <.form for={%{}} id="m-correct-form" phx-submit="confirm_correct" class="mt-4 space-y-3">
-            <.input name="correct[reason]" value="" type="textarea" label="Reason (required)" required />
+            <.input
+              name="correct[reason]"
+              value=""
+              type="textarea"
+              label="Reason (required)"
+              required
+            />
             <.input
               name="correct[replacement_due_by]"
               value={Date.to_iso8601(@obligation.due_by)}

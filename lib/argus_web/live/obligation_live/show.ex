@@ -25,6 +25,33 @@ defmodule ArgusWeb.ObligationLive.Show do
             <h1 class="text-lg font-semibold leading-tight min-w-0">{@obligation.title}</h1>
             <.urgency_badge :if={@live?} urgency={@urgency} />
             <.obligation_status_badge :if={!@live?} cycle_status={@cycle_status} />
+            <div :if={@correctable?} class="dropdown dropdown-end">
+              <div
+                tabindex="0"
+                role="button"
+                id="completed-actions-menu"
+                class="btn btn-ghost btn-xs px-1"
+                aria-label="Completed cycle actions"
+              >
+                <.icon name="hero-ellipsis-vertical-mini" class="size-4" />
+              </div>
+              <ul
+                tabindex="0"
+                class="dropdown-content menu menu-sm bg-base-100 rounded-box z-10 w-60 p-2 shadow border border-base-300"
+              >
+                <li>
+                  <button
+                    id="mark-error-btn"
+                    type="button"
+                    phx-click="open_correct_modal"
+                    class="text-warning"
+                  >
+                    <.icon name="hero-exclamation-triangle-mini" class="size-4" />
+                    Mark completed in error
+                  </button>
+                </li>
+              </ul>
+            </div>
             <button
               :if={@live? and Authorization.can?(@current_scope, :edit_obligation)}
               id="edit-obligation-btn"
@@ -186,7 +213,9 @@ defmodule ArgusWeb.ObligationLive.Show do
             <span class="text-base-content/70">{@obligation.completed_in_error_reason}</span>
             <.link
               :if={@obligation.replaced_by_id}
-              navigate={~p"/entities/#{@current_scope.entity.slug}/obligations/#{@obligation.replaced_by_id}"}
+              navigate={
+                ~p"/entities/#{@current_scope.entity.slug}/obligations/#{@obligation.replaced_by_id}"
+              }
               class="link link-primary ml-auto"
             >
               View replacement
@@ -201,22 +230,13 @@ defmodule ArgusWeb.ObligationLive.Show do
             <.icon name="hero-arrow-uturn-left-mini" class="size-4 text-base-content/50 shrink-0" />
             <span class="text-base-content/70">Replacement for a cycle completed in error.</span>
             <.link
-              navigate={~p"/entities/#{@current_scope.entity.slug}/obligations/#{@obligation.replaces_id}"}
+              navigate={
+                ~p"/entities/#{@current_scope.entity.slug}/obligations/#{@obligation.replaces_id}"
+              }
               class="link link-primary ml-auto"
             >
               View original
             </.link>
-          </div>
-
-          <div :if={@correctable?} class="mt-3 pt-3 border-t border-base-300">
-            <button
-              id="mark-error-btn"
-              type="button"
-              phx-click="open_correct_modal"
-              class="btn btn-outline btn-warning btn-sm gap-1"
-            >
-              <.icon name="hero-exclamation-triangle-mini" class="size-3.5" /> Mark completed in error
-            </button>
           </div>
         </section>
 
@@ -1188,9 +1208,7 @@ defmodule ArgusWeb.ObligationLive.Show do
         {:noreply,
          socket
          |> put_flash(:info, "Cycle marked in error. Replacement created.")
-         |> push_navigate(
-           to: ~p"/entities/#{scope.entity.slug}/obligations/#{replacement.id}"
-         )}
+         |> push_navigate(to: ~p"/entities/#{scope.entity.slug}/obligations/#{replacement.id}")}
 
       :not_authorise ->
         {:noreply, put_flash(socket, :error, "Not authorized.")}

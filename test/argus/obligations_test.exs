@@ -568,6 +568,30 @@ defmodule Argus.ObligationsTest do
       assert replacement.due_by == ~D[2026-07-01]
     end
 
+    test "a blank replacement_due_by falls back to the original's due date" do
+      manager = Argus.EntitiesFixtures.manager_scope_fixture()
+      type = type_fixture(manager.entity)
+
+      {:ok, obligation} =
+        Obligations.create_obligation(manager, %{
+          title: "EPF",
+          obligation_type_id: type.id,
+          due_by: ~D[2026-06-15],
+          open_note: "open"
+        })
+
+      {:ok, done, _} = Obligations.complete(manager, obligation, %{note: "Done"})
+
+      # A cleared date field submits "" — must not crash; falls back to original due_by.
+      assert {:ok, _original, replacement} =
+               Obligations.mark_completed_in_error(manager, done, %{
+                 reason: "redo",
+                 replacement_due_by: ""
+               })
+
+      assert replacement.due_by == ~D[2026-06-15]
+    end
+
     test "completing the one-off replacement does not require next_due and does not spawn" do
       manager = Argus.EntitiesFixtures.manager_scope_fixture()
       # recurring type — but the replacement must still behave as a one-off
@@ -672,6 +696,7 @@ defmodule Argus.ObligationsTest do
         })
 
       {:ok, done, _} = Obligations.complete(manager, obligation, %{note: "Done"})
+
       {:ok, original, _replacement} =
         Obligations.mark_completed_in_error(manager, done, %{reason: "first"})
 

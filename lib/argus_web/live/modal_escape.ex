@@ -39,6 +39,9 @@ defmodule ArgusWeb.ModalEscape do
       socket.assigns[:show_cancel_modal] ->
         Phoenix.Component.assign(socket, :show_cancel_modal, false)
 
+      socket.assigns[:show_correct_modal] ->
+        Phoenix.Component.assign(socket, :show_correct_modal, false)
+
       end_series? && socket.assigns[:show_end_series_modal] ->
         Phoenix.Component.assign(socket, :show_end_series_modal, false)
 

@@ -599,8 +599,10 @@ defmodule Argus.Obligations do
     reason = Map.get(attrs, :reason) || Map.get(attrs, "reason")
 
     replacement_due_by =
-      Map.get(attrs, :replacement_due_by) || Map.get(attrs, "replacement_due_by") ||
-        obligation.due_by
+      case Map.get(attrs, :replacement_due_by) || Map.get(attrs, "replacement_due_by") do
+        blank when blank in [nil, ""] -> obligation.due_by
+        provided -> provided
+      end
 
     with true <- Authorization.can?(scope, :mark_completed_in_error),
          :ok <- validate_correctable(obligation),
