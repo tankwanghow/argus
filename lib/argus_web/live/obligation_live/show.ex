@@ -21,7 +21,75 @@ defmodule ArgusWeb.ObligationLive.Show do
           id="obligation-summary"
           class="argus-workbench w-[100%] mx-auto argus-obligation-summary"
         >
-          <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <div
+            id="obligation-meta"
+            class="flex items-center justify-between text-sm text-base-content/70"
+          >
+            <div class="flex flex-wrap items-center gap-1.5 min-w-0">
+              <span class="font-medium text-base-content">{@obligation.obligation_type.name}</span>
+            </div>
+            <div class="mt-2 flex flex-wrap items-center gap-1.5">
+              <span
+                :if={is_nil(@obligation.primary_assignee)}
+                class="badge badge-sm badge-secondary badge-soft gap-1"
+              >
+                Unassigned
+              </span>
+              <span
+                :if={@obligation.primary_assignee && other_collaborators(@obligation) == []}
+                class="badge badge-sm badge-primary badge-soft gap-1"
+              >
+                <.icon name="hero-user-mini" class="size-3" />
+                {@obligation.primary_assignee.email}
+                <span class="text-[0.65rem] font-semibold uppercase tracking-wide opacity-70">
+                  Primary
+                </span>
+              </span>
+              <div
+                :if={@obligation.primary_assignee && other_collaborators(@obligation) != []}
+                id="assignees-dropdown"
+                class="dropdown"
+              >
+                <div
+                  tabindex="0"
+                  role="button"
+                  id="assignees-toggle"
+                  class="badge badge-sm badge-primary badge-soft gap-1 cursor-pointer"
+                >
+                  <.icon name="hero-user-mini" class="size-3" />
+                  {@obligation.primary_assignee.email}
+                  <span class="text-[0.65rem] font-semibold uppercase tracking-wide opacity-70">
+                    Primary
+                  </span>
+                  <.icon name="hero-chevron-down-mini" class="size-3" />
+                </div>
+                <ul
+                  tabindex="0"
+                  class="dropdown-content menu menu-sm bg-base-100 rounded-box z-10 w-64 p-2 shadow border border-base-300"
+                >
+                  <li class="menu-title text-xs">Also collaborating</li>
+                  <li :for={c <- other_collaborators(@obligation)}>
+                    <span class="flex items-center gap-1">
+                      <.icon name="hero-user-group-mini" class="size-3" />
+                      {c.user.email}
+                    </span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+            <div class="flex flex-wrap items-center gap-1.5 min-w-0 text-xs">
+              <span class="argus-meta-label">Due</span>
+              <span class="font-medium text-base-content">{format_date(@obligation.due_by)}</span>
+              <span :if={@live?} class="text-base-content/60">
+                · {due_label(@obligation.due_by, @today)}
+              </span>
+              <span :if={@cycle_status == :completed} class="text-base-content/60">
+                · completed {format_datetime(@obligation.completed_at)}
+              </span>
+              <span :if={@cycle_status == :cancelled} class="text-base-content/60">· cancelled</span>
+            </div>
+          </div>
+          <div class="flex flex-wrap items-center gap-x-2 gap-y-1 mt-2">
             <h1 class="text-lg font-semibold leading-tight min-w-0">{@obligation.title}</h1>
             <.urgency_badge :if={@live?} urgency={@urgency} />
             <.obligation_status_badge :if={!@live?} cycle_status={@cycle_status} />
@@ -54,57 +122,10 @@ defmodule ArgusWeb.ObligationLive.Show do
             </div>
           </div>
           <div
-            id="obligation-meta"
-            class="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm text-base-content/70"
-          >
-            <div class="flex flex-wrap items-center gap-1.5 min-w-0">
-              <span class="argus-meta-label">Type</span>
-              <span class="font-medium text-base-content">{@obligation.obligation_type.name}</span>
-            </div>
-            <div class="flex flex-wrap items-center gap-1.5 min-w-0">
-              <span class="argus-meta-label">Due</span>
-              <span class="font-medium text-base-content">{format_date(@obligation.due_by)}</span>
-              <span :if={@live?} class="text-base-content/60">
-                · {due_label(@obligation.due_by, @today)}
-              </span>
-              <span :if={@cycle_status == :completed} class="text-base-content/60">
-                · completed {format_datetime(@obligation.completed_at)}
-              </span>
-              <span :if={@cycle_status == :cancelled} class="text-base-content/60">· cancelled</span>
-            </div>
-          </div>
-          <div class="mt-2 flex flex-wrap items-center gap-1.5">
-            <span class="argus-meta-label">Collaborators</span>
-            <span
-              :if={@obligation.primary_assignee}
-              class="badge badge-sm badge-primary badge-soft gap-1"
-            >
-              <.icon name="hero-user-mini" class="size-3" />
-              {@obligation.primary_assignee.email}
-              <span class="text-[0.65rem] font-semibold uppercase tracking-wide opacity-70">
-                Primary
-              </span>
-            </span>
-            <span
-              :if={is_nil(@obligation.primary_assignee)}
-              class="badge badge-sm badge-secondary badge-soft gap-1"
-            >
-              Unassigned
-            </span>
-            <span
-              :for={c <- other_collaborators(@obligation)}
-              class="badge badge-sm badge-ghost gap-1"
-            >
-              <.icon name="hero-user-group-mini" class="size-3" />
-              {c.user.email}
-            </span>
-          </div>
-          <div
             :if={@required_docs != []}
             id="completion-summary"
             class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm"
           >
-            <span class="argus-meta-label">Completion documents</span>
             <span
               :for={{slot, live} <- @required_docs}
               class="border rounded-xl p-1 text-sm inline-flex items-center gap-2"
@@ -296,10 +317,10 @@ defmodule ArgusWeb.ObligationLive.Show do
                 <div class="relative">
                   <textarea name="note[note]" rows="5" class="textarea w-full pb-12">{Phoenix.HTML.Form.normalize_value("textarea", @note_form[:note].value)}</textarea>
                   <div class="absolute bottom-2 right-2 flex gap-2">
-                    <button type="button" class="btn btn-ghost btn-sm" phx-click="cancel_note_edit">
+                    <button type="button" class="btn btn-warning btn-sm" phx-click="cancel_note_edit">
                       Cancel
                     </button>
-                    <.button class="btn btn-primary btn-sm" phx-disable-with="Saving…">Save</.button>
+                    <.button class="btn btn-success btn-sm" phx-disable-with="Saving…">Save</.button>
                   </div>
                 </div>
               </.form>

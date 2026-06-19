@@ -216,6 +216,46 @@ defmodule ArgusWeb.ObligationLiveTest do
     assert Enum.map(obligation.collaborators, & &1.user_id) == [collaborator.id]
   end
 
+  test "primary assignee becomes a dropdown listing other collaborators", %{conn: conn} do
+    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    conn = log_in_user(conn, manager.user)
+    assignee = member_fixture(manager.entity)
+    collaborator = member_fixture(manager.entity)
+    type = type_fixture(manager.entity)
+
+    {:ok, with_collab} =
+      Obligations.create_obligation(manager, %{
+        title: "Shared work",
+        obligation_type_id: type.id,
+        primary_assignee_id: assignee.id,
+        collaborator_ids: [collaborator.id],
+        due_by: ~D[2026-06-30],
+        open_note: "open"
+      })
+
+    {:ok, view, _html} =
+      live(conn, ~p"/entities/#{manager.entity.slug}/obligations/#{with_collab.id}")
+
+    assert has_element?(view, "#assignees-toggle", assignee.email)
+    assert has_element?(view, "#assignees-dropdown", collaborator.email)
+
+    # With no other collaborators, the primary stays a plain badge (no dropdown).
+    {:ok, solo} =
+      Obligations.create_obligation(manager, %{
+        title: "Solo work",
+        obligation_type_id: type.id,
+        primary_assignee_id: assignee.id,
+        due_by: ~D[2026-06-30],
+        open_note: "open"
+      })
+
+    {:ok, solo_view, _html} =
+      live(conn, ~p"/entities/#{manager.entity.slug}/obligations/#{solo.id}")
+
+    refute has_element?(solo_view, "#assignees-toggle")
+    assert render(solo_view) =~ assignee.email
+  end
+
   test "completion modal: manager stages files for two slots and uploads individually", %{
     conn: conn
   } do
