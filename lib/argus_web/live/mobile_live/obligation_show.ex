@@ -56,15 +56,6 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
                 </li>
               </ul>
             </div>
-            <button
-              :if={@live? and Authorization.can?(@current_scope, :edit_obligation)}
-              id="m-edit-obligation-btn"
-              type="button"
-              phx-click="open_edit_modal"
-              class="btn btn-ghost btn-xs"
-            >
-              <.icon name="hero-pencil-square-mini" class="size-3.5" />
-            </button>
           </div>
           <div
             id="obligation-meta"
@@ -118,48 +109,62 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
           <div
             :if={@live?}
             id="obligation-actions"
-            class="mt-3 pt-3 border-t border-base-300 flex flex-wrap items-center gap-x-2 gap-y-2 w-full"
+            class="mt-3 pt-3 border-t border-base-300 flex items-center gap-2 w-full"
           >
-            <div id="obligation-progress-actions" class="argus-inline-actions flex-1 min-w-0">
+            <div id="obligation-progress-actions" class="argus-inline-actions gap-2">
+              <button
+                :if={@live? and Authorization.can?(@current_scope, :edit_obligation)}
+                id="m-edit-obligation-btn"
+                type="button"
+                phx-click="open_edit_modal"
+                class="btn btn-ghost btn-sm btn-square"
+                aria-label="Edit"
+              >
+                <.icon name="hero-pencil-square-mini" class="size-5" />
+              </button>
               <button
                 :if={@live? and Authorization.can?(@current_scope, :start_progress, @obligation)}
                 id="m-start-progress-btn"
                 type="button"
                 phx-click="open_progress_modal"
-                class="btn btn-outline btn-sm w-full min-w-0"
+                class="btn btn-outline btn-sm btn-square"
+                aria-label="Update progress"
               >
-                Update progress
+                <.icon name="hero-play-mini" class="size-5" />
               </button>
             </div>
-            <div id="obligation-done-actions" class="argus-inline-actions flex-1 min-w-0">
+            <div id="obligation-done-actions" class="argus-inline-actions">
               <button
                 :if={@docs_complete? and Authorization.can?(@current_scope, :mark_done, @obligation)}
                 id="m-done-btn"
                 type="button"
                 phx-click="open_done_modal"
-                class="btn btn-primary btn-sm w-full min-w-0"
+                class="btn btn-primary btn-sm btn-square"
+                aria-label="Mark done"
               >
-                Mark done
+                <.icon name="hero-check-mini" class="size-5" />
               </button>
             </div>
-            <div id="obligation-series-actions" class="argus-inline-actions shrink-0">
+            <div id="obligation-series-actions" class="argus-inline-actions ml-auto">
               <button
                 :if={Authorization.can?(@current_scope, :skip_cycle) and @recurring?}
                 id="m-skip-btn"
                 type="button"
                 phx-click="open_skip_modal"
-                class="btn btn-ghost btn-warning btn-sm"
+                class="btn btn-ghost btn-warning btn-sm btn-square"
+                aria-label="Skip cycle"
               >
-                Skip
+                <.icon name="hero-forward-mini" class="size-5" />
               </button>
               <button
                 :if={Authorization.can?(@current_scope, :cancel_obligation) and not @recurring?}
                 id="m-cancel-btn"
                 type="button"
                 phx-click="open_cancel_modal"
-                class="btn btn-ghost btn-error btn-sm"
+                class="btn btn-ghost btn-error btn-sm btn-square"
+                aria-label="Cancel"
               >
-                Cancel
+                <.icon name="hero-x-mark-mini" class="size-5" />
               </button>
             </div>
           </div>

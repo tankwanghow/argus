@@ -52,15 +52,6 @@ defmodule ArgusWeb.ObligationLive.Show do
                 </li>
               </ul>
             </div>
-            <button
-              :if={@live? and Authorization.can?(@current_scope, :edit_obligation)}
-              id="edit-obligation-btn"
-              type="button"
-              phx-click="open_edit_modal"
-              class="btn btn-ghost btn-xs gap-1"
-            >
-              <.icon name="hero-pencil-square-mini" class="size-3.5" /> Edit
-            </button>
           </div>
           <div
             id="obligation-meta"
@@ -148,6 +139,15 @@ defmodule ArgusWeb.ObligationLive.Show do
             class="mt-3 pt-3 border-t border-base-300 flex flex-wrap items-center gap-x-4 gap-y-2 w-full"
           >
             <div id="obligation-progress-actions" class="argus-inline-actions">
+              <button
+                :if={@live? and Authorization.can?(@current_scope, :edit_obligation)}
+                id="edit-obligation-btn"
+                type="button"
+                phx-click="open_edit_modal"
+                class="btn btn-ghost btn-sm gap-1"
+              >
+                <.icon name="hero-pencil-square-mini" class="size-3.5" /> Edit
+              </button>
               <button
                 :if={@live? and Authorization.can?(@current_scope, :start_progress, @obligation)}
                 id="start-progress-btn"
