@@ -238,7 +238,7 @@ defmodule ArgusWeb.ObligationLiveTest do
     {:ok, view, _html} =
       live(conn, ~p"/entities/#{manager.entity.slug}/obligations/#{obligation.id}")
 
-    view |> element("#open-completion-modal") |> render_click()
+    view |> element("#open-completion-slot-receipt") |> render_click()
 
     # Stage receipt slot.
     view |> element("#select-slot-receipt") |> render_click()
@@ -298,7 +298,7 @@ defmodule ArgusWeb.ObligationLiveTest do
     {:ok, view, _html} =
       live(conn, ~p"/entities/#{manager.entity.slug}/obligations/#{obligation.id}")
 
-    view |> element("#open-completion-modal") |> render_click()
+    view |> element("#open-completion-slot-receipt") |> render_click()
 
     # Upload a file into the "receipt" slot.
     view |> element("#select-slot-receipt") |> render_click()
@@ -533,7 +533,7 @@ defmodule ArgusWeb.ObligationLiveTest do
 
     # Required "receipt" is missing → no Mark done, but the completion path is offered.
     refute has_element?(view, "#done-btn")
-    assert has_element?(view, "#open-completion-modal")
+    assert has_element?(view, "#open-completion-slot-receipt")
   end
 
   test "mark done appears once required documents are fulfilled", %{conn: conn} do
@@ -556,7 +556,7 @@ defmodule ArgusWeb.ObligationLiveTest do
     refute has_element?(view, "#done-btn")
 
     # Upload the required receipt via the completion modal.
-    view |> element("#open-completion-modal") |> render_click()
+    view |> element("#open-completion-slot-receipt") |> render_click()
     view |> element("#select-slot-receipt") |> render_click()
 
     file =
@@ -594,7 +594,7 @@ defmodule ArgusWeb.ObligationLiveTest do
     view |> form("#progress-form", %{"progress" => %{"note" => "Working"}}) |> render_submit()
 
     # Upload the required receipt — it physically attaches to the in_progress event.
-    view |> element("#open-completion-modal") |> render_click()
+    view |> element("#open-completion-slot-receipt") |> render_click()
     view |> element("#select-slot-receipt") |> render_click()
 
     file =
@@ -793,7 +793,7 @@ defmodule ArgusWeb.ObligationLiveTest do
     {:ok, view, _html} =
       live(conn, ~p"/entities/#{manager.entity.slug}/obligations/#{obligation.id}")
 
-    view |> element("#open-completion-modal") |> render_click()
+    view |> element("#open-completion-slot-receipt") |> render_click()
 
     # Upload into the "receipt" slot from the cycle modal (no event id in the form).
     view |> element("#select-slot-receipt") |> render_click()
@@ -852,7 +852,7 @@ defmodule ArgusWeb.ObligationLiveTest do
     {:ok, view, _html} =
       live(conn, ~p"/entities/#{manager.entity.slug}/obligations/#{obligation.id}")
 
-    view |> element("#open-completion-modal") |> render_click()
+    view |> element("#open-completion-slot-receipt") |> render_click()
 
     assert has_element?(view, "#completion-voided", "r.pdf")
     assert has_element?(view, "#voided-doc-#{doc.id} a[href*='/documents/#{doc.id}']")
@@ -887,7 +887,7 @@ defmodule ArgusWeb.ObligationLiveTest do
     {:ok, view, _html} =
       live(conn, ~p"/entities/#{admin.entity.slug}/obligations/#{completed.id}")
 
-    view |> element("#open-completion-modal") |> render_click()
+    view |> element("#open-completion-slot-receipt") |> render_click()
 
     # ...but the modal hides the Void button for a non-live cycle.
     assert has_element?(view, "#completion-slot-receipt", "r.pdf")
@@ -1011,7 +1011,7 @@ defmodule ArgusWeb.ObligationLiveTest do
     [open_event] = Enum.filter(obligation.events, &(&1.status == "open"))
 
     # Completion view: receipt gone, "form" now required and unsatisfied; r.pdf not in slot rows.
-    view |> element("#open-completion-modal") |> render_click()
+    view |> element("#open-completion-slot-form") |> render_click()
     assert has_element?(view, "#completion-slot-form")
     refute has_element?(view, "#completion-slot-receipt")
     refute has_element?(view, "#completion-docs", "r.pdf")

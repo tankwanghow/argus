@@ -214,7 +214,7 @@ defmodule ArgusWeb.MobileLiveTest do
     {:ok, view, _html} =
       live(conn, ~p"/m/#{manager.entity.slug}/obligations/#{obligation.id}")
 
-    view |> element("#m-open-completion-modal") |> render_click()
+    view |> element("#m-open-completion-slot-receipt") |> render_click()
     view |> element("#m-select-slot-receipt") |> render_click()
 
     file =

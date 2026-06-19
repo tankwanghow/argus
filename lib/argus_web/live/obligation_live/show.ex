@@ -104,25 +104,24 @@ defmodule ArgusWeb.ObligationLive.Show do
             id="completion-summary"
             class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm"
           >
-            <button
-              id="open-completion-modal"
-              type="button"
-              phx-click="open_completion_modal"
-              class="btn btn-outline gap-1"
-            >
-              <.icon name="hero-paper-clip-mini" class="size-3.5" /> Completion documents
-            </button>
+            <span class="argus-meta-label">Completion documents</span>
             <span
               :for={{slot, live} <- @required_docs}
               class="border rounded-xl p-1 text-sm inline-flex items-center gap-2"
             >
-              <div class="shrink-0">
+              <button
+                id={"open-completion-slot-#{slot}"}
+                type="button"
+                phx-click="open_completion_modal"
+                class="shrink-0 inline-flex items-center gap-1 cursor-pointer hover:opacity-80"
+                title="Manage completion documents"
+              >
                 <.icon
                   name={if live, do: "hero-check-circle-mini", else: "hero-x-circle-mini"}
                   class={["size-3.5", if(live, do: "text-success", else: "text-base-content/40")]}
                 />
                 <span class={if live, do: "", else: "text-base-content/60"}>{slot}</span>
-              </div>
+              </button>
               <.link
                 :if={live}
                 href={"/entities/#{@current_scope.entity.slug}/obligations/#{@obligation.id}/documents/#{live.id}"}
@@ -144,7 +143,7 @@ defmodule ArgusWeb.ObligationLive.Show do
                 id="edit-obligation-btn"
                 type="button"
                 phx-click="open_edit_modal"
-                class="btn btn-ghost btn-sm gap-1"
+                class="btn btn-outline btn-sm gap-1"
               >
                 <.icon name="hero-pencil-square-mini" class="size-3.5" /> Edit
               </button>
@@ -153,7 +152,7 @@ defmodule ArgusWeb.ObligationLive.Show do
                 id="start-progress-btn"
                 type="button"
                 phx-click="open_progress_modal"
-                class="btn btn-outline btn-sm"
+                class="btn btn-success btn-sm"
               >
                 Update progress
               </button>

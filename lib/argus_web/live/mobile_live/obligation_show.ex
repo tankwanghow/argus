@@ -16,7 +16,7 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
   def render(assigns) do
     ~H"""
     <Layouts.mobile_app flash={@flash} current_scope={@current_scope} active={:obligations}>
-      <div id="mobile-obligation-show" class="space-y-3">
+      <div id="mobile-obligation-show" class="space-y-3 px-2 py-4">
         <.link
           navigate={~p"/m/#{@current_scope.entity.slug}/obligations"}
           class="text-sm text-base-content/60 flex items-center gap-1"
@@ -81,21 +81,28 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
               </div>
             </div>
           </div>
-          <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
-            <button
-              id="m-open-completion-modal"
-              type="button"
-              phx-click="open_completion_modal"
-              class="btn btn-outline btn-sm gap-1"
+          <div
+            :if={@required_docs != []}
+            class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5"
+          >
+            <span class="argus-meta-label">Completion documents</span>
+            <span
+              :for={{slot, live} <- @required_docs}
+              class="border rounded-xl p-1 inline-flex items-center gap-2 text-sm"
             >
-              <.icon name="hero-paper-clip-mini" class="size-4" /> Completion documents
-            </button>
-            <span :for={{slot, live} <- @required_docs} class="inline-flex items-center gap-1 text-sm">
-              <.icon
-                name={if live, do: "hero-check-circle-mini", else: "hero-x-circle-mini"}
-                class={["size-3.5", if(live, do: "text-success", else: "text-base-content/40")]}
-              />
-              <span class={if live, do: "", else: "text-base-content/60"}>{slot}</span>
+              <button
+                id={"m-open-completion-slot-#{slot}"}
+                type="button"
+                phx-click="open_completion_modal"
+                class="shrink-0 inline-flex items-center gap-1 cursor-pointer"
+                title="Manage completion documents"
+              >
+                <.icon
+                  name={if live, do: "hero-check-circle-mini", else: "hero-x-circle-mini"}
+                  class={["size-3.5", if(live, do: "text-success", else: "text-base-content/40")]}
+                />
+                <span class={if live, do: "", else: "text-base-content/60"}>{slot}</span>
+              </button>
               <.link
                 :if={live}
                 href={"/entities/#{@current_scope.entity.slug}/obligations/#{@obligation.id}/documents/#{live.id}"}
@@ -127,7 +134,7 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
                 id="m-start-progress-btn"
                 type="button"
                 phx-click="open_progress_modal"
-                class="btn btn-outline btn-square h-11 min-h-11 w-11"
+                class="btn btn-success btn-square h-11 min-h-11 w-11"
                 aria-label="Update progress"
               >
                 <.icon name="hero-arrow-right" class="size-5" />
