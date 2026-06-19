@@ -109,7 +109,7 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
           <div
             :if={@live?}
             id="obligation-actions"
-            class="mt-3 pt-3 border-t border-base-300 flex items-center gap-3 w-full"
+            class="mt-3 pt-3 border-t border-base-300 flex items-center justify-between w-full"
           >
             <div id="obligation-progress-actions" class="argus-inline-actions gap-2">
               <button
@@ -117,7 +117,7 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
                 id="m-edit-obligation-btn"
                 type="button"
                 phx-click="open_edit_modal"
-                class="btn btn-ghost btn-square h-11 min-h-11 w-11"
+                class="btn btn-outline btn-square h-11 min-h-11 w-11"
                 aria-label="Edit"
               >
                 <.icon name="hero-pencil-square-mini" class="size-5" />
@@ -130,7 +130,7 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
                 class="btn btn-outline btn-square h-11 min-h-11 w-11"
                 aria-label="Update progress"
               >
-                <.icon name="hero-play-mini" class="size-5" />
+                <.icon name="hero-arrow-right" class="size-5" />
               </button>
             </div>
             <div id="obligation-done-actions" class="argus-inline-actions">
@@ -145,16 +145,16 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
                 <.icon name="hero-check-mini" class="size-5" />
               </button>
             </div>
-            <div id="obligation-series-actions" class="argus-inline-actions ml-auto">
+            <div id="obligation-series-actions" class="argus-inline-actions">
               <button
                 :if={Authorization.can?(@current_scope, :skip_cycle) and @recurring?}
                 id="m-skip-btn"
                 type="button"
                 phx-click="open_skip_modal"
-                class="btn btn-ghost btn-warning btn-square h-11 min-h-11 w-11"
+                class="btn btn-outline btn-warning btn-square h-11 min-h-11 w-11"
                 aria-label="Skip cycle"
               >
-                <.icon name="hero-forward-mini" class="size-5" />
+                <.icon name="hero-arrow-uturn-right" class="size-5" />
               </button>
               <button
                 :if={Authorization.can?(@current_scope, :cancel_obligation) and not @recurring?}
@@ -305,7 +305,7 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
             phx-submit="save_obligation"
             class="mt-2 space-y-3"
           >
-            <.input field={@edit_form[:title]} type="text" label="Title" required />
+            <.char_count_input field={@edit_form[:title]} label="Title" max={30} required />
             <.input field={@edit_form[:due_by]} type="date" label="Due by" required />
             <div class="fieldset mb-2">
               <label class="label mb-1">Collaborators</label>

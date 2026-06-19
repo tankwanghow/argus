@@ -19,7 +19,7 @@ defmodule ArgusWeb.ObligationLive.Form do
           phx-submit="save"
           class="mt-1 max-w-xl space-y-4"
         >
-          <.input field={@form[:title]} type="text" label="Title" required />
+          <.char_count_input field={@form[:title]} label="Title" max={30} required />
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <.input
               field={@form[:obligation_type_id]}

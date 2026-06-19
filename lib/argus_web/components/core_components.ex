@@ -295,6 +295,61 @@ defmodule ArgusWeb.CoreComponents do
     """
   end
 
+  @doc """
+  A single-line text input with a live "characters left" counter (Twitter-style).
+
+  Enforces `maxlength` in the browser and shows the remaining count, which
+  updates instantly client-side via a colocated hook (no server round-trip).
+  Pair with a `validate_length/3` on the changeset for the authoritative limit.
+  """
+  attr :field, Phoenix.HTML.FormField, required: true
+  attr :label, :string, default: nil
+  attr :max, :integer, default: 30
+  attr :rest, :global, include: ~w(required placeholder autocomplete autofocus)
+
+  def char_count_input(assigns) do
+    ~H"""
+    <div>
+      <.input
+        field={@field}
+        type="text"
+        label={@label}
+        maxlength={@max}
+        phx-hook=".CharCount"
+        data-counter={"#{@field.id}-count"}
+        {@rest}
+      />
+      <p
+        id={"#{@field.id}-count"}
+        class="-mt-1 mb-2 text-right text-xs text-base-content/50"
+        aria-live="polite"
+      >
+        {@max}
+      </p>
+      <script :type={Phoenix.LiveView.ColocatedHook} name=".CharCount">
+        export default {
+          mounted() {
+            this._u = () => this.update()
+            this.el.addEventListener("input", this._u)
+            this.update()
+          },
+          updated() { this.update() },
+          destroyed() { this.el.removeEventListener("input", this._u) },
+          update() {
+            const max = parseInt(this.el.getAttribute("maxlength") || "0", 10)
+            const left = max - this.el.value.length
+            const c = document.getElementById(this.el.dataset.counter)
+            if (!c) return
+            c.textContent = left
+            c.classList.toggle("text-error", left <= 0)
+            c.classList.toggle("text-warning", left > 0 && left <= 5)
+          }
+        }
+      </script>
+    </div>
+    """
+  end
+
   # Helper used by inputs to generate form errors
   defp error(assigns) do
     ~H"""

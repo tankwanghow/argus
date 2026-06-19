@@ -63,6 +63,21 @@ defmodule Argus.ObligationsTest do
       assert is_nil(obligation.primary_assignee_id)
     end
 
+    test "rejects a title longer than 30 characters" do
+      scope = manager_scope_fixture()
+      type = type_fixture(scope.entity)
+
+      attrs = %{
+        title: String.duplicate("x", 31),
+        obligation_type_id: type.id,
+        due_by: ~D[2026-01-15],
+        open_note: "open"
+      }
+
+      assert {:error, changeset} = Obligations.create_obligation(scope, attrs)
+      assert "should be at most 30 character(s)" in errors_on(changeset).title
+    end
+
     test "requires an open note" do
       scope = manager_scope_fixture()
       type = type_fixture(scope.entity)

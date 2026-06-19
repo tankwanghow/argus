@@ -380,7 +380,7 @@ defmodule ArgusWeb.ObligationLive.Show do
         <div class="modal-box">
           <h3 class="font-bold text-lg">Edit obligation</h3>
           <.form for={@edit_form} id="edit-obligation-form" phx-submit="save_obligation" class="mt-2">
-            <.input field={@edit_form[:title]} type="text" label="Title" required />
+            <.char_count_input field={@edit_form[:title]} label="Title" max={30} required />
             <.input field={@edit_form[:due_by]} type="date" label="Due by" required />
             <div class="fieldset mb-2">
               <label class="label mb-1">Collaborators</label>
