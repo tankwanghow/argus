@@ -83,16 +83,18 @@ defmodule ArgusWeb.ObligationLive.Show do
               <span :if={@live?} class="text-base-content/60">
                 · {due_label(@obligation.due_by, @today)}
               </span>
-              <span :if={@cycle_status == :completed} class="text-base-content/60">
-                · completed {format_datetime(@obligation.completed_at)}
-              </span>
               <span :if={@cycle_status == :cancelled} class="text-base-content/60">· cancelled</span>
             </div>
           </div>
-          <div class="flex flex-wrap items-center gap-x-2 gap-y-1 mt-2">
+          <div class="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 mt-2">
             <h1 class="text-lg font-semibold leading-tight min-w-0">{@obligation.title}</h1>
             <.urgency_badge :if={@live?} urgency={@urgency} />
-            <.obligation_status_badge :if={!@live?} cycle_status={@cycle_status} />
+            <div>
+            <.obligation_status_badge
+              :if={!@live?}
+              cycle_status={@cycle_status}
+              detail={if @cycle_status == :completed, do: format_datetime(@obligation.completed_at)}
+            />
             <div :if={@correctable?} class="dropdown dropdown-end">
               <div
                 tabindex="0"
@@ -119,6 +121,7 @@ defmodule ArgusWeb.ObligationLive.Show do
                   </button>
                 </li>
               </ul>
+            </div>
             </div>
           </div>
           <div
