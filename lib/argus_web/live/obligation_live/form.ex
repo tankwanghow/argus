@@ -156,4 +156,9 @@ defmodule ArgusWeb.ObligationLive.Form do
   def handle_event("cancel_create_upload", %{"ref" => ref}, socket) do
     {:noreply, cancel_upload(socket, :document, ref)}
   end
+
+  # The app shell binds a global Escape keydown; this page has no modals.
+  def handle_event("close_modal_on_escape", _params, socket) do
+    {:noreply, socket}
+  end
 end

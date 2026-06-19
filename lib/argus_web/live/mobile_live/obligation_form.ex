@@ -14,7 +14,7 @@ defmodule ArgusWeb.MobileLive.ObligationForm do
   def render(assigns) do
     ~H"""
     <Layouts.mobile_app flash={@flash} current_scope={@current_scope} active={:obligations}>
-      <div id="m-obligation-form" class="space-y-3">
+      <div id="m-obligation-form" class="space-y-3 p-4">
         <.link
           navigate={~p"/m/#{@current_scope.entity.slug}/obligations"}
           class="text-sm text-base-content/60 flex items-center gap-1"
@@ -28,7 +28,7 @@ defmodule ArgusWeb.MobileLive.ObligationForm do
           id="m-obligation-create-form"
           phx-change="validate"
           phx-submit="save"
-          class="space-y-4"
+          class=""
         >
           <.char_count_input field={@form[:title]} label="Title" max={30} required />
           <.input
@@ -160,5 +160,10 @@ defmodule ArgusWeb.MobileLive.ObligationForm do
 
   def handle_event("cancel_create_upload", %{"ref" => ref}, socket) do
     {:noreply, cancel_upload(socket, :document, ref)}
+  end
+
+  # The mobile shell binds a global Escape keydown; this page has no modals.
+  def handle_event("close_modal_on_escape", _params, socket) do
+    {:noreply, socket}
   end
 end

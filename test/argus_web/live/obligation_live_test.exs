@@ -85,6 +85,9 @@ defmodule ArgusWeb.ObligationLiveTest do
     {:ok, view, _html} =
       live(conn, ~p"/entities/#{scope.entity.slug}/obligations/new")
 
+    # The app shell binds a global Escape keydown; the form must not crash on it.
+    assert view |> element("#argus-shell") |> render_keydown() =~ "New obligation"
+
     view
     |> form("#obligation-create-form", %{
       "obligation" => %{
