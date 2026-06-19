@@ -162,6 +162,42 @@ defmodule ArgusWeb.MobileLiveTest do
     assert redirected_to(conn) == ~p"/m/#{scope.entity.slug}"
   end
 
+  test "mobile: manager marks a completed cycle in error", %{conn: conn} do
+    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    conn = mobile_conn(conn, manager)
+    type = type_fixture(manager.entity)
+
+    {:ok, obligation} =
+      Obligations.create_obligation(manager, %{
+        title: "EPF Jan",
+        obligation_type_id: type.id,
+        primary_assignee_id: manager.user.id,
+        due_by: ~D[2026-06-15],
+        open_note: "open"
+      })
+
+    {:ok, done, _} = Obligations.complete(manager, obligation, %{note: "Done"})
+
+    {:ok, view, _html} =
+      live(conn, ~p"/m/#{manager.entity.slug}/obligations/#{done.id}")
+
+    assert has_element?(view, "#m-mark-error-btn")
+
+    view |> element("#m-mark-error-btn") |> render_click()
+    assert has_element?(view, "#m-correct-modal")
+
+    view
+    |> form("#m-correct-form", %{"correct" => %{"reason" => "Wrong figures"}})
+    |> render_submit()
+
+    {path, _flash} = assert_redirect(view)
+    assert path =~ "/m/#{manager.entity.slug}/obligations/"
+    refute path =~ done.id
+
+    {:ok, replacement_view, _} = live(conn, path)
+    assert has_element?(replacement_view, "#m-replaces-banner")
+  end
+
   test "mobile completion modal uploads into a slot", %{conn: conn} do
     manager = Argus.EntitiesFixtures.manager_scope_fixture()
     conn = mobile_conn(conn, manager)

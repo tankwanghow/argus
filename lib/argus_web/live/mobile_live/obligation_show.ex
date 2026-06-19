@@ -136,6 +136,50 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
               </button>
             </div>
           </div>
+
+          <div
+            :if={@obligation.completed_in_error_at}
+            id="m-completed-in-error-banner"
+            class="mt-3 rounded-box border border-warning/40 bg-warning/10 px-3 py-2 text-sm space-y-1"
+          >
+            <div class="flex items-center gap-2">
+              <.icon name="hero-exclamation-triangle-mini" class="size-4 text-warning shrink-0" />
+              <span class="font-medium">Completed in error.</span>
+            </div>
+            <p class="text-base-content/70">{@obligation.completed_in_error_reason}</p>
+            <.link
+              :if={@obligation.replaced_by_id}
+              navigate={~p"/m/#{@current_scope.entity.slug}/obligations/#{@obligation.replaced_by_id}"}
+              class="link link-primary"
+            >
+              View replacement
+            </.link>
+          </div>
+
+          <div
+            :if={@obligation.replaces_id}
+            id="m-replaces-banner"
+            class="mt-3 rounded-box border border-base-300 bg-base-200/40 px-3 py-2 text-sm space-y-1"
+          >
+            <p class="text-base-content/70">Replacement for a cycle completed in error.</p>
+            <.link
+              navigate={~p"/m/#{@current_scope.entity.slug}/obligations/#{@obligation.replaces_id}"}
+              class="link link-primary"
+            >
+              View original
+            </.link>
+          </div>
+
+          <div :if={@correctable?} class="mt-3">
+            <button
+              id="m-mark-error-btn"
+              type="button"
+              phx-click="open_correct_modal"
+              class="btn btn-outline btn-warning btn-sm w-full gap-1"
+            >
+              <.icon name="hero-exclamation-triangle-mini" class="size-3.5" /> Mark completed in error
+            </button>
+          </div>
         </section>
 
         <section class="argus-section">
@@ -448,6 +492,31 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
           </.form>
         </div>
       </div>
+
+      <div :if={@show_correct_modal} id="m-correct-modal" class="modal modal-bottom modal-open">
+        <div class="modal-box">
+          <h3 class="font-bold text-lg">Mark completed in error</h3>
+          <p class="text-sm text-base-content/60 mt-1">
+            Keeps this cycle for audit and creates a one-off replacement to redo the work.
+          </p>
+          <.form for={%{}} id="m-correct-form" phx-submit="confirm_correct" class="mt-4 space-y-3">
+            <.input name="correct[reason]" value="" type="textarea" label="Reason (required)" required />
+            <.input
+              name="correct[replacement_due_by]"
+              value={Date.to_iso8601(@obligation.due_by)}
+              type="date"
+              label="Replacement due date"
+            />
+            <div class="modal-action">
+              <button type="button" class="btn" phx-click="close_correct_modal">Cancel</button>
+              <.button class="btn btn-warning" phx-disable-with="Working…">Create replacement</.button>
+            </div>
+          </.form>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+          <button type="button" phx-click="close_correct_modal">close</button>
+        </form>
+      </div>
     </Layouts.mobile_app>
     """
   end
@@ -464,6 +533,7 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
      |> assign(:show_skip_modal, false)
      |> assign(:show_edit_modal, false)
      |> assign(:show_completion_modal, false)
+     |> assign(:show_correct_modal, false)
      |> assign(:step_files_modal_event_id, nil)
      |> assign(:step_files_modal_event, nil)
      |> assign(:upload_slot_target, nil)
@@ -744,6 +814,44 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
     end
   end
 
+  def handle_event("open_correct_modal", _params, socket) do
+    {:noreply, assign(socket, :show_correct_modal, true)}
+  end
+
+  def handle_event("close_correct_modal", _params, socket) do
+    {:noreply, assign(socket, :show_correct_modal, false)}
+  end
+
+  def handle_event("confirm_correct", %{"correct" => params}, socket) do
+    scope = socket.assigns.current_scope
+    obligation = socket.assigns.obligation
+
+    attrs = %{reason: params["reason"], replacement_due_by: params["replacement_due_by"]}
+
+    case Obligations.mark_completed_in_error(scope, obligation, attrs) do
+      {:ok, _original, replacement} ->
+        {:noreply,
+         socket
+         |> put_flash(:info, "Cycle marked in error. Replacement created.")
+         |> push_navigate(to: ~p"/m/#{scope.entity.slug}/obligations/#{replacement.id}")}
+
+      :not_authorise ->
+        {:noreply, put_flash(socket, :error, "Not authorized.")}
+
+      {:error, :note_required} ->
+        {:noreply, put_flash(socket, :error, "A reason is required.")}
+
+      {:error, reason} when reason in [:not_correctable, :already_corrected] ->
+        {:noreply,
+         socket
+         |> assign(:show_correct_modal, false)
+         |> put_flash(:error, "This cycle can no longer be corrected.")}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Could not mark in error.")}
+    end
+  end
+
   def handle_event("open_step_files", %{"event_id" => event_id}, socket) do
     case find_event(socket.assigns.obligation.events, event_id) do
       nil ->
@@ -972,6 +1080,12 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
     |> assign(:docs_complete?, Enum.all?(slot_rows, fn {_slot, live} -> live end))
     |> assign(:void_reason_required?, Obligations.document_void_reason_required?(obligation))
     |> assign(:can_add_document?, can_add_document?(scope, obligation))
+    |> assign(
+      :correctable?,
+      Index.cycle_status(obligation) == :completed and
+        is_nil(obligation.completed_in_error_at) and
+        Authorization.can?(scope, :mark_completed_in_error)
+    )
     |> assign(
       :done_form,
       to_form(%{"note" => "", "next_due_by" => suggestion(obligation, recurring?)}, as: :done)
