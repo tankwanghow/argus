@@ -228,4 +228,44 @@ defmodule ArgusWeb.MobileLiveTest do
 
     assert has_element?(view, "#m-completion-slot-receipt", "receipt.pdf")
   end
+
+  test "mobile: obligations index shows the New entry point for a manager", %{conn: conn} do
+    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    conn = mobile_conn(conn, manager)
+
+    {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}/obligations")
+
+    assert has_element?(
+             view,
+             "#m-new-obligation-btn[href='/m/#{manager.entity.slug}/obligations/new']"
+           )
+  end
+
+  test "mobile: new-obligation form creates and redirects to the mobile show page", %{conn: conn} do
+    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    conn = mobile_conn(conn, manager)
+    type = type_fixture(manager.entity)
+
+    {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}/obligations/new")
+
+    assert has_element?(view, "#m-obligation-form", "New obligation")
+
+    view
+    |> form("#m-obligation-create-form", %{
+      "obligation" => %{
+        "title" => "Mobile EPF",
+        "obligation_type_id" => type.id,
+        "due_by" => "2026-06-30",
+        "open_note" => "Created on mobile"
+      }
+    })
+    |> render_submit()
+
+    {path, _flash} = assert_redirect(view)
+    assert path =~ "/m/#{manager.entity.slug}/obligations/"
+    refute path =~ "/new"
+
+    [created] = Argus.Obligations.list_team_overview(manager)
+    assert created.title == "Mobile EPF"
+  end
 end

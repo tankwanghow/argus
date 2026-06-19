@@ -13,7 +13,7 @@ defmodule ArgusWeb.Plugs.AutoRouteByDeviceTest do
     test "desktop-only paths are absent from the whitelist" do
       tails = AutoRouteByDevice.mobile_capable_tails()
 
-      refute "/obligations/new" in tails
+      assert "/obligations/new" in tails
       refute "/obligation-types" in tails
       refute "/members" in tails
     end
@@ -61,7 +61,7 @@ defmodule ArgusWeb.Plugs.AutoRouteByDeviceTest do
       assert conn.halted
     end
 
-    test "does not redirect mobile UA on desktop-only obligation create", %{conn: conn} do
+    test "redirects mobile UA from desktop obligation create to mobile", %{conn: conn} do
       conn =
         conn
         |> put_req_header("user-agent", @mobile_ua)
@@ -70,7 +70,8 @@ defmodule ArgusWeb.Plugs.AutoRouteByDeviceTest do
         |> Map.put(:query_string, "")
         |> AutoRouteByDevice.call([])
 
-      refute conn.halted
+      assert redirected_to(conn) == "/m/acme/obligations/new"
+      assert conn.halted
     end
 
     test "does not redirect mobile UA on desktop-only members page", %{conn: conn} do

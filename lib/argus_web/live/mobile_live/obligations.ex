@@ -9,7 +9,17 @@ defmodule ArgusWeb.MobileLive.Obligations do
     ~H"""
     <Layouts.mobile_app flash={@flash} current_scope={@current_scope} active={:obligations}>
       <div class="sticky top-0 z-30 px-4 py-3 bg-base-100/95 backdrop-blur border-b border-base-200 space-y-2">
-        <h1 class="text-lg font-semibold">Obligations</h1>
+        <div class="flex items-center justify-between gap-2">
+          <h1 class="text-lg font-semibold">Obligations</h1>
+          <.link
+            :if={Argus.Authorization.can?(@current_scope, :create_obligation)}
+            id="m-new-obligation-btn"
+            navigate={~p"/m/#{@current_scope.entity.slug}/obligations/new"}
+            class="btn btn-primary btn-sm gap-1"
+          >
+            <.icon name="hero-plus-mini" class="size-4" /> New
+          </.link>
+        </div>
         <input
           id="m-obligation-search"
           type="search"
