@@ -63,6 +63,23 @@ defmodule ArgusWeb.MobileLiveTest do
     refute has_element?(view, "#m-done-modal")
   end
 
+  test "mobile note editing happens in a modal", %{conn: conn} do
+    {scope, obligation} = manager_obligation_scope_fixture()
+    conn = mobile_conn(conn, scope)
+    event = hd(Argus.Obligations.list_events(obligation))
+
+    {:ok, view, _html} = live(conn, ~p"/m/#{scope.entity.slug}/obligations/#{obligation.id}")
+
+    refute has_element?(view, "#m-note-modal")
+    view |> element("#m-edit-note-#{event.id}") |> render_click()
+    assert has_element?(view, "#m-note-modal")
+
+    view |> form("#m-note-form", %{"note" => %{"note" => "Edited via modal"}}) |> render_submit()
+
+    refute has_element?(view, "#m-note-modal")
+    assert render(view) =~ "Edited via modal"
+  end
+
   test "mobile cancel modal requires a reason", %{conn: conn} do
     {scope, obligation} = manager_obligation_scope_fixture()
     conn = mobile_conn(conn, scope)

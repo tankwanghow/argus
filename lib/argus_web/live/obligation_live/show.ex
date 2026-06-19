@@ -240,7 +240,6 @@ defmodule ArgusWeb.ObligationLive.Show do
         </section>
 
         <section class="argus-section">
-          <div class="argus-section-head">Timeline</div>
           <ol id="event-timeline">
             <li
               :for={event <- @obligation.events}
@@ -268,40 +267,40 @@ defmodule ArgusWeb.ObligationLive.Show do
               <div
                 :if={@editing_note_id != event.id}
                 id={"event-note-#{event.id}"}
-                class="argus-event-note-block"
+                class="argus-event-note-block relative"
               >
-                <div class="flex items-center justify-between gap-2">
-                  <span class="argus-meta-label">Note</span>
-                  <button
-                    :if={Obligations.note_editable?(@current_scope, event, @obligation)}
-                    id={"edit-note-#{event.id}"}
-                    type="button"
-                    phx-click="edit_note"
-                    phx-value-event_id={event.id}
-                    class="btn btn-ghost btn-xs h-6 min-h-6 px-1.5"
-                  >
-                    Edit
-                  </button>
-                </div>
                 <div :if={is_binary(event.note)} class="argus-event-note">{event.note}</div>
                 <div :if={is_nil(event.note)} class="argus-event-note argus-event-note-empty">
                   No note added
                 </div>
+                <button
+                  :if={Obligations.note_editable?(@current_scope, event, @obligation)}
+                  id={"edit-note-#{event.id}"}
+                  type="button"
+                  phx-click="edit_note"
+                  phx-value-event_id={event.id}
+                  class="btn btn-ghost btn-xs btn-square absolute bottom-2 right-2 bg-base-100/80"
+                  aria-label="Edit note"
+                >
+                  <.icon name="hero-pencil-square-mini" class="size-4" />
+                </button>
               </div>
               <.form
                 :if={@editing_note_id == event.id}
                 for={@note_form}
                 id={"note-form-#{event.id}"}
                 phx-submit="save_note"
-                class="argus-event-note-block space-y-2"
+                class="argus-event-note-block"
               >
                 <input type="hidden" name="event_id" value={event.id} />
-                <.input field={@note_form[:note]} type="textarea" label="Note" />
-                <div class="flex gap-2">
-                  <.button class="btn btn-primary btn-sm" phx-disable-with="Saving…">Save</.button>
-                  <button type="button" class="btn btn-ghost btn-sm" phx-click="cancel_note_edit">
-                    Cancel
-                  </button>
+                <div class="relative">
+                  <textarea name="note[note]" rows="5" class="textarea w-full pb-12">{Phoenix.HTML.Form.normalize_value("textarea", @note_form[:note].value)}</textarea>
+                  <div class="absolute bottom-2 right-2 flex gap-2">
+                    <button type="button" class="btn btn-ghost btn-sm" phx-click="cancel_note_edit">
+                      Cancel
+                    </button>
+                    <.button class="btn btn-primary btn-sm" phx-disable-with="Saving…">Save</.button>
+                  </div>
                 </div>
               </.form>
               <ul

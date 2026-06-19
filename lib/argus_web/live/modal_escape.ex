@@ -48,6 +48,11 @@ defmodule ArgusWeb.ModalEscape do
       socket.assigns[:show_edit_modal] ->
         Phoenix.Component.assign(socket, :show_edit_modal, false)
 
+      socket.assigns[:editing_note_id] ->
+        socket
+        |> Phoenix.Component.assign(:editing_note_id, nil)
+        |> Phoenix.Component.assign(:note_form, nil)
+
       true ->
         socket
     end

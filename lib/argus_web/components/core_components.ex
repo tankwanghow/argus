@@ -205,7 +205,7 @@ defmodule ArgusWeb.CoreComponents do
       end)
 
     ~H"""
-    <div class="fieldset mb-2">
+    <div class="fieldset">
       <label for={@id}>
         <input
           type="hidden"
@@ -233,7 +233,7 @@ defmodule ArgusWeb.CoreComponents do
 
   def input(%{type: "select"} = assigns) do
     ~H"""
-    <div class="fieldset mb-2">
+    <div class="fieldset">
       <label for={@id}>
         <span :if={@label} class="label mb-1">{@label}</span>
         <select
@@ -254,7 +254,7 @@ defmodule ArgusWeb.CoreComponents do
 
   def input(%{type: "textarea"} = assigns) do
     ~H"""
-    <div class="fieldset mb-2">
+    <div class="fieldset">
       <label for={@id}>
         <span :if={@label} class="label mb-1">{@label}</span>
         <textarea
@@ -275,7 +275,7 @@ defmodule ArgusWeb.CoreComponents do
   # All other inputs text, datetime-local, url, password, etc. are handled here...
   def input(assigns) do
     ~H"""
-    <div class="fieldset mb-2">
+    <div class="fieldset">
       <label for={@id}>
         <span :if={@label} class="label mb-1">{@label}</span>
         <input
@@ -310,6 +310,13 @@ defmodule ArgusWeb.CoreComponents do
   def char_count_input(assigns) do
     ~H"""
     <div>
+      <p
+        id={"#{@field.id}-count"}
+        class="-mb-6 mr-2 text-right text-xs text-base-content/100"
+        aria-live="polite"
+      >
+        {@max}
+      </p>
       <.input
         field={@field}
         type="text"
@@ -319,13 +326,6 @@ defmodule ArgusWeb.CoreComponents do
         data-counter={"#{@field.id}-count"}
         {@rest}
       />
-      <p
-        id={"#{@field.id}-count"}
-        class="-mt-1 mb-2 text-right text-xs text-base-content/50"
-        aria-live="polite"
-      >
-        {@max}
-      </p>
       <script :type={Phoenix.LiveView.ColocatedHook} name=".CharCount">
         export default {
           mounted() {

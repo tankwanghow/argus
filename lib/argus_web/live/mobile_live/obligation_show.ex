@@ -213,7 +213,6 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
         </section>
 
         <section class="argus-section">
-          <div class="argus-section-head">Timeline</div>
           <ol id="event-timeline">
             <li
               :for={event <- @obligation.events}
@@ -235,45 +234,23 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
                   Files ({length(other_file_count(event, @doc_slots))})
                 </button>
               </div>
-              <div
-                :if={@editing_note_id != event.id}
-                id={"m-event-note-#{event.id}"}
-                class="argus-event-note-block"
-              >
-                <div class="flex items-center justify-between gap-2">
-                  <span class="argus-meta-label">Note</span>
-                  <button
-                    :if={Obligations.note_editable?(@current_scope, event, @obligation)}
-                    id={"m-edit-note-#{event.id}"}
-                    type="button"
-                    phx-click="edit_note"
-                    phx-value-event_id={event.id}
-                    class="btn btn-ghost btn-xs h-6 min-h-6 px-1.5"
-                  >
-                    Edit
-                  </button>
-                </div>
+              <div id={"m-event-note-#{event.id}"} class="argus-event-note-block relative">
                 <div :if={is_binary(event.note)} class="argus-event-note">{event.note}</div>
                 <div :if={is_nil(event.note)} class="argus-event-note argus-event-note-empty">
                   No note added
                 </div>
+                <button
+                  :if={Obligations.note_editable?(@current_scope, event, @obligation)}
+                  id={"m-edit-note-#{event.id}"}
+                  type="button"
+                  phx-click="edit_note"
+                  phx-value-event_id={event.id}
+                  class="btn btn-ghost btn-xs btn-square absolute bottom-2 right-2 bg-base-100/80"
+                  aria-label="Edit note"
+                >
+                  <.icon name="hero-pencil-square-mini" class="size-4" />
+                </button>
               </div>
-              <.form
-                :if={@editing_note_id == event.id}
-                for={@note_form}
-                id={"m-note-form-#{event.id}"}
-                phx-submit="save_note"
-                class="argus-event-note-block space-y-2"
-              >
-                <input type="hidden" name="event_id" value={event.id} />
-                <.input field={@note_form[:note]} type="textarea" label="Note" />
-                <div class="flex gap-2">
-                  <.button class="btn btn-primary btn-sm" phx-disable-with="Saving…">Save</.button>
-                  <button type="button" class="btn btn-ghost btn-sm" phx-click="cancel_note_edit">
-                    Cancel
-                  </button>
-                </div>
-              </.form>
               <ul
                 :if={timeline_files(event, @doc_slots) != []}
                 id={"m-event-files-#{event.id}"}
@@ -301,6 +278,23 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
             </li>
           </ol>
         </section>
+      </div>
+
+      <div :if={@editing_note_id} id="m-note-modal" class="modal modal-bottom modal-open">
+        <div class="modal-box">
+          <h3 class="font-bold text-lg">Edit note</h3>
+          <.form for={@note_form} id="m-note-form" phx-submit="save_note" class="mt-4 space-y-3">
+            <input type="hidden" name="event_id" value={@editing_note_id} />
+            <.input field={@note_form[:note]} type="textarea" label="Note" />
+            <div class="modal-action">
+              <button type="button" class="btn" phx-click="cancel_note_edit">Cancel</button>
+              <.button class="btn btn-primary" phx-disable-with="Saving…">Save</.button>
+            </div>
+          </.form>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+          <button type="button" phx-click="cancel_note_edit">close</button>
+        </form>
       </div>
 
       <div :if={@show_edit_modal} id="m-edit-modal" class="modal modal-bottom modal-open">
