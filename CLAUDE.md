@@ -43,7 +43,10 @@ applies here too. Headlines:
   UIs (`DashboardLive.Index` at `/entities/:slug`, `MobileLive.Dashboard` at `/m/:slug`). It's a
   flat, filtered list (status tabs + search), not a grouped view; both render via
   `ObligationLive.IndexHelpers.load_rows` (status/`default_status` role-based default, urgency, tier,
-  event meta). After create/complete/cancel/skip, forms and show redirect back to the dashboard.
+  event meta). Each card shows the **current (latest) event** via the shared
+  `ArgusWeb.EventMeta.event_meta/1` component (status badge, count, actor, note). The card's urgency
+  **countdown badge** is the only relative-due indicator — there is no separate "due in N days" text.
+  After create/complete/cancel/skip, forms and show redirect back to the dashboard.
 - **Shell-Escape contract:** both layout shells (`#argus-shell`) bind
   `phx-window-keydown="close_modal_on_escape"`, so **every** LiveView rendered in them must define a
   `handle_event("close_modal_on_escape", …)` clause (no-op if the page has no modals) or it crashes

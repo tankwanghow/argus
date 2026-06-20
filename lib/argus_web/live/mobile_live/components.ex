@@ -14,7 +14,11 @@ defmodule ArgusWeb.MobileLive.Components do
 
   def obligation_card(assigns) do
     ~H"""
-    <li id={"m-ob-#{@row.obligation.id}"}>
+    <li
+      id={"m-ob-#{@row.obligation.id}"}
+      data-event-count={@row.event_count}
+      data-event-status={@row.latest_event && @row.latest_event.status}
+    >
       <.link
         navigate={~p"/m/#{@slug}/obligations/#{@row.obligation.id}"}
         class={["block rounded-box border border-base-300 p-3 border-l-4", accent(@row)]}
@@ -37,8 +41,14 @@ defmodule ArgusWeb.MobileLive.Components do
           {@row.obligation.obligation_type.name}
         </div>
         <div class={["text-xs mt-0.5", text_color(@row)]}>
-          {card_meta(@row, @today)}
+          {card_meta(@row)}
         </div>
+        <.event_meta
+          :if={@row.latest_event}
+          event={@row.latest_event}
+          event_count={@row.event_count}
+          show_actor={false}
+        />
       </.link>
     </li>
     """
@@ -56,15 +66,15 @@ defmodule ArgusWeb.MobileLive.Components do
   defp text_color(%{tier: tier}) when tier in [:due_soon, :approaching], do: "text-warning"
   defp text_color(_), do: "text-base-content/50"
 
-  defp card_meta(%{cycle_status: :completed, obligation: o}, _today) do
+  defp card_meta(%{cycle_status: :completed, obligation: o}) do
     "completed #{format_datetime(o.completed_at)} · due #{format_date(o.due_by)}"
   end
 
-  defp card_meta(%{cycle_status: :cancelled, obligation: o}, _today) do
+  defp card_meta(%{cycle_status: :cancelled, obligation: o}) do
     "cancelled · due #{format_date(o.due_by)}"
   end
 
-  defp card_meta(%{obligation: o}, today) do
-    "due #{format_date(o.due_by)} · #{due_label(o.due_by, today)}"
+  defp card_meta(%{obligation: o}) do
+    "due #{format_date(o.due_by)}"
   end
 end

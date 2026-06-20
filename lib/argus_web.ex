@@ -87,6 +87,7 @@ defmodule ArgusWeb do
       # Core UI components
       import ArgusWeb.CoreComponents
       import ArgusWeb.DoneDocumentChecklist
+      import ArgusWeb.EventMeta
       import ArgusWeb.ObligationStatusBadge
       import ArgusWeb.UrgencyBadge
 

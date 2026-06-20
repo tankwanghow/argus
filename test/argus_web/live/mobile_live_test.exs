@@ -24,6 +24,23 @@ defmodule ArgusWeb.MobileLiveTest do
     assert has_element?(view, "#m-ob-#{obligation.id}")
   end
 
+  test "mobile dashboard card shows the current event", %{conn: conn} do
+    {scope, obligation} = manager_obligation_scope_fixture()
+    conn = mobile_conn(conn, scope)
+
+    assert {:ok, _} = Obligations.start_progress(scope, obligation, %{note: "On it"})
+
+    {:ok, view, _html} = live(conn, ~p"/m/#{scope.entity.slug}")
+
+    assert has_element?(
+             view,
+             "#m-ob-#{obligation.id}[data-event-count='2'][data-event-status='in_progress']",
+             "In progress"
+           )
+
+    assert has_element?(view, "#m-ob-#{obligation.id}", "On it")
+  end
+
   test "mobile show runs start_progress workflow", %{conn: conn} do
     {scope, obligation} = assigned_member_scope_fixture()
     conn = mobile_conn(conn, scope)

@@ -105,11 +105,8 @@ defmodule ArgusWeb.DashboardLive.Index do
           detail={completion_detail(@row)}
         />
       </div>
-      <div class="flex flex-wrap items-baseline gap-x-2 text-sm mt-0.5">
-        <span class="text-base-content/60">{format_date(@row.obligation.due_by)}</span>
-        <span :if={@row.cycle_status == :live} class={["text-xs", urgency_text_class(@row.tier)]}>
-          {due_label(@row.obligation.due_by, @today)}
-        </span>
+      <div class="text-sm text-base-content/60 mt-0.5">
+        due {format_date(@row.obligation.due_by)}
       </div>
       <div class="text-sm text-base-content/60 mt-0.5">{obligation_subtitle(@row.obligation)}</div>
       <.event_meta
@@ -118,24 +115,6 @@ defmodule ArgusWeb.DashboardLive.Index do
         event_count={@row.event_count}
       />
     </.link>
-    """
-  end
-
-  attr :event, :map, required: true
-  attr :event_count, :integer, required: true
-
-  defp event_meta(assigns) do
-    ~H"""
-    <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-base-content/60 mt-1">
-      <span class={["badge badge-xs", status_badge_class(@event.status)]}>
-        {humanize_status(@event.status)}
-      </span>
-      <span>{event_count_label(@event_count)}</span>
-      <span :if={@event.status_by}>by {@event.status_by.email}</span>
-      <span :if={@event.note} class="truncate max-w-[16rem] italic text-base-content/50">
-        “{truncate_note(@event.note)}”
-      </span>
-    </div>
     """
   end
 
@@ -186,24 +165,5 @@ defmodule ArgusWeb.DashboardLive.Index do
     dt
     |> DateTime.to_date()
     |> format_date()
-  end
-
-  defp urgency_text_class(tier) when tier in [:overdue, :critical], do: "text-error"
-  defp urgency_text_class(tier) when tier in [:due_soon, :approaching], do: "text-warning"
-  defp urgency_text_class(_), do: "text-base-content/60"
-
-  defp humanize_status("in_progress"), do: "In progress"
-  defp humanize_status(status), do: String.capitalize(status)
-
-  defp status_badge_class("in_progress"), do: "badge-warning badge-soft"
-  defp status_badge_class("done"), do: "badge-success badge-soft"
-  defp status_badge_class("cancelled"), do: "badge-error badge-soft"
-  defp status_badge_class(_), do: "badge-ghost"
-
-  defp event_count_label(1), do: "1 event"
-  defp event_count_label(count), do: "#{count} events"
-
-  defp truncate_note(note) when is_binary(note) do
-    if String.length(note) > 72, do: String.slice(note, 0, 69) <> "…", else: note
   end
 end
