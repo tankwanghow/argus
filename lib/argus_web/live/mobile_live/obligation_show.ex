@@ -150,24 +150,14 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
             </div>
             <div id="obligation-series-actions" class="argus-inline-actions">
               <button
-                :if={Authorization.can?(@current_scope, :skip) and @recurring?}
+                :if={Authorization.can?(@current_scope, :skip)}
                 id="m-skip-btn"
                 type="button"
                 phx-click="open_skip_modal"
                 class="btn btn-outline btn-warning btn-square h-11 min-h-11 w-11"
-                aria-label="Skip cycle"
+                aria-label="Skip"
               >
                 <.icon name="hero-arrow-uturn-right" class="size-5" />
-              </button>
-              <button
-                :if={Authorization.can?(@current_scope, :skip) and not @recurring?}
-                id="m-cancel-btn"
-                type="button"
-                phx-click="open_cancel_modal"
-                class="btn btn-ghost btn-error btn-square h-11 min-h-11 w-11"
-                aria-label="Cancel"
-              >
-                <.icon name="hero-x-mark-mini" class="size-5" />
               </button>
             </div>
           </div>
@@ -461,15 +451,16 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
         <div class="modal-box">
           <h3 class="font-bold text-lg">Skip this cycle</h3>
           <p class="text-sm text-base-content/60 mt-1">
-            Cancels the current cycle and opens the next one.
+            Closes this cycle without completing it. A reason is recorded on the timeline.
           </p>
           <.form
             for={@skip_form}
             id="m-skip-form"
-            phx-submit="confirm_skip_cycle"
+            phx-submit="skip"
             class="mt-4 space-y-3"
           >
             <.input
+              :if={@recurring?}
               field={@skip_form[:next_due_by]}
               type="date"
               label="Next due date"
@@ -483,33 +474,7 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
             />
             <div class="modal-action">
               <button type="button" class="btn" phx-click="close_skip_modal">Back</button>
-              <.button class="btn btn-warning" phx-disable-with="Skipping…">Skip cycle</.button>
-            </div>
-          </.form>
-        </div>
-      </div>
-
-      <div :if={@show_cancel_modal} id="m-cancel-modal" class="modal modal-bottom modal-open">
-        <div class="modal-box">
-          <h3 class="font-bold text-lg">Cancel obligation</h3>
-          <p class="text-sm text-base-content/60 mt-1">
-            This removes the obligation from active dashboards.
-          </p>
-          <.form
-            for={@cancel_form}
-            id="m-cancel-form"
-            phx-submit="confirm_cancel"
-            class="mt-4 space-y-3"
-          >
-            <.input
-              field={@cancel_form[:note]}
-              type="textarea"
-              label="Reason for cancelling"
-              required
-            />
-            <div class="modal-action">
-              <button type="button" class="btn" phx-click="close_cancel_modal">Back</button>
-              <.button class="btn btn-error" phx-disable-with="Cancelling…">Cancel obligation</.button>
+              <.button class="btn btn-warning" phx-disable-with="Skipping…">Skip</.button>
             </div>
           </.form>
         </div>
@@ -557,7 +522,6 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
      socket
      |> assign(:show_done_modal, false)
      |> assign(:show_progress_modal, false)
-     |> assign(:show_cancel_modal, false)
      |> assign(:show_skip_modal, false)
      |> assign(:show_edit_modal, false)
      |> assign(:show_completion_modal, false)
@@ -783,7 +747,7 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
     {:noreply, assign(socket, :show_skip_modal, false)}
   end
 
-  def handle_event("confirm_skip_cycle", %{"skip" => params}, socket) do
+  def handle_event("skip", %{"skip" => params}, socket) do
     scope = socket.assigns.current_scope
 
     attrs = %{
@@ -810,35 +774,6 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
 
       :not_authorise ->
         {:noreply, put_flash(socket, :error, "Not authorized.")}
-    end
-  end
-
-  def handle_event("open_cancel_modal", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:show_cancel_modal, true)
-     |> assign(:cancel_form, to_form(%{"note" => ""}, as: :cancel))}
-  end
-
-  def handle_event("close_cancel_modal", _params, socket) do
-    {:noreply, assign(socket, :show_cancel_modal, false)}
-  end
-
-  def handle_event("confirm_cancel", %{"cancel" => %{"note" => note}}, socket) do
-    scope = socket.assigns.current_scope
-
-    case Obligations.skip(scope, socket.assigns.obligation, %{note: note}) do
-      {:ok, _, _} ->
-        {:noreply,
-         socket
-         |> put_flash(:info, "Obligation cancelled.")
-         |> push_navigate(to: ~p"/m/#{scope.entity.slug}")}
-
-      {:error, :note_required} ->
-        {:noreply, put_flash(socket, :error, "A reason is required.")}
-
-      _ ->
-        {:noreply, put_flash(socket, :error, "Could not cancel.")}
     end
   end
 
@@ -1118,7 +1053,6 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
       :done_form,
       to_form(%{"note" => "", "next_due_by" => suggestion(obligation, recurring?)}, as: :done)
     )
-    |> assign(:cancel_form, to_form(%{"note" => ""}, as: :cancel))
     |> assign(
       :skip_form,
       to_form(%{"note" => "", "next_due_by" => suggestion(obligation, recurring?)}, as: :skip)

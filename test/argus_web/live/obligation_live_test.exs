@@ -424,7 +424,7 @@ defmodule ArgusWeb.ObligationLiveTest do
     refute html =~ "Due soon"
   end
 
-  test "recurring obligation shows skip instead of cancel", %{conn: conn} do
+  test "skip button is shown for all live cycles (recurring and one-off)", %{conn: conn} do
     {scope, obligation} = recurring_manager_scope_fixture(interval: "monthly")
     conn = log_in_user(conn, scope.user)
 
@@ -433,6 +433,15 @@ defmodule ArgusWeb.ObligationLiveTest do
 
     refute has_element?(view, "#cancel-btn")
     assert has_element?(view, "#skip-btn")
+
+    {scope2, obligation2} = manager_obligation_scope_fixture()
+    conn2 = log_in_user(build_conn(), scope2.user)
+
+    {:ok, view2, _html} =
+      live(conn2, ~p"/entities/#{scope2.entity.slug}/obligations/#{obligation2.id}")
+
+    refute has_element?(view2, "#cancel-btn")
+    assert has_element?(view2, "#skip-btn")
   end
 
   test "skip modal requires reason and next due", %{conn: conn} do
@@ -494,11 +503,11 @@ defmodule ArgusWeb.ObligationLiveTest do
     {:ok, view, _html} =
       live(conn, ~p"/entities/#{scope.entity.slug}/obligations/#{obligation.id}")
 
-    view |> element("#cancel-btn") |> render_click()
-    assert has_element?(view, "#cancel-modal")
+    view |> element("#skip-btn") |> render_click()
+    assert has_element?(view, "#skip-modal")
 
     view |> element("#argus-shell") |> render_keydown()
-    refute has_element?(view, "#cancel-modal")
+    refute has_element?(view, "#skip-modal")
 
     view |> element("#done-btn") |> render_click()
     assert has_element?(view, "#done-modal")
@@ -507,35 +516,36 @@ defmodule ArgusWeb.ObligationLiveTest do
     refute has_element?(view, "#done-modal")
   end
 
-  test "cancel modal requires a reason", %{conn: conn} do
+  test "skip modal closes a one-off cycle", %{conn: conn} do
     {scope, obligation} = manager_obligation_scope_fixture()
     conn = log_in_user(conn, scope.user)
 
     {:ok, view, _html} =
       live(conn, ~p"/entities/#{scope.entity.slug}/obligations/#{obligation.id}")
 
-    view |> element("#cancel-btn") |> render_click()
-    assert has_element?(view, "#cancel-modal")
-
-    view |> form("#cancel-form", %{"cancel" => %{"note" => ""}}) |> render_submit()
-    assert render(view) =~ "A reason is required"
-  end
-
-  test "cancel modal submits reason and redirects", %{conn: conn} do
-    {scope, obligation} = manager_obligation_scope_fixture()
-    conn = log_in_user(conn, scope.user)
-
-    {:ok, view, _html} =
-      live(conn, ~p"/entities/#{scope.entity.slug}/obligations/#{obligation.id}")
-
-    view |> element("#cancel-btn") |> render_click()
+    view |> element("#skip-btn") |> render_click()
+    assert has_element?(view, "#skip-modal")
 
     view
-    |> form("#cancel-form", %{"cancel" => %{"note" => "Duplicate entry"}})
+    |> form("#skip-form", %{"skip" => %{"note" => "Not needed"}})
     |> render_submit()
 
     assert_redirect(view, ~p"/entities/#{scope.entity.slug}")
     assert Obligations.get_obligation!(scope, obligation.id).closed_at
+  end
+
+  test "skip modal requires a reason for one-off", %{conn: conn} do
+    {scope, obligation} = manager_obligation_scope_fixture()
+    conn = log_in_user(conn, scope.user)
+
+    {:ok, view, _html} =
+      live(conn, ~p"/entities/#{scope.entity.slug}/obligations/#{obligation.id}")
+
+    view |> element("#skip-btn") |> render_click()
+    assert has_element?(view, "#skip-modal")
+
+    view |> form("#skip-form", %{"skip" => %{"note" => ""}}) |> render_submit()
+    assert render(view) =~ "A reason is required"
   end
 
   test "end series modal requires a reason", %{conn: conn} do

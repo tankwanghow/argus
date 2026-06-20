@@ -57,7 +57,7 @@ defmodule ArgusWeb.MobileLiveTest do
     assert render(view) =~ "in_progress"
   end
 
-  test "mobile recurring obligation shows skip instead of cancel", %{conn: conn} do
+  test "mobile skip button shown for all live cycles (recurring and one-off)", %{conn: conn} do
     {scope, obligation} = recurring_manager_scope_fixture(interval: "monthly")
     conn = mobile_conn(conn, scope)
 
@@ -65,6 +65,14 @@ defmodule ArgusWeb.MobileLiveTest do
 
     refute has_element?(view, "#m-cancel-btn")
     assert has_element?(view, "#m-skip-btn")
+
+    {scope2, obligation2} = manager_obligation_scope_fixture()
+    conn2 = mobile_conn(build_conn(), scope2)
+
+    {:ok, view2, _html} = live(conn2, ~p"/m/#{scope2.entity.slug}/obligations/#{obligation2.id}")
+
+    refute has_element?(view2, "#m-cancel-btn")
+    assert has_element?(view2, "#m-skip-btn")
   end
 
   test "mobile escape closes open modals", %{conn: conn} do
@@ -110,17 +118,19 @@ defmodule ArgusWeb.MobileLiveTest do
     assert render(view) =~ "Edited via modal"
   end
 
-  test "mobile cancel modal requires a reason", %{conn: conn} do
+  test "mobile skip modal closes a one-off cycle", %{conn: conn} do
     {scope, obligation} = manager_obligation_scope_fixture()
     conn = mobile_conn(conn, scope)
 
     {:ok, view, _html} = live(conn, ~p"/m/#{scope.entity.slug}/obligations/#{obligation.id}")
 
-    view |> element("#m-cancel-btn") |> render_click()
-    assert has_element?(view, "#m-cancel-modal")
+    view |> element("#m-skip-btn") |> render_click()
+    assert has_element?(view, "#m-skip-modal")
 
-    view |> form("#m-cancel-form", %{"cancel" => %{"note" => ""}}) |> render_submit()
-    assert render(view) =~ "A reason is required"
+    view |> form("#m-skip-form", %{"skip" => %{"note" => "Not needed"}}) |> render_submit()
+
+    assert_redirect(view, ~p"/m/#{scope.entity.slug}")
+    assert Obligations.get_obligation!(scope, obligation.id).closed_at
   end
 
   test "mobile done modal requires next due for recurring", %{conn: conn} do
