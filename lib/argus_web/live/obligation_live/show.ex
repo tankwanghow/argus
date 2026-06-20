@@ -406,7 +406,6 @@ defmodule ArgusWeb.ObligationLive.Show do
             <.char_count_input field={@edit_form[:title]} label="Title" max={30} required />
             <.input field={@edit_form[:due_by]} type="date" label="Due by" required />
             <div class="fieldset mb-2">
-              <label class="label mb-1">Collaborators</label>
               <.input
                 field={@edit_form[:primary_assignee_id]}
                 type="select"

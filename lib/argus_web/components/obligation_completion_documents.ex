@@ -45,8 +45,6 @@ defmodule ArgusWeb.ObligationCompletionDocuments do
         This obligation type has no required completion documents.
       </div>
 
-      <div class="argus-meta-label">Completion documents</div>
-
       <ul class="divide-y divide-base-300 rounded-box border border-base-300">
         <li
           :for={{slot, live} <- @slot_rows}

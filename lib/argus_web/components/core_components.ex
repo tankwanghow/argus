@@ -505,6 +505,7 @@ defmodule ArgusWeb.CoreComponents do
   """
   def format_date(nil), do: "—"
   def format_date(%Date{} = date), do: Calendar.strftime(date, "%d %b %Y")
+  def format_date(%Date{} = date, :short), do: Calendar.strftime(date, "%Y-%m-%d")
 
   @doc """
   Formats a `DateTime` for display, e.g. `15 Jan 2026, 14:30`.
