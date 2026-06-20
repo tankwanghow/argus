@@ -52,11 +52,11 @@ defmodule ArgusWeb.ObligationLiveTest do
     assert has_element?(view, "#obligation-row-#{live_obligation.id}")
     refute has_element?(view, "#obligation-row-#{completed.id}")
 
-    view |> element("#filter-completed") |> render_click()
+    view |> form("#obligation-status-filter", %{lifecycle: "completed"}) |> render_change()
     assert has_element?(view, "#obligation-row-#{completed.id}")
     refute has_element?(view, "#obligation-row-#{live_obligation.id}")
 
-    view |> element("#filter-skipped") |> render_click()
+    view |> form("#obligation-status-filter", %{lifecycle: "skipped"}) |> render_change()
     assert has_element?(view, "#obligation-row-#{to_skip.id}")
 
     member_conn = log_in_user(conn, member_scope.user)
@@ -64,13 +64,14 @@ defmodule ArgusWeb.ObligationLiveTest do
     {:ok, member_view, _html} =
       live(member_conn, ~p"/entities/#{manager.entity.slug}")
 
-    member_view |> element("#filter-my_live") |> render_click()
+    # member defaults to Mine + Live
+    assert has_element?(member_view, "#scope-mine.tab-active")
     assert has_element?(member_view, "#obligation-row-#{live_obligation.id}")
 
-    member_view |> element("#filter-my_completed") |> render_click()
+    member_view |> form("#obligation-status-filter", %{lifecycle: "completed"}) |> render_change()
     assert has_element?(member_view, "#obligation-row-#{completed.id}")
 
-    view |> element("#filter-live") |> render_click()
+    view |> form("#obligation-status-filter", %{lifecycle: "live"}) |> render_change()
     view |> element("#obligation-search") |> render_keyup(%{"value" => "Alpha"})
     assert has_element?(view, "#obligation-row-#{live_obligation.id}")
     refute has_element?(view, "#obligation-row-#{to_skip.id}")

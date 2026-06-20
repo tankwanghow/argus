@@ -131,7 +131,7 @@ defmodule Argus.Obligations do
     |> Repo.all()
   end
 
-  @status_filters ~w(my_live my_completed live completed skipped all)a
+  @status_filters ~w(my_live my_completed my_skipped my_all live completed skipped all)a
 
   @doc """
   Lists obligations for the entity scope.
@@ -159,7 +159,8 @@ defmodule Argus.Obligations do
     |> filter_by_query(query)
   end
 
-  defp scope_to_assignee(query, status, user) when status in [:my_live, :my_completed] do
+  defp scope_to_assignee(query, status, user)
+       when status in [:my_live, :my_completed, :my_skipped, :my_all] do
     collaborator_ids = collaborator_obligation_ids(user.id)
 
     where(
@@ -177,17 +178,20 @@ defmodule Argus.Obligations do
     from o in query, where: not is_nil(o.completed_at)
   end
 
-  defp apply_status_filter(query, :skipped) do
+  defp apply_status_filter(query, status) when status in [:skipped, :my_skipped] do
     from o in query, where: not is_nil(o.closed_at)
   end
 
-  defp apply_status_filter(query, :all), do: query
+  defp apply_status_filter(query, status) when status in [:all, :my_all], do: query
 
   defp apply_list_order(query, status) when status in [:live, :my_live],
     do: order_by(query, [o], asc: o.due_by)
 
   defp apply_list_order(query, status) when status in [:completed, :my_completed],
     do: order_by(query, [o], desc: o.completed_at)
+
+  defp apply_list_order(query, status) when status in [:skipped, :my_skipped],
+    do: order_by(query, [o], desc: o.closed_at)
 
   defp apply_list_order(query, _), do: order_by(query, [o], desc: o.due_by)
 

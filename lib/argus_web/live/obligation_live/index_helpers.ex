@@ -6,35 +6,45 @@ defmodule ArgusWeb.ObligationLive.IndexHelpers do
   alias Argus.Obligations.{Obligation, Urgency}
 
   @urgency_rank %{overdue: 0, due_soon: 1, ok: 2}
-  @statuses ~w(my_live my_completed live completed skipped all)
+  @lifecycles ~w(live completed skipped all)a
 
-  def statuses, do: @statuses
+  @doc "Lifecycle options for the status dropdown, as `{value, label}` pairs."
+  def lifecycles, do: Enum.map(@lifecycles, &{Atom.to_string(&1), lifecycle_label(&1)})
 
-  def default_status(%Scope{role: :member}), do: :my_live
-  def default_status(_scope), do: :live
+  @doc "Whether the list defaults to the current user's own work."
+  def default_mine?(%Scope{role: :member}), do: true
+  def default_mine?(_scope), do: false
 
-  def parse_status("my_live"), do: :my_live
-  def parse_status("my_completed"), do: :my_completed
-  def parse_status("completed"), do: :completed
-  def parse_status("skipped"), do: :skipped
-  def parse_status("all"), do: :all
-  def parse_status(_), do: :live
+  def parse_lifecycle("completed"), do: :completed
+  def parse_lifecycle("skipped"), do: :skipped
+  def parse_lifecycle("all"), do: :all
+  def parse_lifecycle(_), do: :live
 
-  def status_label(:my_live), do: "My Live"
-  def status_label(:my_completed), do: "My Completed"
-  def status_label(:live), do: "Live"
-  def status_label(:completed), do: "Completed"
-  def status_label(:skipped), do: "Skipped"
-  def status_label(:all), do: "All"
+  def lifecycle_label(:live), do: "Live"
+  def lifecycle_label(:completed), do: "Completed"
+  def lifecycle_label(:skipped), do: "Skipped"
+  def lifecycle_label(:all), do: "All"
 
-  def empty_message(:my_live), do: "No live obligations assigned to you."
-  def empty_message(:my_completed), do: "No completed obligations assigned to you."
-  def empty_message(:live), do: "No live obligations."
-  def empty_message(:completed), do: "No completed obligations."
-  def empty_message(:skipped), do: "No skipped obligations."
-  def empty_message(:all), do: "No obligations."
+  @doc "Combined status atom for `Obligations.list_obligations/2`."
+  def status_atom(true, :live), do: :my_live
+  def status_atom(true, :completed), do: :my_completed
+  def status_atom(true, :skipped), do: :my_skipped
+  def status_atom(true, :all), do: :my_all
+  def status_atom(false, lifecycle), do: lifecycle
 
-  def load_rows(scope, today, status, query) do
+  def empty_message(mine?, lifecycle) do
+    who = if mine?, do: " assigned to you", else: ""
+
+    case lifecycle do
+      :live -> "No live obligations#{who}."
+      :completed -> "No completed obligations#{who}."
+      :skipped -> "No skipped obligations#{who}."
+      :all -> "No obligations#{who}."
+    end
+  end
+
+  def load_rows(scope, today, mine?, lifecycle, query) do
+    status = status_atom(mine?, lifecycle)
     obligations = Obligations.list_obligations(scope, status: status, query: query)
     summaries = Obligations.event_summaries_for(obligations)
 
@@ -52,16 +62,14 @@ defmodule ArgusWeb.ObligationLive.IndexHelpers do
         latest_event: latest_event
       }
     end)
-    |> sort_rows(status)
+    |> sort_rows(lifecycle)
   end
 
-  defp sort_rows(rows, status) when status in [:live, :my_live] do
+  defp sort_rows(rows, :live) do
     Enum.sort_by(rows, fn %{obligation: o, urgency: u} -> {@urgency_rank[u], o.due_by} end)
   end
 
-  defp sort_rows(rows, _status) do
-    rows
-  end
+  defp sort_rows(rows, _lifecycle), do: rows
 
   def cycle_status(%Obligation{completed_at: %DateTime{}}), do: :completed
   def cycle_status(%Obligation{series_ended_at: %DateTime{}}), do: :series_ended

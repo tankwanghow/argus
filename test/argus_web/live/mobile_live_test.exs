@@ -193,7 +193,8 @@ defmodule ArgusWeb.MobileLiveTest do
 
     {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}")
 
-    view |> element("#m-filter-my_completed") |> render_click()
+    # member defaults to Mine; switch the status dropdown to Completed
+    view |> form("#m-obligation-status-filter", %{lifecycle: "completed"}) |> render_change()
     assert has_element?(view, "#m-ob-#{completed.id}")
     refute has_element?(view, "#m-obligations-empty")
   end
@@ -215,7 +216,7 @@ defmodule ArgusWeb.MobileLiveTest do
 
     {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}")
 
-    view |> element("#m-filter-skipped") |> render_click()
+    view |> form("#m-obligation-status-filter", %{lifecycle: "skipped"}) |> render_change()
     assert has_element?(view, "#m-ob-#{skipped.id}")
     assert render(view) =~ "skipped"
   end

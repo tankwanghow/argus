@@ -229,11 +229,15 @@ dashboard is where overdue/due-soon work surfaces, computed at render time:
   Every live row map carries both `urgency` and `tier`.
 - `reminder_offsets` / `complete_documents` are validated and normalized on the `Type` changeset
   (write time), so the render path can't crash on bad input; `parse_offsets` still parses defensively.
-- Status filter (single flat list, no grouping): `My Live · My Completed · Live · Completed ·
-  Skipped · All` + title/type/assignee search. The **Skipped** filter selects `closed_at IS NOT NULL`
-  (covers both skipped and series-ended cycles; their badges differentiate). `default_status` is
-  role-based — members land on **My Live**, managers/admins on **Live** (team). Live/My-Live are
-  sorted overdue → due_soon → `due_by` asc; other statuses keep DB order.
+- Filter (single flat list, no grouping) is **two orthogonal controls**, not one tab strip: a
+  **scope toggle** (`Mine` / `Team`) and a **status dropdown** (`Live · Completed · Skipped · All`),
+  plus title/type/assignee search. `IndexHelpers` keeps a `mine?` boolean + a `lifecycle` atom and
+  maps them to the combined `list_obligations` status atom via `status_atom/2` (mine → `my_*`). The
+  **Skipped** lifecycle selects `closed_at IS NOT NULL` (covers both skipped and series-ended cycles;
+  their badges differentiate). Defaults are role-based via `default_mine?/1` — members land on
+  **Mine + Live**, managers/admins on **Team + Live**. The Live lifecycle is sorted overdue →
+  due_soon → `due_by` asc; completed by `completed_at` desc, skipped by `closed_at` desc, all by
+  `due_by` desc.
 
 ### Out of scope for v1
 

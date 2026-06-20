@@ -397,6 +397,55 @@ defmodule Argus.ObligationsTest do
       assert completed.id in my_completed_ids
       refute completed.id in my_live_ids
     end
+
+    test "my_skipped and my_all scope to the user across lifecycles" do
+      manager = manager_scope_fixture()
+      member_scope = member_scope_on_entity(manager.entity)
+      type = type_fixture(manager.entity)
+
+      {:ok, mine_live} =
+        Obligations.create_obligation(manager, %{
+          title: "Mine Live",
+          obligation_type_id: type.id,
+          primary_assignee_id: member_scope.user.id,
+          due_by: ~D[2026-06-30],
+          open_note: "live"
+        })
+
+      {:ok, mine_to_skip} =
+        Obligations.create_obligation(manager, %{
+          title: "Mine Skip",
+          obligation_type_id: type.id,
+          primary_assignee_id: member_scope.user.id,
+          due_by: ~D[2026-05-30],
+          open_note: "skip"
+        })
+
+      assert {:ok, mine_skipped, nil} =
+               Obligations.skip(manager, mine_to_skip, %{note: "superseded"})
+
+      {:ok, others} =
+        Obligations.create_obligation(manager, %{
+          title: "Theirs Skip",
+          obligation_type_id: type.id,
+          primary_assignee_id: manager.user.id,
+          due_by: ~D[2026-05-15],
+          open_note: "skip"
+        })
+
+      assert {:ok, others_skipped, nil} = Obligations.skip(manager, others, %{note: "nope"})
+
+      my_skipped =
+        member_scope |> Obligations.list_obligations(status: :my_skipped) |> Enum.map(& &1.id)
+
+      assert mine_skipped.id in my_skipped
+      refute others_skipped.id in my_skipped
+
+      my_all = member_scope |> Obligations.list_obligations(status: :my_all) |> Enum.map(& &1.id)
+      assert mine_live.id in my_all
+      assert mine_skipped.id in my_all
+      refute others_skipped.id in my_all
+    end
   end
 
   describe "list_unassigned/1 and list_recently_completed/1" do

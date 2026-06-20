@@ -8,7 +8,7 @@ defmodule ArgusWeb.DashboardLiveTest do
 
   setup :register_and_log_in_user
 
-  test "member defaults to the My Live filter", %{conn: conn} do
+  test "member defaults to the Mine scope", %{conn: conn} do
     {scope, _obligation} = assigned_member_scope_fixture()
 
     conn = log_in_user(conn, scope.user)
@@ -16,11 +16,11 @@ defmodule ArgusWeb.DashboardLiveTest do
     {:ok, view, _html} =
       live(conn, ~p"/entities/#{scope.entity.slug}")
 
-    assert has_element?(view, "#filter-my_live.tab-active")
-    refute has_element?(view, "#filter-live.tab-active")
+    assert has_element?(view, "#scope-mine.tab-active")
+    refute has_element?(view, "#scope-team.tab-active")
   end
 
-  test "manager defaults to the Live filter", %{conn: conn} do
+  test "manager defaults to the Team scope", %{conn: conn} do
     {scope, _obligation} = manager_obligation_scope_fixture()
 
     conn = log_in_user(conn, scope.user)
@@ -28,7 +28,7 @@ defmodule ArgusWeb.DashboardLiveTest do
     {:ok, view, _html} =
       live(conn, ~p"/entities/#{scope.entity.slug}")
 
-    assert has_element?(view, "#filter-live.tab-active")
+    assert has_element?(view, "#scope-team.tab-active")
   end
 
   test "user menu has all entities and members links", %{conn: conn} do
@@ -44,15 +44,16 @@ defmodule ArgusWeb.DashboardLiveTest do
     refute has_element?(view, "nav a", "Members")
   end
 
-  test "switches the status filter", %{conn: conn} do
+  test "switches scope between Mine and Team", %{conn: conn} do
     {scope, _obligation} = manager_obligation_scope_fixture()
     conn = log_in_user(conn, scope.user)
 
     {:ok, view, _html} =
       live(conn, ~p"/entities/#{scope.entity.slug}")
 
-    view |> element("#filter-my_live") |> render_click()
-    assert has_element?(view, "#filter-my_live.tab-active")
+    view |> element("#scope-mine") |> render_click()
+    assert has_element?(view, "#scope-mine.tab-active")
+    refute has_element?(view, "#scope-team.tab-active")
   end
 
   test "manager sees the New obligation button", %{conn: conn} do
@@ -109,7 +110,7 @@ defmodule ArgusWeb.DashboardLiveTest do
 
     {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}")
 
-    view |> element("#filter-completed") |> render_click()
+    view |> form("#obligation-status-filter", %{lifecycle: "completed"}) |> render_change()
     assert has_element?(view, "#obligation-row-#{original.id}", "in error")
   end
 

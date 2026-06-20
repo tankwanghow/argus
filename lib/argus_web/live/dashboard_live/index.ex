@@ -25,18 +25,38 @@ defmodule ArgusWeb.DashboardLive.Index do
             </:actions>
           </.header>
 
-          <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <div id="obligation-status-filters" class="tabs tabs-box tabs-wrap flex-1 min-w-0">
-              <.link
-                :for={status <- Index.statuses()}
-                id={"filter-#{status}"}
-                phx-click="filter_status"
-                phx-value-status={status}
-                class={["tab", @status == Index.parse_status(status) && "tab-active font-bold"]}
+          <div class="flex flex-wrap items-center gap-2">
+            <div id="obligation-scope-toggle" class="tabs tabs-box">
+              <button
+                id="scope-mine"
+                type="button"
+                phx-click="set_scope"
+                phx-value-mine="true"
+                class={["tab", @mine? && "tab-active font-bold"]}
               >
-                {Index.status_label(Index.parse_status(status))}
-              </.link>
+                Mine
+              </button>
+              <button
+                id="scope-team"
+                type="button"
+                phx-click="set_scope"
+                phx-value-mine="false"
+                class={["tab", !@mine? && "tab-active font-bold"]}
+              >
+                Team
+              </button>
             </div>
+            <form id="obligation-status-filter" phx-change="set_status">
+              <select name="lifecycle" class="select select-sm">
+                <option
+                  :for={{value, label} <- Index.lifecycles()}
+                  value={value}
+                  selected={@lifecycle == Index.parse_lifecycle(value)}
+                >
+                  {label}
+                </option>
+              </select>
+            </form>
             <input
               id="obligation-search"
               type="search"
@@ -45,7 +65,7 @@ defmodule ArgusWeb.DashboardLive.Index do
               phx-keyup="search"
               phx-debounce="150"
               value={@query}
-              class="input input-sm w-full sm:w-48 shrink-0"
+              class="input input-sm w-full sm:w-48 sm:ml-auto"
             />
           </div>
         </div>
@@ -65,7 +85,7 @@ defmodule ArgusWeb.DashboardLive.Index do
               id="obligations-empty"
               class="py-8 text-center text-base-content/60"
             >
-              {Index.empty_message(@status)}
+              {Index.empty_message(@mine?, @lifecycle)}
             </li>
           </ul>
         </div>
@@ -126,14 +146,19 @@ defmodule ArgusWeb.DashboardLive.Index do
     {:ok,
      socket
      |> assign(:today, today)
-     |> assign(:status, Index.default_status(scope))
+     |> assign(:mine?, Index.default_mine?(scope))
+     |> assign(:lifecycle, :live)
      |> assign(:query, "")
      |> load_rows()}
   end
 
   @impl true
-  def handle_event("filter_status", %{"status" => status}, socket) do
-    {:noreply, socket |> assign(:status, Index.parse_status(status)) |> load_rows()}
+  def handle_event("set_scope", %{"mine" => mine}, socket) do
+    {:noreply, socket |> assign(:mine?, mine == "true") |> load_rows()}
+  end
+
+  def handle_event("set_status", %{"lifecycle" => lifecycle}, socket) do
+    {:noreply, socket |> assign(:lifecycle, Index.parse_lifecycle(lifecycle)) |> load_rows()}
   end
 
   def handle_event("search", %{"value" => query}, socket) do
@@ -143,8 +168,10 @@ defmodule ArgusWeb.DashboardLive.Index do
   def handle_event("close_modal_on_escape", _params, socket), do: {:noreply, socket}
 
   defp load_rows(socket) do
-    %{current_scope: scope, today: today, status: status, query: query} = socket.assigns
-    assign(socket, :rows, Index.load_rows(scope, today, status, query))
+    %{current_scope: scope, today: today, mine?: mine?, lifecycle: lifecycle, query: query} =
+      socket.assigns
+
+    assign(socket, :rows, Index.load_rows(scope, today, mine?, lifecycle, query))
   end
 
   defp obligation_subtitle(obligation) do

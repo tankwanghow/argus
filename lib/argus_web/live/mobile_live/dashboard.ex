@@ -20,17 +20,38 @@ defmodule ArgusWeb.MobileLive.Dashboard do
           value={@query}
           class="input w-full"
         />
-        <div id="m-obligation-status-filters" class="tabs tabs-box tabs-wrap w-full">
-          <button
-            :for={status <- Index.statuses()}
-            id={"m-filter-#{status}"}
-            type="button"
-            phx-click="filter_status"
-            phx-value-status={status}
-            class={["tab tab-xs", @status == Index.parse_status(status) && "tab-active"]}
-          >
-            {Index.status_label(Index.parse_status(status))}
-          </button>
+        <div class="flex items-center gap-2">
+          <div id="m-obligation-scope-toggle" class="tabs tabs-box flex-1">
+            <button
+              id="m-scope-mine"
+              type="button"
+              phx-click="set_scope"
+              phx-value-mine="true"
+              class={["tab flex-1", @mine? && "tab-active"]}
+            >
+              Mine
+            </button>
+            <button
+              id="m-scope-team"
+              type="button"
+              phx-click="set_scope"
+              phx-value-mine="false"
+              class={["tab flex-1", !@mine? && "tab-active"]}
+            >
+              Team
+            </button>
+          </div>
+          <form id="m-obligation-status-filter" phx-change="set_status">
+            <select name="lifecycle" class="select select-sm">
+              <option
+                :for={{value, label} <- Index.lifecycles()}
+                value={value}
+                selected={@lifecycle == Index.parse_lifecycle(value)}
+              >
+                {label}
+              </option>
+            </select>
+          </form>
         </div>
       </div>
 
@@ -46,7 +67,7 @@ defmodule ArgusWeb.MobileLive.Dashboard do
           id="m-obligations-empty"
           class="text-center text-base-content/60 py-12"
         >
-          {Index.empty_message(@status)}
+          {Index.empty_message(@mine?, @lifecycle)}
         </li>
       </ul>
     </Layouts.mobile_app>
@@ -61,14 +82,19 @@ defmodule ArgusWeb.MobileLive.Dashboard do
     {:ok,
      socket
      |> assign(:today, today)
-     |> assign(:status, Index.default_status(scope))
+     |> assign(:mine?, Index.default_mine?(scope))
+     |> assign(:lifecycle, :live)
      |> assign(:query, "")
      |> load_rows()}
   end
 
   @impl true
-  def handle_event("filter_status", %{"status" => status}, socket) do
-    {:noreply, socket |> assign(:status, Index.parse_status(status)) |> load_rows()}
+  def handle_event("set_scope", %{"mine" => mine}, socket) do
+    {:noreply, socket |> assign(:mine?, mine == "true") |> load_rows()}
+  end
+
+  def handle_event("set_status", %{"lifecycle" => lifecycle}, socket) do
+    {:noreply, socket |> assign(:lifecycle, Index.parse_lifecycle(lifecycle)) |> load_rows()}
   end
 
   def handle_event("search", params, socket) do
@@ -79,7 +105,9 @@ defmodule ArgusWeb.MobileLive.Dashboard do
   def handle_event("close_modal_on_escape", _params, socket), do: {:noreply, socket}
 
   defp load_rows(socket) do
-    %{current_scope: scope, today: today, status: status, query: query} = socket.assigns
-    assign(socket, :rows, Index.load_rows(scope, today, status, query))
+    %{current_scope: scope, today: today, mine?: mine?, lifecycle: lifecycle, query: query} =
+      socket.assigns
+
+    assign(socket, :rows, Index.load_rows(scope, today, mine?, lifecycle, query))
   end
 end
