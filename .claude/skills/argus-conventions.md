@@ -75,7 +75,7 @@ Argus must wire into it the same way (mirror peggy's `mix.exs` + `config/config.
 - Domain logic lives in context modules (`Argus.Accounts`, `Argus.Entities`, `Argus.Obligations`).
   LiveViews call contexts, never `Repo` directly.
 - **Bespoke context functions** (decided), all **scope-first**: `create_obligation/2`,
-  `complete/3`, `cancel_obligation/3`, `start_progress/2`, etc. (scope replaces the old
+  `complete/3`, `skip/3`, `end_series/3`, `start_progress/2`, etc. (scope replaces the old
   entity+actor args) — Argus does NOT adopt full_circle's generic `StdInterface`.
 - Multi-step writes use `Ecto.Multi`/transactions.
 - **Return conventions (house style):**
@@ -189,7 +189,7 @@ Rules:
 - **Voided files are kept and remain downloadable** (`DocumentController` serves them;
   do not reintroduce a voided→404 guard).
 - Admin type edits: `Obligations.propagate_complete_documents_to_live/3` updates the
-  snapshot of **live** obligations only (completed/cancelled frozen); a removed/renamed
+  snapshot of **live** obligations only (completed/closed frozen); a removed/renamed
   slot reclassifies its file required → supporting **without mutating the row** (re-adding
   the slot re-links it).
 - Create-form attachments are LiveView upload entries **consumed on save** (no disk
