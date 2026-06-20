@@ -60,6 +60,7 @@ defmodule ArgusWeb.ObligationLive.Index do
                     <.obligation_status_badge
                       :if={row.cycle_status != :live}
                       cycle_status={row.cycle_status}
+                      in_error={!is_nil(row.obligation.completed_in_error_at)}
                     />
                     <.urgency_badge :if={row.cycle_status == :live} urgency={row.urgency} />
                   </div>

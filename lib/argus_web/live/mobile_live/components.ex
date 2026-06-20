@@ -21,7 +21,11 @@ defmodule ArgusWeb.MobileLive.Components do
       >
         <div class="flex items-center justify-between gap-2">
           <span class="font-medium truncate">{@row.obligation.title}</span>
-          <.obligation_status_badge :if={@row.cycle_status != :live} cycle_status={@row.cycle_status} />
+          <.obligation_status_badge
+            :if={@row.cycle_status != :live}
+            cycle_status={@row.cycle_status}
+            in_error={!is_nil(@row.obligation.completed_in_error_at)}
+          />
           <.urgency_badge :if={@row.cycle_status == :live} urgency={@row.urgency} />
         </div>
         <div class="text-sm text-base-content/60 truncate mt-1">

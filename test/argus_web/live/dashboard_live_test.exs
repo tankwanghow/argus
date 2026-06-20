@@ -76,6 +76,30 @@ defmodule ArgusWeb.DashboardLiveTest do
     assert has_element?(view, "#summary-overdue")
   end
 
+  test "recently completed marks a completed-in-error cycle", %{conn: conn} do
+    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    conn = log_in_user(conn, manager.user)
+    type = type_fixture(manager.entity)
+
+    {:ok, obligation} =
+      Obligations.create_obligation(manager, %{
+        title: "Wrong filing",
+        obligation_type_id: type.id,
+        primary_assignee_id: manager.user.id,
+        due_by: ~D[2026-06-15],
+        open_note: "open"
+      })
+
+    {:ok, done, _} = Obligations.complete(manager, obligation, %{note: "Done"})
+
+    {:ok, original, _replacement} =
+      Obligations.mark_completed_in_error(manager, done, %{reason: "oops"})
+
+    {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}")
+
+    assert has_element?(view, "#completed-row-#{original.id}", "in error")
+  end
+
   test "dashboard rows show latest event status and count", %{conn: conn} do
     {scope, obligation} = manager_obligation_scope_fixture()
     conn = log_in_user(conn, scope.user)

@@ -314,6 +314,9 @@ defmodule ArgusWeb.DashboardLive.Index do
     >
       <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
         <span class="font-medium">{@row.obligation.title}</span>
+        <span :if={@row.obligation.completed_in_error_at} class="badge badge-xs badge-error">
+          in error
+        </span>
         <span class="text-sm text-base-content/60">·</span>
         <span class="text-sm">{format_date(@row.obligation.due_by)}</span>
         <span :if={@due_label} class={["text-xs", @tier_color]}>{@due_label}</span>
