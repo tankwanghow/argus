@@ -39,7 +39,7 @@ defmodule Argus.Obligations.Obligation do
     obligation
     |> cast(attrs, @cast_fields)
     |> validate_required([:title, :obligation_type_id, :due_by])
-    |> validate_length(:title, max: 30)
+    |> validate_length(:title, max: 60)
     |> normalize_blank_assignee()
     |> unique_constraint(:series_id, name: :obligations_one_live_cycle_per_series)
   end

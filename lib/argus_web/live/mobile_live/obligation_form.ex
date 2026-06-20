@@ -30,7 +30,7 @@ defmodule ArgusWeb.MobileLive.ObligationForm do
           phx-submit="save"
           class=""
         >
-          <.char_count_input field={@form[:title]} label="Title" max={30} required />
+          <.char_count_input field={@form[:title]} label="Title" max={60} required />
           <.input
             field={@form[:obligation_type_id]}
             type="select"

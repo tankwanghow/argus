@@ -295,7 +295,7 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
             phx-submit="save_obligation"
             class="mt-2 space-y-3"
           >
-            <.char_count_input field={@edit_form[:title]} label="Title" max={30} required />
+            <.char_count_input field={@edit_form[:title]} label="Title" max={60} required />
             <.input field={@edit_form[:due_by]} type="date" label="Due by" required />
             <div class="fieldset mb-2">
               <.input
