@@ -628,7 +628,7 @@ defmodule ArgusWeb.ObligationLive.Show do
         <div class="modal-box">
           <h3 class="font-bold text-lg">End series</h3>
           <p class="text-sm text-base-content/60 mt-1">
-            Cancels the current cycle and stops future recurrence. A reason is recorded on the timeline.
+            Closes the current cycle and stops future recurrence. A reason is recorded on the timeline.
           </p>
           <.form
             for={@end_series_form}
