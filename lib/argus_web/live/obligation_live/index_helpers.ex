@@ -41,7 +41,8 @@ defmodule ArgusWeb.ObligationLive.IndexHelpers do
       %{
         obligation: obligation,
         cycle_status: cycle_status(obligation),
-        urgency: Urgency.classify(obligation.obligation_type, obligation.due_by, today)
+        urgency: Urgency.classify(obligation.obligation_type, obligation.due_by, today),
+        tier: Urgency.tier(obligation.obligation_type, obligation.due_by, today)
       }
     end)
     |> sort_rows(status)

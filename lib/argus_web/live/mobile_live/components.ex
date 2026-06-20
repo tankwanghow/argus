@@ -26,7 +26,12 @@ defmodule ArgusWeb.MobileLive.Components do
             cycle_status={@row.cycle_status}
             in_error={!is_nil(@row.obligation.completed_in_error_at)}
           />
-          <.urgency_badge :if={@row.cycle_status == :live} urgency={@row.urgency} />
+          <.urgency_badge
+            :if={@row.cycle_status == :live}
+            tier={@row.tier}
+            due_by={@row.obligation.due_by}
+            today={@today}
+          />
         </div>
         <div class="text-sm text-base-content/60 truncate mt-1">
           {@row.obligation.obligation_type.name}
@@ -41,15 +46,14 @@ defmodule ArgusWeb.MobileLive.Components do
 
   defp accent(%{cycle_status: :cancelled}), do: "border-error/60"
   defp accent(%{cycle_status: :completed}), do: "border-success/60"
-  defp accent(%{urgency: :overdue}), do: "border-error"
-  defp accent(%{urgency: :due_soon}), do: "border-warning"
+  defp accent(%{tier: tier}), do: tier_border(tier)
   defp accent(_), do: "border-transparent"
 
   defp text_color(%{cycle_status: status}) when status in [:completed, :cancelled],
     do: "text-base-content/50"
 
-  defp text_color(%{urgency: :overdue}), do: "text-error"
-  defp text_color(%{urgency: :due_soon}), do: "text-warning"
+  defp text_color(%{tier: tier}) when tier in [:overdue, :critical], do: "text-error"
+  defp text_color(%{tier: tier}) when tier in [:due_soon, :approaching], do: "text-warning"
   defp text_color(_), do: "text-base-content/50"
 
   defp card_meta(%{cycle_status: :completed, obligation: o}, _today) do

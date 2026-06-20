@@ -43,7 +43,7 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
           </div>
           <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
             <h1 class="text-lg font-semibold leading-tight min-w-0 flex-1">{@obligation.title}</h1>
-            <.urgency_badge :if={@live?} urgency={@urgency} />
+            <.urgency_badge :if={@live?} tier={@tier} due_by={@obligation.due_by} today={@today} />
             <.obligation_status_badge
               :if={!@live?}
               cycle_status={@cycle_status}
@@ -1100,7 +1100,7 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
     socket
     |> assign(:obligation, obligation)
     |> assign(:today, today)
-    |> assign(:urgency, Urgency.classify(obligation.obligation_type, obligation.due_by, today))
+    |> assign(:tier, Urgency.tier(obligation.obligation_type, obligation.due_by, today))
     |> assign(:cycle_status, Index.cycle_status(obligation))
     |> assign(:live?, live_cycle?(obligation))
     |> assign(:recurring?, recurring?)

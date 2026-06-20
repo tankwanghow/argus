@@ -11,7 +11,7 @@ defmodule ArgusWeb.MobileLive.Dashboard do
   def render(assigns) do
     ~H"""
     <Layouts.mobile_app flash={@flash} current_scope={@current_scope} active={:home}>
-      <div class="sticky top-0 z-30  px-4 py-3 bg-base-100/95 backdrop-blur border-b border-base-200">
+      <div class="sticky top-0 z-30 px-4 py-3 bg-base-100/95 backdrop-blur border-b border-base-200">
         <h1 class="text-lg font-semibold truncate">{@current_scope.entity.name}</h1>
         <div class="mt-2 tabs tabs-box w-full">
           <button
@@ -40,7 +40,7 @@ defmodule ArgusWeb.MobileLive.Dashboard do
         />
       </div>
 
-      <ul id="mobile-obligations" class="mt-3 space-y-2">
+      <ul id="mobile-obligations" class="px-4 space-y-2">
         <.obligation_card
           :for={row <- @rows}
           row={row}
@@ -93,7 +93,8 @@ defmodule ArgusWeb.MobileLive.Dashboard do
         %{
           obligation: obligation,
           cycle_status: :live,
-          urgency: Urgency.classify(obligation.obligation_type, obligation.due_by, today)
+          urgency: Urgency.classify(obligation.obligation_type, obligation.due_by, today),
+          tier: Urgency.tier(obligation.obligation_type, obligation.due_by, today)
         }
       end)
       |> Enum.sort_by(fn %{obligation: o, urgency: u} -> {@urgency_rank[u], o.due_by} end)

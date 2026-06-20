@@ -52,7 +52,10 @@ defmodule ArgusWeb.ObligationLive.Index do
                 navigate={
                   ~p"/entities/#{@current_scope.entity.slug}/obligations/#{row.obligation.id}"
                 }
-                class="argus-compact-row block border-l-4 border-transparent"
+                class={[
+                  "argus-compact-row block border-l-4",
+                  if(row.cycle_status == :live, do: tier_border(row.tier), else: "border-transparent")
+                ]}
               >
                 <div class="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_9rem_7rem] gap-x-4 gap-y-1 items-center">
                   <div class="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
@@ -62,7 +65,12 @@ defmodule ArgusWeb.ObligationLive.Index do
                       cycle_status={row.cycle_status}
                       in_error={!is_nil(row.obligation.completed_in_error_at)}
                     />
-                    <.urgency_badge :if={row.cycle_status == :live} urgency={row.urgency} />
+                    <.urgency_badge
+                      :if={row.cycle_status == :live}
+                      tier={row.tier}
+                      due_by={row.obligation.due_by}
+                      today={@today}
+                    />
                   </div>
                   <div class="text-sm text-base-content/60 truncate sm:text-right">
                     {row.obligation.obligation_type.name}

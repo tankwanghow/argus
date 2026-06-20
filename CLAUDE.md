@@ -209,7 +209,17 @@ dashboard is where overdue/due-soon work surfaces, computed at render time:
   `:due_soon` means `due_by` is within any offset in the type's `reminder_offsets`
   (comma-delimited days, e.g. `"30,7,1"`). `today` is **required and computed in the entity's
   timezone** via `Urgency.today_for(entity.timezone)` — never `Date.utc_today()`, which would
-  mis-date non-UTC tenants near midnight. Rendered by `UrgencyBadge` (red/amber/none).
+  mis-date non-UTC tenants near midnight. Used for dashboard **grouping/chips** (overdue/due_soon/ok).
+- `Obligations.Urgency.tier(type, due_by, today)` → `:overdue | :critical | :due_soon | :approaching
+  | :ok` is the **graded** refinement used for **color-coding card borders**. It splits the span
+  between the smallest and largest `reminder_offset` into three equal bands (critical → due_soon →
+  approaching); `:overdue` (past due) and `:ok` (beyond the largest offset) are fixed endpoints. A
+  **single offset** is widened by 7 days so it still yields three bands. Only `min`/`max` drive the
+  bands — intermediate offsets are decorative. Rendered by `ArgusWeb.UrgencyBadge`: `tier_border/1`
+  (the shared left-accent class `error → error/60 → warning → warning/40 → transparent`, used by
+  desktop index/dashboard and the mobile card so they don't drift) and `urgency_badge/1` (a
+  **tier-coloured countdown badge** — "Nd overdue" / "Due today" / "Nd left", nothing when `:ok`).
+  Every live row map carries both `urgency` and `tier`.
 - `reminder_offsets` / `complete_documents` are validated and normalized on the `Type` changeset
   (write time), so the render path can't crash on bad input; `parse_offsets` still parses defensively.
 - Split view: **My work** (default for member) vs **Team overview** (default for manager/admin),

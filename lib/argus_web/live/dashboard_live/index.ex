@@ -289,8 +289,6 @@ defmodule ArgusWeb.DashboardLive.Index do
           row={row}
           slug={@slug}
           today={@today}
-          accent={@tier.accent}
-          tier_color={@tier.color}
           subtitle={obligation_subtitle(row, @show_assignee)}
         />
       </li>
@@ -301,12 +299,17 @@ defmodule ArgusWeb.DashboardLive.Index do
   attr :row, :map, required: true
   attr :slug, :string, required: true
   attr :today, :any, default: nil
-  attr :accent, :string, required: true
-  attr :tier_color, :string, required: true
+  attr :accent, :string, default: nil
+  attr :tier_color, :string, default: nil
   attr :subtitle, :string, required: true
   attr :due_label, :string, default: nil
 
   defp obligation_row_link(assigns) do
+    assigns =
+      assigns
+      |> assign(:accent, assigns.accent || tier_border(assigns.row.tier))
+      |> assign(:tier_color, assigns.tier_color || urgency_text_class(assigns.row.tier))
+
     ~H"""
     <.link
       navigate={~p"/entities/#{@slug}/obligations/#{@row.obligation.id}"}
@@ -371,15 +374,13 @@ defmodule ArgusWeb.DashboardLive.Index do
         key: :overdue,
         label: "Overdue",
         color: "text-error",
-        dot: "bg-error",
-        accent: "border-error"
+        dot: "bg-error"
       },
       %{
         key: :due_soon,
         label: "Due soon",
         color: "text-warning",
-        dot: "bg-warning",
-        accent: "border-warning"
+        dot: "bg-warning"
       }
     ]
   end
@@ -389,15 +390,14 @@ defmodule ArgusWeb.DashboardLive.Index do
       key: :ok,
       label: "On track",
       color: "text-base-content/60",
-      dot: "bg-base-300",
-      accent: "border-transparent"
+      dot: "bg-base-300"
     }
   end
 
   defp tier_rows(grouped, key), do: Map.get(grouped, key, [])
 
-  defp urgency_text_class(:overdue), do: "text-error"
-  defp urgency_text_class(:due_soon), do: "text-warning"
+  defp urgency_text_class(tier) when tier in [:overdue, :critical], do: "text-error"
+  defp urgency_text_class(tier) when tier in [:due_soon, :approaching], do: "text-warning"
   defp urgency_text_class(_), do: "text-base-content/60"
 
   defp assignee_label(%{primary_assignee: nil}), do: "Unassigned"
@@ -502,6 +502,7 @@ defmodule ArgusWeb.DashboardLive.Index do
       %{
         obligation: obligation,
         urgency: Urgency.classify(obligation.obligation_type, obligation.due_by, today),
+        tier: Urgency.tier(obligation.obligation_type, obligation.due_by, today),
         event_count: event_count,
         latest_event: latest_event
       }

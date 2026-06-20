@@ -88,7 +88,7 @@ defmodule ArgusWeb.ObligationLive.Show do
           </div>
           <div class="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 mt-2">
             <h1 class="text-lg font-semibold leading-tight min-w-0">{@obligation.title}</h1>
-            <.urgency_badge :if={@live?} urgency={@urgency} />
+            <.urgency_badge :if={@live?} tier={@tier} due_by={@obligation.due_by} today={@today} />
             <div class="flex">
               <.obligation_status_badge
                 :if={!@live?}
@@ -700,7 +700,7 @@ defmodule ArgusWeb.ObligationLive.Show do
 
     today = Urgency.today_for(scope.entity.timezone)
 
-    urgency = Urgency.classify(obligation.obligation_type, obligation.due_by, today)
+    tier = Urgency.tier(obligation.obligation_type, obligation.due_by, today)
     live? = live_cycle?(obligation)
 
     {:ok,
@@ -724,7 +724,7 @@ defmodule ArgusWeb.ObligationLive.Show do
      |> assign(:note_form, nil)
      |> assign(:recurring?, recurring?(obligation))
      |> assign(:today, today)
-     |> assign(:urgency, urgency)
+     |> assign(:tier, tier)
      |> assign(:cycle_status, Index.cycle_status(obligation))
      |> assign(:live?, live?)
      |> assign(:member_options, member_options(scope))
