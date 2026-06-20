@@ -89,39 +89,39 @@ defmodule ArgusWeb.ObligationLive.Show do
           <div class="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 mt-2">
             <h1 class="text-lg font-semibold leading-tight min-w-0">{@obligation.title}</h1>
             <.urgency_badge :if={@live?} urgency={@urgency} />
-            <div>
-            <.obligation_status_badge
-              :if={!@live?}
-              cycle_status={@cycle_status}
-              detail={if @cycle_status == :completed, do: format_datetime(@obligation.completed_at)}
-            />
-            <div :if={@correctable?} class="dropdown dropdown-end">
-              <div
-                tabindex="0"
-                role="button"
-                id="completed-actions-menu"
-                class="btn btn-ghost btn-xs px-1"
-                aria-label="Completed cycle actions"
-              >
-                <.icon name="hero-ellipsis-vertical-mini" class="size-4" />
+            <div class="flex">
+              <.obligation_status_badge
+                :if={!@live?}
+                cycle_status={@cycle_status}
+                detail={if @cycle_status == :completed, do: format_datetime(@obligation.completed_at)}
+              />
+              <div :if={@correctable?} class="dropdown dropdown-end">
+                <div
+                  tabindex="0"
+                  role="button"
+                  id="completed-actions-menu"
+                  class="btn btn-ghost btn-xs px-1"
+                  aria-label="Completed cycle actions"
+                >
+                  <.icon name="hero-ellipsis-vertical-mini" class="size-4" />
+                </div>
+                <ul
+                  tabindex="0"
+                  class="dropdown-content menu menu-sm bg-base-100 rounded-box z-10 w-60 p-2 shadow border border-base-300"
+                >
+                  <li>
+                    <button
+                      id="mark-error-btn"
+                      type="button"
+                      phx-click="open_correct_modal"
+                      class="text-warning"
+                    >
+                      <.icon name="hero-exclamation-triangle-mini" class="size-4" />
+                      Mark completed in error
+                    </button>
+                  </li>
+                </ul>
               </div>
-              <ul
-                tabindex="0"
-                class="dropdown-content menu menu-sm bg-base-100 rounded-box z-10 w-60 p-2 shadow border border-base-300"
-              >
-                <li>
-                  <button
-                    id="mark-error-btn"
-                    type="button"
-                    phx-click="open_correct_modal"
-                    class="text-warning"
-                  >
-                    <.icon name="hero-exclamation-triangle-mini" class="size-4" />
-                    Mark completed in error
-                  </button>
-                </li>
-              </ul>
-            </div>
             </div>
           </div>
           <div
@@ -766,8 +766,8 @@ defmodule ArgusWeb.ObligationLive.Show do
          |> assign(:show_progress_modal, false)
          |> put_flash(:info, "Progress updated.")}
 
-      {:error, :not_open} ->
-        {:noreply, put_flash(socket, :error, "Already in progress.")}
+      {:error, :not_live} ->
+        {:noreply, put_flash(socket, :error, "This cycle is closed.")}
 
       {:error, :note_required} ->
         {:noreply, put_flash(socket, :error, "A progress note is required.")}

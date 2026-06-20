@@ -305,7 +305,7 @@ defmodule Argus.Obligations do
     note = Map.get(attrs, :note) || Map.get(attrs, "note")
 
     with true <- Authorization.can?(scope, :start_progress, obligation),
-         :ok <- ensure_latest_open(obligation),
+         :ok <- ensure_progressable(obligation),
          :ok <- validate_action_note(note),
          {:ok, event} <- insert_progress_event(scope, obligation, note) do
       {:ok, event}
@@ -918,13 +918,17 @@ defmodule Argus.Obligations do
     end)
   end
 
-  defp ensure_latest_open(%Obligation{} = obligation) do
-    forward_step? =
+  # A cycle accepts progress updates until it is closed. Multiple in_progress
+  # events are allowed (each is a logged progress note); only `done`/`cancelled`
+  # are terminal, so we reject once either exists. `open` stays singular (created
+  # at creation) and `done` singular (created at completion).
+  defp ensure_progressable(%Obligation{} = obligation) do
+    closed? =
       Event
-      |> where([e], e.obligation_id == ^obligation.id and e.status != "open")
+      |> where([e], e.obligation_id == ^obligation.id and e.status in ["done", "cancelled"])
       |> Repo.exists?()
 
-    if forward_step?, do: {:error, :not_open}, else: :ok
+    if closed?, do: {:error, :not_live}, else: :ok
   end
 
   defp insert_progress_event(%Scope{user: user}, %Obligation{} = obligation, note) do

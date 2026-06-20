@@ -131,10 +131,29 @@ defmodule Argus.ObligationsTest do
       assert {:error, :note_required} = Obligations.start_progress(scope, obligation, %{})
     end
 
-    test "is idempotent — rejected if already in_progress" do
+    test "allows multiple in_progress updates on a live cycle" do
       {scope, obligation} = assigned_member_scope_fixture()
-      assert {:ok, _} = Obligations.start_progress(scope, obligation, %{note: "Started"})
-      assert {:error, :not_open} = Obligations.start_progress(scope, obligation, %{note: "Again"})
+      assert {:ok, first} = Obligations.start_progress(scope, obligation, %{note: "Started"})
+      assert {:ok, second} = Obligations.start_progress(scope, obligation, %{note: "Halfway"})
+
+      assert first.status == "in_progress"
+      assert second.status == "in_progress"
+      assert first.id != second.id
+
+      in_progress =
+        Obligations.list_events(obligation)
+        |> Enum.filter(&(&1.status == "in_progress"))
+
+      assert length(in_progress) == 2
+    end
+
+    test "rejects a progress update once the cycle is done" do
+      {scope, obligation} = recurring_primary_scope_fixture(interval: "monthly")
+
+      {:ok, done, _spawned} =
+        Obligations.complete(scope, obligation, %{note: "Done", next_due_by: ~D[2026-02-15]})
+
+      assert {:error, :not_live} = Obligations.start_progress(scope, done, %{note: "Too late"})
     end
   end
 

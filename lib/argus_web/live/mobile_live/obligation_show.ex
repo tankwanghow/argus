@@ -699,8 +699,8 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
          |> assign(:show_progress_modal, false)
          |> put_flash(:info, "Progress updated.")}
 
-      {:error, :not_open} ->
-        {:noreply, put_flash(socket, :error, "Already in progress.")}
+      {:error, :not_live} ->
+        {:noreply, put_flash(socket, :error, "This cycle is closed.")}
 
       {:error, :note_required} ->
         {:noreply, put_flash(socket, :error, "A progress note is required.")}
