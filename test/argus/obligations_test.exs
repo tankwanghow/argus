@@ -24,7 +24,8 @@ defmodule Argus.ObligationsTest do
 
       assert {:ok, obligation} = Obligations.create_obligation(scope, attrs)
       assert obligation.series_id
-      assert obligation.status == "active"
+      assert is_nil(obligation.completed_at)
+      assert is_nil(obligation.closed_at)
       assert obligation.complete_documents == "receipt"
 
       events = Obligations.list_events(obligation)
@@ -217,80 +218,50 @@ defmodule Argus.ObligationsTest do
     end
   end
 
-  describe "cancel_obligation/3" do
-    test "requires a cancel reason" do
-      {scope, obligation} = manager_obligation_scope_fixture()
-      assert {:error, :note_required} = Obligations.cancel_obligation(scope, obligation, %{})
-    end
-
-    test "sets status cancelled and logs event with reason" do
+  describe "skip/3" do
+    test "one-off skip closes the cycle with a skipped event, no successor" do
       {scope, obligation} = manager_obligation_scope_fixture()
 
-      assert {:ok, cancelled} =
-               Obligations.cancel_obligation(scope, obligation, %{note: "No longer applicable"})
+      assert {:ok, closed, nil} = Obligations.skip(scope, obligation, %{note: "drop it"})
+      assert closed.closed_at
+      assert is_nil(closed.completed_at)
 
-      assert cancelled.status == "cancelled"
-      event = Obligations.latest_event(cancelled)
-      assert event.status == "cancelled"
-      assert event.note == "No longer applicable"
+      events = Obligations.list_events(closed)
+      assert Enum.any?(events, &(&1.status == "skipped" and &1.note == "drop it"))
+
+      assert Obligations.list_obligations(scope, status: :live)
+             |> Enum.all?(&(&1.id != closed.id))
     end
-  end
 
-  describe "skip_cycle/3" do
-    test "requires a skip reason" do
+    test "recurring skip requires next_due_by and spawns the next cycle" do
       {scope, obligation} = recurring_manager_scope_fixture(interval: "monthly")
 
-      assert {:error, :note_required} =
-               Obligations.skip_cycle(scope, obligation, %{next_due_by: ~D[2026-02-15]})
+      assert {:error, :next_due_required} = Obligations.skip(scope, obligation, %{note: "skip"})
+
+      assert {:ok, closed, %Argus.Obligations.Obligation{} = spawned} =
+               Obligations.skip(scope, obligation, %{note: "skip", next_due_by: ~D[2026-08-01]})
+
+      assert closed.closed_at
+      assert spawned.series_id == closed.series_id
+      assert is_nil(spawned.closed_at) and is_nil(spawned.completed_at)
     end
 
-    test "requires next_due_by" do
-      {scope, obligation} = recurring_manager_scope_fixture(interval: "monthly")
-
-      assert {:error, :next_due_required} =
-               Obligations.skip_cycle(scope, obligation, %{note: "Deferred"})
-    end
-
-    test "rejects one-off obligations" do
+    test "skip requires a note" do
       {scope, obligation} = manager_obligation_scope_fixture()
-
-      assert {:error, :not_recurring} =
-               Obligations.skip_cycle(scope, obligation, %{
-                 note: "Skip",
-                 next_due_by: ~D[2026-07-15]
-               })
-    end
-
-    test "cancels current cycle and spawns next without done validation" do
-      {scope, obligation} = recurring_manager_scope_fixture(interval: "monthly")
-
-      assert {:ok, cancelled, spawned} =
-               Obligations.skip_cycle(scope, obligation, %{
-                 note: "Deferred this month",
-                 next_due_by: ~D[2026-02-15]
-               })
-
-      assert cancelled.status == "cancelled"
-      refute cancelled.completed_at
-      event = Obligations.latest_event(cancelled)
-      assert event.status == "cancelled"
-      assert event.note == "Deferred this month"
-      assert spawned.due_by == ~D[2026-02-15]
-      assert spawned.series_id == obligation.series_id
-      assert spawned.status == "active"
+      assert {:error, _} = Obligations.skip(scope, obligation, %{note: ""})
     end
 
     test "is idempotent — a second skip on the same cycle is rejected" do
       {scope, obligation} = recurring_manager_scope_fixture(interval: "monthly")
 
-      assert {:ok, cancelled, _} =
-               Obligations.skip_cycle(scope, obligation, %{
+      assert {:ok, closed, _} =
+               Obligations.skip(scope, obligation, %{
                  note: "Skip",
                  next_due_by: ~D[2026-02-15]
                })
 
       assert {:error, :not_live} =
-               Obligations.skip_cycle(scope, cancelled, %{
+               Obligations.skip(scope, closed, %{
                  note: "Again",
                  next_due_by: ~D[2026-03-15]
                })
@@ -303,14 +274,17 @@ defmodule Argus.ObligationsTest do
       assert {:error, :note_required} = Obligations.end_series(scope, obligation, %{})
     end
 
-    test "cancels the current cycle so it can never be completed/spawn" do
+    test "stamps closed_at + series_ended_at with a series_ended event" do
       {scope, obligation} = recurring_manager_scope_fixture(interval: "monthly")
 
       assert {:ok, ended} =
                Obligations.end_series(scope, obligation, %{note: "Client left"})
 
-      assert ended.status == "cancelled"
+      assert ended.closed_at
       assert ended.series_ended_at
+
+      events = Obligations.list_events(ended)
+      assert Enum.any?(events, &(&1.status == "series_ended"))
       assert Obligations.latest_event(ended).note == "Client left"
       assert {:error, :not_live} = Obligations.complete(scope, ended, %{note: "Too late"})
     end
@@ -327,7 +301,6 @@ defmodule Argus.ObligationsTest do
         %Obligation{
           entity_id: obligation.entity_id,
           series_id: obligation.series_id,
-          status: "active",
           complete_documents: ""
         }
         |> Obligation.changeset(%{
@@ -376,30 +349,30 @@ defmodule Argus.ObligationsTest do
                  next_due_by: nil
                })
 
-      {:ok, cancelled} =
+      {:ok, skipped} =
         Obligations.create_obligation(manager, %{
-          title: "EPF Cancelled",
+          title: "EPF Skipped",
           obligation_type_id: type_fixture(manager.entity).id,
           primary_assignee_id: member_scope.user.id,
           due_by: ~D[2026-04-30],
-          open_note: "Cancel cycle"
+          open_note: "Skip cycle"
         })
 
-      assert {:ok, _} =
-               Obligations.cancel_obligation(manager, cancelled, %{note: "Superseded"})
+      assert {:ok, _, nil} =
+               Obligations.skip(manager, skipped, %{note: "Superseded"})
 
       live_ids = manager |> Obligations.list_obligations(status: :live) |> Enum.map(& &1.id)
 
       completed_ids =
         manager |> Obligations.list_obligations(status: :completed) |> Enum.map(& &1.id)
 
-      cancelled_ids =
-        manager |> Obligations.list_obligations(status: :cancelled) |> Enum.map(& &1.id)
+      skipped_ids =
+        manager |> Obligations.list_obligations(status: :skipped) |> Enum.map(& &1.id)
 
       assert live_obligation.id in live_ids
       refute completed.id in live_ids
       assert completed.id in completed_ids
-      assert cancelled.id in cancelled_ids
+      assert skipped.id in skipped_ids
 
       assert [found] = Obligations.list_obligations(manager, status: :all, query: "done")
       assert found.id == completed.id
@@ -560,7 +533,7 @@ defmodule Argus.ObligationsTest do
       # replacement is a fresh, live, standalone one-off
       assert replacement.series_id != original.series_id
       assert replacement.series_ended_at
-      assert replacement.status == "active"
+      assert replacement.closed_at == nil
       assert replacement.completed_at == nil
       assert replacement.due_by == ~D[2026-06-15]
       assert replacement.title == "EPF Jan"
@@ -673,7 +646,7 @@ defmodule Argus.ObligationsTest do
       # The recurring successor still lives, still in the original series, unchanged.
       reloaded = Obligations.get_obligation!(manager, spawned.id)
       assert reloaded.completed_at == nil
-      assert reloaded.status == "active"
+      assert reloaded.closed_at == nil
       assert reloaded.series_id == done.series_id
       assert reloaded.replaces_id == nil
 
@@ -699,7 +672,7 @@ defmodule Argus.ObligationsTest do
                Obligations.mark_completed_in_error(manager, obligation, %{reason: "x"})
     end
 
-    test "rejects a cancelled cycle" do
+    test "rejects a skipped cycle" do
       manager = Argus.EntitiesFixtures.manager_scope_fixture()
       type = type_fixture(manager.entity)
 
@@ -711,10 +684,10 @@ defmodule Argus.ObligationsTest do
           open_note: "open"
         })
 
-      {:ok, cancelled} = Obligations.cancel_obligation(manager, obligation, %{note: "drop"})
+      {:ok, skipped, nil} = Obligations.skip(manager, obligation, %{note: "drop"})
 
       assert {:error, :not_correctable} =
-               Obligations.mark_completed_in_error(manager, cancelled, %{reason: "x"})
+               Obligations.mark_completed_in_error(manager, skipped, %{reason: "x"})
     end
 
     test "rejects double-correction" do

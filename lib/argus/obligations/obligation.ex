@@ -10,8 +10,8 @@ defmodule Argus.Obligations.Obligation do
     field :series_id, :binary_id
     field :title, :string
     field :due_by, :date
-    field :status, :string, default: "active"
     field :completed_at, :utc_datetime
+    field :closed_at, :utc_datetime
     field :series_ended_at, :utc_datetime
     field :complete_documents, :string, default: ""
     field :open_note, :string, virtual: true
@@ -41,7 +41,6 @@ defmodule Argus.Obligations.Obligation do
     |> validate_required([:title, :obligation_type_id, :due_by])
     |> validate_length(:title, max: 30)
     |> normalize_blank_assignee()
-    |> validate_inclusion(:status, ["active", "cancelled"])
     |> unique_constraint(:series_id, name: :obligations_one_live_cycle_per_series)
   end
 

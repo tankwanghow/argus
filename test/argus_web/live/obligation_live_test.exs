@@ -8,7 +8,7 @@ defmodule ArgusWeb.ObligationLiveTest do
 
   setup :register_and_log_in_user
 
-  test "dashboard filters completed and cancelled cycles", %{conn: conn} do
+  test "dashboard filters completed and skipped cycles", %{conn: conn} do
     manager = Argus.EntitiesFixtures.manager_scope_fixture()
     member_scope = member_scope_on_entity(manager.entity)
     conn = log_in_user(conn, manager.user)
@@ -35,17 +35,17 @@ defmodule ArgusWeb.ObligationLiveTest do
     assert {:ok, completed, _} =
              Obligations.complete(member_scope, to_complete, %{note: "Done"})
 
-    {:ok, to_cancel} =
+    {:ok, to_skip} =
       Obligations.create_obligation(manager, %{
-        title: "Gamma Cancelled",
+        title: "Gamma Skipped",
         obligation_type_id: type.id,
         primary_assignee_id: member_scope.user.id,
         due_by: ~D[2026-04-30],
         open_note: "Gamma"
       })
 
-    assert {:ok, _} =
-             Obligations.cancel_obligation(manager, to_cancel, %{note: "No longer needed"})
+    assert {:ok, _skipped, nil} =
+             Obligations.skip(manager, to_skip, %{note: "No longer needed"})
 
     {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}")
 
@@ -56,8 +56,8 @@ defmodule ArgusWeb.ObligationLiveTest do
     assert has_element?(view, "#obligation-row-#{completed.id}")
     refute has_element?(view, "#obligation-row-#{live_obligation.id}")
 
-    view |> element("#filter-cancelled") |> render_click()
-    assert has_element?(view, "#obligation-row-#{to_cancel.id}")
+    view |> element("#filter-skipped") |> render_click()
+    assert has_element?(view, "#obligation-row-#{to_skip.id}")
 
     member_conn = log_in_user(conn, member_scope.user)
 
@@ -73,7 +73,7 @@ defmodule ArgusWeb.ObligationLiveTest do
     view |> element("#filter-live") |> render_click()
     view |> element("#obligation-search") |> render_keyup(%{"value" => "Alpha"})
     assert has_element?(view, "#obligation-row-#{live_obligation.id}")
-    refute has_element?(view, "#obligation-row-#{to_cancel.id}")
+    refute has_element?(view, "#obligation-row-#{to_skip.id}")
   end
 
   test "manager creates obligation via form", %{conn: conn} do
@@ -408,18 +408,18 @@ defmodule ArgusWeb.ObligationLiveTest do
     refute html =~ "days overdue"
   end
 
-  test "cancelled obligation hides urgency and relative due label", %{conn: conn} do
+  test "skipped obligation hides urgency and relative due label", %{conn: conn} do
     {scope, obligation} = manager_obligation_scope_fixture()
     conn = log_in_user(conn, scope.user)
 
-    assert {:ok, _} =
-             Obligations.cancel_obligation(scope, obligation, %{note: "No longer needed"})
+    assert {:ok, _, nil} =
+             Obligations.skip(scope, obligation, %{note: "No longer needed"})
 
     {:ok, view, html} =
       live(conn, ~p"/entities/#{scope.entity.slug}/obligations/#{obligation.id}")
 
     refute has_element?(view, "[data-urgency]")
-    assert html =~ "Cancelled"
+    assert html =~ "Skipped"
     refute html =~ "overdue"
     refute html =~ "Due soon"
   end
@@ -476,7 +476,7 @@ defmodule ArgusWeb.ObligationLiveTest do
     |> render_submit()
 
     assert_redirect(view, ~p"/entities/#{scope.entity.slug}")
-    assert Obligations.get_obligation!(scope, obligation.id).status == "cancelled"
+    assert Obligations.get_obligation!(scope, obligation.id).closed_at
 
     live_cycles =
       scope
@@ -535,7 +535,7 @@ defmodule ArgusWeb.ObligationLiveTest do
     |> render_submit()
 
     assert_redirect(view, ~p"/entities/#{scope.entity.slug}")
-    assert Obligations.get_obligation!(scope, obligation.id).status == "cancelled"
+    assert Obligations.get_obligation!(scope, obligation.id).closed_at
   end
 
   test "end series modal requires a reason", %{conn: conn} do

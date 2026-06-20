@@ -24,7 +24,7 @@ defmodule Argus.Obligations do
   alias Argus.Uploads
 
   def live(query \\ Obligation) do
-    from(o in query, where: o.status == "active" and is_nil(o.completed_at))
+    from(o in query, where: is_nil(o.completed_at) and is_nil(o.closed_at))
   end
 
   def list_my_work(scope), do: list_obligations(scope, status: :my_live)
@@ -131,14 +131,14 @@ defmodule Argus.Obligations do
     |> Repo.all()
   end
 
-  @status_filters ~w(my_live my_completed live completed cancelled all)a
+  @status_filters ~w(my_live my_completed live completed skipped all)a
 
   @doc """
   Lists obligations for the entity scope.
 
   Options:
     * `:status` — `:my_live`, `:my_completed`, `:live` (default), `:completed`,
-      `:cancelled`, or `:all`. My filters scope to primary assignee or collaborator.
+      `:skipped`, or `:all`. My filters scope to primary assignee or collaborator.
     * `:query` — optional case-insensitive search on title, type name, assignee email
   """
   def list_obligations(%Scope{entity: entity, user: user}, opts \\ []) do
@@ -177,8 +177,8 @@ defmodule Argus.Obligations do
     from o in query, where: not is_nil(o.completed_at)
   end
 
-  defp apply_status_filter(query, :cancelled) do
-    from o in query, where: o.status == "cancelled"
+  defp apply_status_filter(query, :skipped) do
+    from o in query, where: not is_nil(o.closed_at)
   end
 
   defp apply_status_filter(query, :all), do: query
@@ -237,7 +237,7 @@ defmodule Argus.Obligations do
       desc: e.inserted_at,
       desc:
         fragment(
-          "CASE ? WHEN 'done' THEN 4 WHEN 'in_progress' THEN 3 WHEN 'cancelled' THEN 2 WHEN 'open' THEN 1 ELSE 0 END",
+          "CASE ? WHEN 'done' THEN 5 WHEN 'series_ended' THEN 4 WHEN 'skipped' THEN 3 WHEN 'in_progress' THEN 2 WHEN 'open' THEN 1 ELSE 0 END",
           e.status
         )
     )
@@ -274,7 +274,7 @@ defmodule Argus.Obligations do
         desc: e.inserted_at,
         desc:
           fragment(
-            "CASE ? WHEN 'done' THEN 4 WHEN 'in_progress' THEN 3 WHEN 'cancelled' THEN 2 WHEN 'open' THEN 1 ELSE 0 END",
+            "CASE ? WHEN 'done' THEN 5 WHEN 'series_ended' THEN 4 WHEN 'skipped' THEN 3 WHEN 'in_progress' THEN 2 WHEN 'open' THEN 1 ELSE 0 END",
             e.status
           )
       )
@@ -548,46 +548,6 @@ defmodule Argus.Obligations do
     end
   end
 
-  def cancel_obligation(%Scope{} = scope, %Obligation{} = obligation, attrs) do
-    note = Map.get(attrs, :note) || Map.get(attrs, "note")
-
-    with true <- Authorization.can?(scope, :cancel_obligation),
-         :ok <- validate_action_note(note) do
-      now = DateTime.utc_now(:second)
-
-      Ecto.Multi.new()
-      |> Ecto.Multi.update_all(
-        :obligation,
-        live(Obligation) |> where([o], o.id == ^obligation.id),
-        set: [status: "cancelled", updated_at: now]
-      )
-      |> Ecto.Multi.run(:check, fn _repo, %{obligation: {count, _}} ->
-        if count == 1, do: {:ok, :updated}, else: {:error, :not_live}
-      end)
-      |> Ecto.Multi.insert(:cancelled_event, fn _ ->
-        %Event{
-          obligation_id: obligation.id,
-          status_by_id: scope.user.id
-        }
-        |> Event.changeset(%{status: "cancelled", note: note})
-      end)
-      |> Repo.transaction()
-      |> case do
-        {:ok, _} ->
-          {:ok, Repo.get!(Obligation, obligation.id)}
-
-        {:error, :check, :not_live, _} ->
-          {:error, :not_live}
-
-        {:error, :cancelled_event, changeset, _} ->
-          {:error, changeset}
-      end
-    else
-      false -> :not_authorise
-      {:error, _} = error -> error
-    end
-  end
-
   @doc """
   Flags a *completed* cycle as completed-in-error and spawns a standalone one-off
   replacement (new `series_id`, `series_ended_at` set so it never spawns). Manager/admin
@@ -616,21 +576,55 @@ defmodule Argus.Obligations do
     end
   end
 
-  def skip_cycle(%Scope{} = scope, %Obligation{} = obligation, attrs) do
-    obligation = Repo.preload(obligation, [:collaborators, :obligation_type])
+  def skip(%Scope{} = scope, %Obligation{} = obligation, attrs) do
+    obligation = Repo.preload(obligation, :obligation_type)
     note = Map.get(attrs, :note) || Map.get(attrs, "note")
     next_due_by = Map.get(attrs, :next_due_by) || Map.get(attrs, "next_due_by")
 
-    with true <- Authorization.can?(scope, :skip_cycle),
-         :ok <- validate_skipable(obligation),
+    with true <- Authorization.can?(scope, :skip),
          :ok <- validate_action_note(note),
-         :ok <- validate_next_due(obligation, attrs),
-         {:ok, cancelled, spawned} <- skip_cycle_multi(scope, obligation, note, next_due_by) do
-      {:ok, cancelled, spawned}
+         :ok <- validate_next_due(obligation, attrs) do
+      skip_multi(scope, obligation, note, next_due_by)
     else
       false -> :not_authorise
       {:error, _} = error -> error
     end
+  end
+
+  defp skip_multi(scope, obligation, note, next_due_by) do
+    now = DateTime.utc_now(:second)
+    spawn? = should_spawn_next?(obligation, next_due_by)
+
+    Ecto.Multi.new()
+    |> Ecto.Multi.update_all(
+      :close,
+      live(Obligation) |> where([o], o.id == ^obligation.id),
+      set: [closed_at: now, updated_at: now]
+    )
+    |> Ecto.Multi.run(:check, fn _repo, %{close: {count, _}} ->
+      if count == 1, do: {:ok, :closed}, else: {:error, :not_live}
+    end)
+    |> Ecto.Multi.insert(:skipped_event, fn _ ->
+      %Event{obligation_id: obligation.id, status_by_id: scope.user.id}
+      |> Event.changeset(%{status: "skipped", note: note})
+    end)
+    |> maybe_spawn_next(spawn?, obligation, next_due_by, scope.user.id)
+    |> Repo.transaction()
+    |> case do
+      {:ok, %{spawn: spawned}} -> {:ok, Repo.get!(Obligation, obligation.id), spawned}
+      {:ok, _} -> {:ok, Repo.get!(Obligation, obligation.id), nil}
+      {:error, :check, :not_live, _} -> {:error, :not_live}
+      {:error, :skipped_event, changeset, _} -> {:error, changeset}
+      {:error, :spawn, reason, _} -> {:error, reason}
+    end
+  end
+
+  defp maybe_spawn_next(multi, false, _obligation, _next_due_by, _actor_id), do: multi
+
+  defp maybe_spawn_next(multi, true, obligation, next_due_by, actor_id) do
+    Ecto.Multi.run(multi, :spawn, fn repo, _changes ->
+      spawn_next_cycle(repo, obligation, next_due_by, actor_id)
+    end)
   end
 
   def end_series(%Scope{} = scope, %Obligation{} = obligation, attrs) do
@@ -644,17 +638,17 @@ defmodule Argus.Obligations do
       |> Ecto.Multi.update_all(
         :obligation,
         live(Obligation) |> where([o], o.id == ^obligation.id),
-        set: [status: "cancelled", series_ended_at: now, updated_at: now]
+        set: [closed_at: now, series_ended_at: now, updated_at: now]
       )
       |> Ecto.Multi.run(:check, fn _repo, %{obligation: {count, _}} ->
         if count == 1, do: {:ok, :updated}, else: {:error, :not_live}
       end)
-      |> Ecto.Multi.insert(:cancelled_event, fn _ ->
+      |> Ecto.Multi.insert(:series_ended_event, fn _ ->
         %Event{
           obligation_id: obligation.id,
           status_by_id: scope.user.id
         }
-        |> Event.changeset(%{status: "cancelled", note: note})
+        |> Event.changeset(%{status: "series_ended", note: note})
       end)
       |> Repo.transaction()
       |> case do
@@ -664,50 +658,12 @@ defmodule Argus.Obligations do
         {:error, :check, :not_live, _} ->
           {:error, :not_live}
 
-        {:error, :cancelled_event, changeset, _} ->
+        {:error, :series_ended_event, changeset, _} ->
           {:error, changeset}
       end
     else
       false -> :not_authorise
       {:error, _} = error -> error
-    end
-  end
-
-  defp skip_cycle_multi(scope, obligation, note, next_due_by) do
-    now = DateTime.utc_now(:second)
-
-    Ecto.Multi.new()
-    |> Ecto.Multi.update_all(
-      :obligation,
-      live(Obligation) |> where([o], o.id == ^obligation.id),
-      set: [status: "cancelled", updated_at: now]
-    )
-    |> Ecto.Multi.run(:check, fn _repo, %{obligation: {count, _}} ->
-      if count == 1, do: {:ok, :updated}, else: {:error, :not_live}
-    end)
-    |> Ecto.Multi.insert(:cancelled_event, fn _ ->
-      %Event{
-        obligation_id: obligation.id,
-        status_by_id: scope.user.id
-      }
-      |> Event.changeset(%{status: "cancelled", note: note})
-    end)
-    |> Ecto.Multi.run(:spawn, fn repo, %{check: _} ->
-      spawn_next_cycle(repo, obligation, next_due_by, scope.user.id)
-    end)
-    |> Repo.transaction()
-    |> case do
-      {:ok, %{spawn: spawned}} ->
-        {:ok, Repo.get!(Obligation, obligation.id), spawned}
-
-      {:error, :check, :not_live, _} ->
-        {:error, :not_live}
-
-      {:error, :cancelled_event, changeset, _} ->
-        {:error, changeset}
-
-      {:error, :spawn, reason, _} ->
-        {:error, reason}
     end
   end
 
@@ -764,16 +720,6 @@ defmodule Argus.Obligations do
       not is_nil(next_due_by)
   end
 
-  defp validate_skipable(%Obligation{} = obligation) do
-    type = obligation.obligation_type || Repo.get!(Type, obligation.obligation_type_id)
-
-    cond do
-      not Recurrence.recurring?(type) -> {:error, :not_recurring}
-      Series.ended?(obligation.series_id) -> {:error, :series_ended}
-      true -> :ok
-    end
-  end
-
   defp validate_next_due(%Obligation{} = obligation, attrs) do
     next_due_by = Map.get(attrs, :next_due_by) || Map.get(attrs, "next_due_by")
     type = obligation.obligation_type || Repo.get!(Type, obligation.obligation_type_id)
@@ -805,7 +751,6 @@ defmodule Argus.Obligations do
       %Obligation{
         entity_id: done_obligation.entity_id,
         series_id: done_obligation.series_id,
-        status: "active",
         complete_documents: type.complete_documents
       }
       |> Obligation.changeset(%{
@@ -858,7 +803,6 @@ defmodule Argus.Obligations do
       %Obligation{
         entity_id: obligation.entity_id,
         series_id: series_id,
-        status: "active",
         series_ended_at: now,
         complete_documents: type.complete_documents
       }
@@ -919,9 +863,10 @@ defmodule Argus.Obligations do
   end
 
   # A cycle accepts progress updates until it is closed. Multiple in_progress
-  # events are allowed (each is a logged progress note); only `done`/`cancelled`
-  # are terminal, so we reject once either exists. `open` stays singular (created
-  # at creation) and `done` singular (created at completion).
+  # events are allowed (each is a logged progress note); only terminal statuses
+  # (done/cancelled/skipped/series_ended) close a cycle, so we reject once any
+  # exists. `open` stays singular (created at creation) and `done` singular
+  # (created at completion).
   defp ensure_progressable(%Obligation{} = obligation) do
     closed? =
       Event
@@ -967,7 +912,6 @@ defmodule Argus.Obligations do
       %Obligation{
         entity_id: entity.id,
         series_id: series_id,
-        status: "active",
         complete_documents: type.complete_documents
       }
       |> Obligation.changeset(attrs)
@@ -1169,7 +1113,7 @@ defmodule Argus.Obligations do
     end
   end
 
-  defp validate_correctable(%Obligation{status: "cancelled"}), do: {:error, :not_correctable}
+  defp validate_correctable(%Obligation{closed_at: %DateTime{}}), do: {:error, :not_correctable}
   defp validate_correctable(%Obligation{completed_at: nil}), do: {:error, :not_correctable}
 
   defp validate_correctable(%Obligation{completed_in_error_at: %DateTime{}}),
@@ -1188,10 +1132,10 @@ defmodule Argus.Obligations do
     end
   end
 
-  defp live_cycle?(%Obligation{status: "active", completed_at: nil}), do: true
+  defp live_cycle?(%Obligation{completed_at: nil, closed_at: nil}), do: true
   defp live_cycle?(_), do: false
 
-  defp locked_cycle?(%Obligation{status: "cancelled"}), do: true
+  defp locked_cycle?(%Obligation{closed_at: %DateTime{}}), do: true
   defp locked_cycle?(%Obligation{completed_at: %DateTime{}}), do: true
   defp locked_cycle?(_), do: false
 

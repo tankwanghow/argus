@@ -291,6 +291,6 @@ defmodule ArgusWeb.ObligationStepFiles do
     Map.get(file, "original") || Map.get(file, :original) || "file"
   end
 
-  defp cycle_live?(%{status: "active", completed_at: nil}), do: true
+  defp cycle_live?(%{completed_at: nil, closed_at: nil}), do: true
   defp cycle_live?(_), do: false
 end

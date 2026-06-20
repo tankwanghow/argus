@@ -13,9 +13,14 @@ defmodule Argus.AuthorizationTest do
       assert Authorization.can?(scope, :create_obligation)
     end
 
-    test "member cannot cancel obligation" do
+    test "manager can skip" do
+      scope = manager_scope_fixture()
+      assert Authorization.can?(scope, :skip)
+    end
+
+    test "member cannot skip" do
       scope = member_scope_fixture()
-      refute Authorization.can?(scope, :cancel_obligation)
+      refute Authorization.can?(scope, :skip)
     end
 
     test "admin can manage entity" do

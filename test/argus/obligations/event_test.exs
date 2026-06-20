@@ -4,11 +4,11 @@ defmodule Argus.Obligations.EventTest do
   alias Argus.Obligations.Event
 
   test "terminal_statuses are the closing statuses" do
-    assert Event.terminal_statuses() == ["done", "cancelled", "skipped", "series_ended"]
+    assert Event.terminal_statuses() == ["done", "skipped", "series_ended"]
   end
 
   test "changeset accepts all valid statuses" do
-    for status <- ["open", "in_progress", "done", "cancelled", "skipped", "series_ended"] do
+    for status <- ["open", "in_progress", "done", "skipped", "series_ended"] do
       cs = Event.changeset(%Event{}, %{status: status, note: "n"})
       assert cs.valid?, "expected #{status} to be valid"
     end

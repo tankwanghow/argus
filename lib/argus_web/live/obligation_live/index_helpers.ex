@@ -6,7 +6,7 @@ defmodule ArgusWeb.ObligationLive.IndexHelpers do
   alias Argus.Obligations.{Obligation, Urgency}
 
   @urgency_rank %{overdue: 0, due_soon: 1, ok: 2}
-  @statuses ~w(my_live my_completed live completed cancelled all)
+  @statuses ~w(my_live my_completed live completed skipped all)
 
   def statuses, do: @statuses
 
@@ -16,7 +16,7 @@ defmodule ArgusWeb.ObligationLive.IndexHelpers do
   def parse_status("my_live"), do: :my_live
   def parse_status("my_completed"), do: :my_completed
   def parse_status("completed"), do: :completed
-  def parse_status("cancelled"), do: :cancelled
+  def parse_status("skipped"), do: :skipped
   def parse_status("all"), do: :all
   def parse_status(_), do: :live
 
@@ -24,14 +24,14 @@ defmodule ArgusWeb.ObligationLive.IndexHelpers do
   def status_label(:my_completed), do: "My Completed"
   def status_label(:live), do: "Live"
   def status_label(:completed), do: "Completed"
-  def status_label(:cancelled), do: "Cancelled"
+  def status_label(:skipped), do: "Skipped"
   def status_label(:all), do: "All"
 
   def empty_message(:my_live), do: "No live obligations assigned to you."
   def empty_message(:my_completed), do: "No completed obligations assigned to you."
   def empty_message(:live), do: "No live obligations."
   def empty_message(:completed), do: "No completed obligations."
-  def empty_message(:cancelled), do: "No cancelled obligations."
+  def empty_message(:skipped), do: "No skipped obligations."
   def empty_message(:all), do: "No obligations."
 
   def load_rows(scope, today, status, query) do
@@ -63,9 +63,8 @@ defmodule ArgusWeb.ObligationLive.IndexHelpers do
     rows
   end
 
-  def cycle_status(%Obligation{status: "cancelled"}), do: :cancelled
-
   def cycle_status(%Obligation{completed_at: %DateTime{}}), do: :completed
-
+  def cycle_status(%Obligation{series_ended_at: %DateTime{}}), do: :series_ended
+  def cycle_status(%Obligation{closed_at: %DateTime{}}), do: :skipped
   def cycle_status(_), do: :live
 end

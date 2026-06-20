@@ -83,7 +83,7 @@ defmodule ArgusWeb.ObligationLive.Show do
               <span :if={@live?} class="text-base-content/60">
                 · {due_label(@obligation.due_by, @today)}
               </span>
-              <span :if={@cycle_status == :cancelled} class="text-base-content/60">· cancelled</span>
+              <span :if={@cycle_status == :skipped} class="text-base-content/60">· skipped</span>
             </div>
           </div>
           <div class="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 mt-2">
@@ -198,7 +198,7 @@ defmodule ArgusWeb.ObligationLive.Show do
             </div>
             <div id="obligation-series-actions" class="argus-inline-actions ml-auto">
               <button
-                :if={Authorization.can?(@current_scope, :skip_cycle) and @recurring?}
+                :if={Authorization.can?(@current_scope, :skip) and @recurring?}
                 id="skip-btn"
                 type="button"
                 phx-click="open_skip_modal"
@@ -207,7 +207,7 @@ defmodule ArgusWeb.ObligationLive.Show do
                 Skip cycle
               </button>
               <button
-                :if={Authorization.can?(@current_scope, :cancel_obligation) and not @recurring?}
+                :if={Authorization.can?(@current_scope, :skip) and not @recurring?}
                 id="cancel-btn"
                 type="button"
                 phx-click="open_cancel_modal"
@@ -951,7 +951,7 @@ defmodule ArgusWeb.ObligationLive.Show do
       next_due_by: parse_date(params["next_due_by"])
     }
 
-    case Obligations.skip_cycle(scope, socket.assigns.obligation, attrs) do
+    case Obligations.skip(scope, socket.assigns.obligation, attrs) do
       {:ok, _cancelled, _spawned} ->
         {:noreply,
          socket
@@ -984,8 +984,8 @@ defmodule ArgusWeb.ObligationLive.Show do
   def handle_event("confirm_cancel", %{"cancel" => %{"note" => note}}, socket) do
     scope = socket.assigns.current_scope
 
-    case Obligations.cancel_obligation(scope, socket.assigns.obligation, %{note: note}) do
-      {:ok, _} ->
+    case Obligations.skip(scope, socket.assigns.obligation, %{note: note}) do
+      {:ok, _, _} ->
         {:noreply,
          socket
          |> put_flash(:info, "Obligation cancelled.")
@@ -1451,7 +1451,7 @@ defmodule ArgusWeb.ObligationLive.Show do
     Recurrence.recurring?(obligation.obligation_type) and is_nil(obligation.series_ended_at)
   end
 
-  defp live_cycle?(%Obligation{status: "active", completed_at: nil}), do: true
+  defp live_cycle?(%Obligation{completed_at: nil, closed_at: nil}), do: true
   defp live_cycle?(_), do: false
 
   defp file_name(%{file: file}) when is_map(file) do
