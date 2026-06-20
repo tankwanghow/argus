@@ -6,11 +6,19 @@ defmodule ArgusWeb.ObligationStatusBadge do
 
   attr :cycle_status, :atom, required: true
   attr :detail, :string, default: nil
+  attr :in_error, :boolean, default: false
 
   def obligation_status_badge(assigns) do
     ~H"""
-    <div :if={@cycle_status == :completed} class="badge badge-success badge-sm gap-1">
-      Completed<p :if={@detail} class="font-normal text-xs">{@detail}</p>
+    <div
+      :if={@cycle_status == :completed}
+      class={[
+        "-space-y-1 text-center border rounded-xl p-1",
+        if(@in_error, do: "bg-error", else: "bg-success")
+      ]}
+    >
+      <div class="font-bold text-xs">Completed</div>
+      <div :if={@detail} class="text-[12px]">{@detail}</div>
     </div>
     <span :if={@cycle_status == :cancelled} class="badge badge-error badge-sm">Cancelled</span>
     """

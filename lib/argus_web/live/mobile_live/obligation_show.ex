@@ -47,6 +47,7 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
             <.obligation_status_badge
               :if={!@live?}
               cycle_status={@cycle_status}
+              in_error={!is_nil(@obligation.completed_in_error_at)}
               detail={if @cycle_status == :completed, do: format_datetime(@obligation.completed_at)}
             />
             <div :if={@correctable?} class="dropdown dropdown-end">
