@@ -33,16 +33,16 @@ defmodule ArgusWeb.Plugs.AutoRouteByDeviceTest do
       assert conn.halted
     end
 
-    test "redirects mobile UA from desktop obligations list to mobile", %{conn: conn} do
+    test "redirects mobile UA from desktop new-obligation form to mobile", %{conn: conn} do
       conn =
         conn
         |> put_req_header("user-agent", @mobile_ua)
-        |> Map.put(:request_path, "/entities/acme/obligations")
-        |> Map.put(:path_info, ["entities", "acme", "obligations"])
+        |> Map.put(:request_path, "/entities/acme/obligations/new")
+        |> Map.put(:path_info, ["entities", "acme", "obligations", "new"])
         |> Map.put(:query_string, "")
         |> AutoRouteByDevice.call([])
 
-      assert redirected_to(conn) == "/m/acme/obligations"
+      assert redirected_to(conn) == "/m/acme/obligations/new"
       assert conn.halted
     end
 

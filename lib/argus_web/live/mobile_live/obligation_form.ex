@@ -13,13 +13,13 @@ defmodule ArgusWeb.MobileLive.ObligationForm do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.mobile_app flash={@flash} current_scope={@current_scope} active={:obligations}>
+    <Layouts.mobile_app flash={@flash} current_scope={@current_scope} active={:new}>
       <div id="m-obligation-form" class="space-y-3 p-4">
         <.link
-          navigate={~p"/m/#{@current_scope.entity.slug}/obligations"}
+          navigate={~p"/m/#{@current_scope.entity.slug}"}
           class="text-sm text-base-content/60 flex items-center gap-1"
         >
-          <.icon name="hero-chevron-left-mini" class="size-4" /> Obligations
+          <.icon name="hero-chevron-left-mini" class="size-4" /> Dashboard
         </.link>
         <h1 class="text-lg font-semibold">New obligation</h1>
 
@@ -139,7 +139,7 @@ defmodule ArgusWeb.MobileLive.ObligationForm do
       {:ok,
        socket
        |> put_flash(:error, "You are not authorized to create obligations.")
-       |> push_navigate(to: ~p"/m/#{socket.assigns.current_scope.entity.slug}/obligations")}
+       |> push_navigate(to: ~p"/m/#{socket.assigns.current_scope.entity.slug}")}
     end
   end
 

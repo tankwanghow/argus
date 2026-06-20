@@ -908,7 +908,7 @@ defmodule ArgusWeb.ObligationLive.Show do
         {:noreply,
          socket
          |> put_flash(:info, "Obligation completed.")
-         |> push_navigate(to: ~p"/entities/#{scope.entity.slug}/obligations")}
+         |> push_navigate(to: ~p"/entities/#{scope.entity.slug}")}
 
       {:error, :next_due_required} ->
         {:noreply,
@@ -957,7 +957,7 @@ defmodule ArgusWeb.ObligationLive.Show do
         {:noreply,
          socket
          |> put_flash(:info, "Cycle skipped.")
-         |> push_navigate(to: ~p"/entities/#{scope.entity.slug}/obligations")}
+         |> push_navigate(to: ~p"/entities/#{scope.entity.slug}")}
 
       {:error, :next_due_required} ->
         {:noreply,
@@ -990,7 +990,7 @@ defmodule ArgusWeb.ObligationLive.Show do
         {:noreply,
          socket
          |> put_flash(:info, "Obligation cancelled.")
-         |> push_navigate(to: ~p"/entities/#{scope.entity.slug}/obligations")}
+         |> push_navigate(to: ~p"/entities/#{scope.entity.slug}")}
 
       {:error, :note_required} ->
         {:noreply, put_flash(socket, :error, "A reason is required.")}
@@ -1016,7 +1016,7 @@ defmodule ArgusWeb.ObligationLive.Show do
         {:noreply,
          socket
          |> put_flash(:info, "Series ended.")
-         |> push_navigate(to: ~p"/entities/#{scope.entity.slug}/obligations")}
+         |> push_navigate(to: ~p"/entities/#{scope.entity.slug}")}
 
       {:error, :note_required} ->
         {:noreply, put_flash(socket, :error, "A reason is required.")}

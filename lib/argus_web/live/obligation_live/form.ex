@@ -134,7 +134,7 @@ defmodule ArgusWeb.ObligationLive.Form do
       {:ok,
        socket
        |> put_flash(:error, "You are not authorized to create obligations.")
-       |> push_navigate(to: ~p"/entities/#{socket.assigns.current_scope.entity.slug}/obligations")}
+       |> push_navigate(to: ~p"/entities/#{socket.assigns.current_scope.entity.slug}")}
     end
   end
 

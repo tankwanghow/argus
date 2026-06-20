@@ -121,7 +121,7 @@ defmodule ArgusWeb.MobileLiveTest do
     assert render(view) =~ "Next due date is required"
   end
 
-  test "completing on mobile spawns successor and redirects to list", %{conn: conn} do
+  test "completing on mobile spawns successor and redirects to dashboard", %{conn: conn} do
     {scope, obligation} = recurring_primary_scope_fixture(interval: "monthly")
     conn = mobile_conn(conn, scope)
 
@@ -133,11 +133,11 @@ defmodule ArgusWeb.MobileLiveTest do
     |> form("#m-done-form", %{"done" => %{"next_due_by" => "2026-07-15", "note" => "Done"}})
     |> render_submit()
 
-    assert_redirect(view, ~p"/m/#{scope.entity.slug}/obligations")
+    assert_redirect(view, ~p"/m/#{scope.entity.slug}")
     refute Obligations.get_obligation!(scope, obligation.id).completed_at == nil
   end
 
-  test "mobile obligations list filters completed cycles", %{conn: conn} do
+  test "mobile dashboard filters completed cycles", %{conn: conn} do
     manager = Argus.EntitiesFixtures.manager_scope_fixture()
     member_scope = member_scope_on_entity(manager.entity)
     conn = mobile_conn(conn, member_scope)
@@ -164,7 +164,7 @@ defmodule ArgusWeb.MobileLiveTest do
     assert {:ok, completed, _} =
              Obligations.complete(member_scope, to_complete, %{note: "Done"})
 
-    {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}/obligations")
+    {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}")
 
     view |> element("#m-filter-my_completed") |> render_click()
     assert has_element?(view, "#m-ob-#{completed.id}")
@@ -259,11 +259,11 @@ defmodule ArgusWeb.MobileLiveTest do
     assert has_element?(view, "#m-completion-slot-receipt", "receipt.pdf")
   end
 
-  test "mobile: obligations index shows the New entry point for a manager", %{conn: conn} do
+  test "mobile: bottom nav shows the New entry point for a manager", %{conn: conn} do
     manager = Argus.EntitiesFixtures.manager_scope_fixture()
     conn = mobile_conn(conn, manager)
 
-    {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}/obligations")
+    {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}")
 
     assert has_element?(
              view,

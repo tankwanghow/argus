@@ -33,11 +33,17 @@ applies here too. Headlines:
   nullable. A `%Argus.Accounts.Scope{user, entity, membership, role}` struct flows as
   `@current_scope`; never `@current_user`/`@current_role` in templates.
 - **Dual UI:** Desktop `/entities/:entity_slug/...`, Mobile `/m/:entity_slug/...`, with an
-  `AutoRouteByDevice` plug (mobile-capable tails: `""`, `/obligations`, `/obligations/new`) + a
+  `AutoRouteByDevice` plug (mobile-capable tails: `""`, `/obligations/new`) + a
   `argus_view` cookie override. Separate LiveViews + layouts (`Layouts.app/1` navbar,
-  `Layouts.mobile_app/1` bottom-nav shell). New-obligation has both Desktop (`ObligationLive.Form`)
-  and Mobile (`MobileLive.ObligationForm`) LiveViews sharing all non-render logic via
-  `ObligationLive.CreateForm` (`load_form`/`validate`/`save` with a redirect-path fn).
+  `Layouts.mobile_app/1` bottom-nav shell — bottom nav is **New(+) · Dashboard · More**, the New
+  tab shown only when the role `can?(:create_obligation)`). New-obligation has both Desktop
+  (`ObligationLive.Form`) and Mobile (`MobileLive.ObligationForm`) LiveViews sharing all non-render
+  logic via `ObligationLive.CreateForm` (`load_form`/`validate`/`save` with a redirect-path fn).
+  **There is no separate obligation index page** — the **dashboard is the obligation list** on both
+  UIs (`DashboardLive.Index` at `/entities/:slug`, `MobileLive.Dashboard` at `/m/:slug`). It's a
+  flat, filtered list (status tabs + search), not a grouped view; both render via
+  `ObligationLive.IndexHelpers.load_rows` (status/`default_status` role-based default, urgency, tier,
+  event meta). After create/complete/cancel/skip, forms and show redirect back to the dashboard.
 - **Shell-Escape contract:** both layout shells (`#argus-shell`) bind
   `phx-window-keydown="close_modal_on_escape"`, so **every** LiveView rendered in them must define a
   `handle_event("close_modal_on_escape", …)` clause (no-op if the page has no modals) or it crashes
@@ -209,7 +215,7 @@ dashboard is where overdue/due-soon work surfaces, computed at render time:
   `:due_soon` means `due_by` is within any offset in the type's `reminder_offsets`
   (comma-delimited days, e.g. `"30,7,1"`). `today` is **required and computed in the entity's
   timezone** via `Urgency.today_for(entity.timezone)` — never `Date.utc_today()`, which would
-  mis-date non-UTC tenants near midnight. Used for dashboard **grouping/chips** (overdue/due_soon/ok).
+  mis-date non-UTC tenants near midnight. Used to **sort** the live list (overdue → due_soon → due_by).
 - `Obligations.Urgency.tier(type, due_by, today)` → `:overdue | :critical | :due_soon | :approaching
   | :ok` is the **graded** refinement used for **color-coding card borders**. It splits the span
   between the smallest and largest `reminder_offset` into three equal bands (critical → due_soon →
@@ -217,14 +223,15 @@ dashboard is where overdue/due-soon work surfaces, computed at render time:
   **single offset** is widened by 7 days so it still yields three bands. Only `min`/`max` drive the
   bands — intermediate offsets are decorative. Rendered by `ArgusWeb.UrgencyBadge`: `tier_border/1`
   (the shared left-accent class `error → error/60 → warning → warning/40 → transparent`, used by
-  desktop index/dashboard and the mobile card so they don't drift) and `urgency_badge/1` (a
+  the desktop dashboard rows and the mobile card so they don't drift) and `urgency_badge/1` (a
   **tier-coloured countdown badge** — "Nd overdue" / "Due today" / "Nd left", nothing when `:ok`).
   Every live row map carries both `urgency` and `tier`.
 - `reminder_offsets` / `complete_documents` are validated and normalized on the `Type` changeset
   (write time), so the render path can't crash on bad input; `parse_offsets` still parses defensively.
-- Split view: **My work** (default for member) vs **Team overview** (default for manager/admin),
-  filtered to **live cycles** (`status = active AND completed_at IS NULL`), sorted overdue →
-  due_soon → `due_by` asc.
+- Status filter (single flat list, no grouping): `My Live · My Completed · Live · Completed ·
+  Cancelled · All` + title/type/assignee search. `default_status` is role-based — members land on
+  **My Live**, managers/admins on **Live** (team). Live/My-Live are sorted overdue → due_soon →
+  `due_by` asc; other statuses keep DB order.
 
 ### Out of scope for v1
 

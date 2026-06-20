@@ -18,10 +18,10 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
     <Layouts.mobile_app flash={@flash} current_scope={@current_scope} active={:obligations}>
       <div id="mobile-obligation-show" class="space-y-3 px-2 py-4">
         <.link
-          navigate={~p"/m/#{@current_scope.entity.slug}/obligations"}
+          navigate={~p"/m/#{@current_scope.entity.slug}"}
           class="text-sm text-base-content/60 flex items-center gap-1"
         >
-          <.icon name="hero-chevron-left-mini" class="size-4" /> Obligations
+          <.icon name="hero-chevron-left-mini" class="size-4" /> Dashboard
         </.link>
 
         <section id="obligation-summary" class="argus-workbench argus-obligation-summary">
@@ -737,7 +737,7 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
         {:noreply,
          socket
          |> put_flash(:info, "Obligation completed.")
-         |> push_navigate(to: ~p"/m/#{scope.entity.slug}/obligations")}
+         |> push_navigate(to: ~p"/m/#{scope.entity.slug}")}
 
       {:error, :next_due_required} ->
         {:noreply,
@@ -797,7 +797,7 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
         {:noreply,
          socket
          |> put_flash(:info, "Cycle skipped.")
-         |> push_navigate(to: ~p"/m/#{scope.entity.slug}/obligations")}
+         |> push_navigate(to: ~p"/m/#{scope.entity.slug}")}
 
       {:error, :next_due_required} ->
         {:noreply,
@@ -833,7 +833,7 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
         {:noreply,
          socket
          |> put_flash(:info, "Obligation cancelled.")
-         |> push_navigate(to: ~p"/m/#{scope.entity.slug}/obligations")}
+         |> push_navigate(to: ~p"/m/#{scope.entity.slug}")}
 
       {:error, :note_required} ->
         {:noreply, put_flash(socket, :error, "A reason is required.")}

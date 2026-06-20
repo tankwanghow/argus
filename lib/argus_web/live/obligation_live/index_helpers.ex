@@ -35,14 +35,21 @@ defmodule ArgusWeb.ObligationLive.IndexHelpers do
   def empty_message(:all), do: "No obligations."
 
   def load_rows(scope, today, status, query) do
-    scope
-    |> Obligations.list_obligations(status: status, query: query)
+    obligations = Obligations.list_obligations(scope, status: status, query: query)
+    summaries = Obligations.event_summaries_for(obligations)
+
+    obligations
     |> Enum.map(fn obligation ->
+      %{event_count: event_count, latest_event: latest_event} =
+        Map.fetch!(summaries, obligation.id)
+
       %{
         obligation: obligation,
         cycle_status: cycle_status(obligation),
         urgency: Urgency.classify(obligation.obligation_type, obligation.due_by, today),
-        tier: Urgency.tier(obligation.obligation_type, obligation.due_by, today)
+        tier: Urgency.tier(obligation.obligation_type, obligation.due_by, today),
+        event_count: event_count,
+        latest_event: latest_event
       }
     end)
     |> sort_rows(status)

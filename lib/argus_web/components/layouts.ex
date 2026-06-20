@@ -113,11 +113,6 @@ defmodule ArgusWeb.Layouts do
           label="Dashboard"
         />
         <.entity_nav_link
-          href={~p"/entities/#{@current_scope.entity.slug}/obligations"}
-          icon="hero-clipboard-document-list-micro"
-          label="Obligations"
-        />
-        <.entity_nav_link
           href={~p"/entities/#{@current_scope.entity.slug}/obligation-types"}
           icon="hero-tag-micro"
           label="Types"
@@ -362,9 +357,30 @@ defmodule ArgusWeb.Layouts do
   attr :current_scope, :map, required: true
 
   defp mobile_bottom_nav(assigns) do
+    assigns =
+      assign(
+        assigns,
+        :can_create,
+        Argus.Authorization.can?(assigns.current_scope, :create_obligation)
+      )
+
     ~H"""
     <nav class="fixed bottom-0 inset-x-0 z-30 bg-base-100 border-t border-base-300 pb-[env(safe-area-inset-bottom)]">
-      <ul class="grid grid-cols-3">
+      <ul class={["grid", if(@can_create, do: "grid-cols-3", else: "grid-cols-2")]}>
+        <li :if={@can_create}>
+          <.link
+            id="m-new-obligation-btn"
+            navigate={~p"/m/#{@current_scope.entity.slug}/obligations/new"}
+            class={[
+              "flex flex-col items-center gap-1 py-3 active:bg-base-200",
+              @active == :new && "text-primary",
+              @active != :new && "text-base-content/60"
+            ]}
+          >
+            <.icon name="hero-plus-circle" class="size-6" />
+            <span class="text-[11px]">New</span>
+          </.link>
+        </li>
         <li>
           <.link
             navigate={~p"/m/#{@current_scope.entity.slug}"}
@@ -376,19 +392,6 @@ defmodule ArgusWeb.Layouts do
           >
             <.icon name="hero-home" class="size-6" />
             <span class="text-[11px]">Dashboard</span>
-          </.link>
-        </li>
-        <li>
-          <.link
-            navigate={~p"/m/#{@current_scope.entity.slug}/obligations"}
-            class={[
-              "flex flex-col items-center gap-1 py-3 active:bg-base-200",
-              @active == :obligations && "text-primary",
-              @active != :obligations && "text-base-content/60"
-            ]}
-          >
-            <.icon name="hero-clipboard-document-list" class="size-6" />
-            <span class="text-[11px]">Tasks</span>
           </.link>
         </li>
         <li>

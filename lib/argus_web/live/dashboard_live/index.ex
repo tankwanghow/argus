@@ -1,10 +1,9 @@
 defmodule ArgusWeb.DashboardLive.Index do
   use ArgusWeb, :live_view
 
-  alias Argus.Obligations
+  alias Argus.Authorization
   alias Argus.Obligations.Urgency
-
-  @urgency_rank %{overdue: 0, due_soon: 1, ok: 2}
+  alias ArgusWeb.ObligationLive.IndexHelpers, as: Index
 
   @impl true
   def render(assigns) do
@@ -15,322 +14,104 @@ defmodule ArgusWeb.DashboardLive.Index do
           <.header>
             Dashboard
             <:subtitle>{@current_scope.entity.name}</:subtitle>
+            <:actions>
+              <.link
+                :if={Authorization.can?(@current_scope, :create_obligation)}
+                navigate={~p"/entities/#{@current_scope.entity.slug}/obligations/new"}
+                class="btn btn-primary btn-sm"
+              >
+                New obligation
+              </.link>
+            </:actions>
           </.header>
 
-          <div class="flex flex-wrap items-center gap-3">
-            <div class="tabs tabs-box w-fit bg-base-200/80">
-              <button
-                id="tab-my-work"
-                type="button"
-                phx-click="switch_tab"
-                phx-value-tab="my_work"
-                class={["tab", @tab == :my_work && "tab-active"]}
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div id="obligation-status-filters" class="tabs tabs-box tabs-wrap flex-1 min-w-0">
+              <.link
+                :for={status <- Index.statuses()}
+                id={"filter-#{status}"}
+                phx-click="filter_status"
+                phx-value-status={status}
+                class={["tab", @status == Index.parse_status(status) && "tab-active font-bold"]}
               >
-                My work
-              </button>
-              <button
-                id="tab-team-overview"
-                type="button"
-                phx-click="switch_tab"
-                phx-value-tab="team"
-                class={["tab", @tab == :team && "tab-active"]}
-              >
-                Team overview
-              </button>
+                {Index.status_label(Index.parse_status(status))}
+              </.link>
             </div>
-
-            <.team_summary :if={@tab == :team} chips={@summary_chips} />
+            <input
+              id="obligation-search"
+              type="search"
+              name="q"
+              placeholder="Search…"
+              phx-keyup="search"
+              phx-debounce="150"
+              value={@query}
+              class="input input-sm w-full sm:w-48 shrink-0"
+            />
           </div>
         </div>
 
-        <div class="argus-page-body space-y-3">
-          <%= if @tab == :team do %>
-            <.tier
-              :for={tier <- urgency_tiers()}
-              :if={tier_rows(@grouped, tier.key) != []}
-              tier={tier}
-              rows={tier_rows(@grouped, tier.key)}
-              today={@today}
-              slug={@current_scope.entity.slug}
-              show_assignee
-            />
-
-            <.unassigned_section
-              :if={@unassigned_rows != []}
-              rows={@unassigned_rows}
-              today={@today}
-              slug={@current_scope.entity.slug}
-            />
-
-            <.collapsible_tier
-              :if={tier_rows(@grouped, :ok) != []}
-              id="tier-on-track"
-              tier={on_track_tier()}
-              rows={tier_rows(@grouped, :ok)}
-              today={@today}
-              slug={@current_scope.entity.slug}
-              show_assignee
-              collapsed={@on_track_collapsed}
-            />
-
-            <.recently_completed
-              :if={@recently_completed_rows != []}
-              rows={@recently_completed_rows}
-              slug={@current_scope.entity.slug}
-              collapsed={@recent_collapsed}
-            />
-          <% else %>
-            <.tier
-              :for={tier <- urgency_tiers()}
-              :if={tier_rows(@grouped, tier.key) != []}
-              tier={tier}
-              rows={tier_rows(@grouped, tier.key)}
-              today={@today}
-              slug={@current_scope.entity.slug}
-            />
-          <% end %>
-
-          <div
-            :if={empty_dashboard?(@tab, @grouped, @unassigned_rows, @recently_completed_rows)}
-            id="dashboard-empty"
-            class="argus-section py-12 text-center text-base-content/60 border-dashed"
-          >
-            <.icon name="hero-check-circle" class="size-8 mx-auto mb-2 opacity-50" />
-            <p>Nothing on your plate. No live obligations.</p>
-          </div>
+        <div class="argus-page-body">
+          <ul id="obligations-list" class="argus-row-list">
+            <li
+              :for={row <- @rows}
+              id={"obligation-row-#{row.obligation.id}"}
+              data-event-count={row.event_count}
+              data-event-status={row.latest_event && row.latest_event.status}
+            >
+              <.obligation_row_link row={row} slug={@current_scope.entity.slug} today={@today} />
+            </li>
+            <li
+              :if={@rows == []}
+              id="obligations-empty"
+              class="py-8 text-center text-base-content/60"
+            >
+              {Index.empty_message(@status)}
+            </li>
+          </ul>
         </div>
       </div>
     </Layouts.app>
     """
   end
 
-  attr :chips, :list, required: true
-
-  defp team_summary(assigns) do
-    ~H"""
-    <div id="team-summary" class="flex flex-wrap gap-2">
-      <span
-        :for={chip <- @chips}
-        :if={chip.count > 0}
-        id={"summary-#{chip.key}"}
-        class={["badge badge-sm gap-1", chip.badge]}
-        data-count={chip.count}
-      >
-        <.icon :if={chip.icon} name={chip.icon} class="size-3.5" />
-        {chip.count} {chip.label}
-      </span>
-    </div>
-    """
-  end
-
-  attr :tier, :map, required: true
-  attr :rows, :list, required: true
-  attr :today, Date, required: true
-  attr :slug, :string, required: true
-  attr :show_assignee, :boolean, default: false
-
-  defp tier(assigns) do
-    ~H"""
-    <section data-tier={@tier.key} class="argus-section">
-      <div class={["argus-section-head", @tier.color]}>
-        <span class={["inline-block size-2 rounded-full shrink-0", @tier.dot]} />
-        {@tier.label}
-        <span class="text-base-content/50 font-normal">({length(@rows)})</span>
-      </div>
-
-      <.obligation_rows
-        rows={@rows}
-        tier={@tier}
-        today={@today}
-        slug={@slug}
-        show_assignee={@show_assignee}
-      />
-    </section>
-    """
-  end
-
-  attr :id, :string, required: true
-  attr :tier, :map, required: true
-  attr :rows, :list, required: true
-  attr :today, Date, required: true
-  attr :slug, :string, required: true
-  attr :show_assignee, :boolean, default: false
-  attr :collapsed, :boolean, default: true
-
-  defp collapsible_tier(assigns) do
-    ~H"""
-    <section data-tier={@tier.key} id={@id} class="argus-section">
-      <div class="argus-section-head">
-        <button
-          type="button"
-          phx-click="toggle_section"
-          phx-value-section="on_track"
-          class="flex items-center gap-2 text-left"
-        >
-          <.icon
-            name={if @collapsed, do: "hero-chevron-right", else: "hero-chevron-down"}
-            class="size-4 text-base-content/50 shrink-0"
-          />
-          <span class={["inline-block size-2 rounded-full shrink-0", @tier.dot]} />
-          <span class={@tier.color}>{@tier.label}</span>
-          <span class="text-base-content/50 font-normal">({length(@rows)})</span>
-        </button>
-      </div>
-
-      <.obligation_rows
-        :if={not @collapsed}
-        rows={@rows}
-        tier={@tier}
-        today={@today}
-        slug={@slug}
-        show_assignee={@show_assignee}
-      />
-    </section>
-    """
-  end
-
-  attr :rows, :list, required: true
-  attr :today, Date, required: true
-  attr :slug, :string, required: true
-
-  defp unassigned_section(assigns) do
-    ~H"""
-    <section id="tier-unassigned" data-tier="unassigned" class="argus-section">
-      <div class="argus-section-head text-secondary">
-        <span class="inline-block size-2 rounded-full bg-secondary shrink-0" /> Unassigned
-        <span class="text-base-content/50 font-normal">({length(@rows)})</span>
-      </div>
-
-      <ul class="argus-row-list">
-        <li
-          :for={row <- @rows}
-          id={"unassigned-row-#{row.obligation.id}"}
-          data-event-count={row.event_count}
-          data-event-status={row.latest_event && row.latest_event.status}
-        >
-          <.obligation_row_link
-            row={row}
-            slug={@slug}
-            today={@today}
-            accent="border-secondary"
-            tier_color={urgency_text_class(row.urgency)}
-            subtitle={"#{row.obligation.obligation_type.name} · Unassigned"}
-          />
-          <div class="px-3 pb-3 -mt-1">
-            <.link
-              navigate={~p"/entities/#{@slug}/obligations/#{row.obligation.id}"}
-              class="btn btn-ghost btn-xs text-secondary"
-            >
-              <.icon name="hero-user-plus" class="size-3.5" /> Assign someone
-            </.link>
-          </div>
-        </li>
-      </ul>
-    </section>
-    """
-  end
-
-  attr :rows, :list, required: true
-  attr :slug, :string, required: true
-  attr :collapsed, :boolean, default: false
-
-  defp recently_completed(assigns) do
-    ~H"""
-    <section id="tier-recently-completed" data-tier="recently_completed" class="argus-section">
-      <div class="argus-section-head text-base-content/70">
-        <button
-          type="button"
-          phx-click="toggle_section"
-          phx-value-section="recent"
-          class="flex items-center gap-2 text-left"
-        >
-          <.icon
-            name={if @collapsed, do: "hero-chevron-right", else: "hero-chevron-down"}
-            class="size-4 text-base-content/50 shrink-0"
-          />
-          <span class="inline-block size-2 rounded-full bg-success/60 shrink-0" /> Recently completed
-          <span class="text-base-content/50 font-normal">({length(@rows)})</span>
-        </button>
-      </div>
-
-      <ul :if={not @collapsed} class="argus-row-list">
-        <li :for={row <- @rows} id={"completed-row-#{row.obligation.id}"}>
-          <.obligation_row_link
-            row={row}
-            slug={@slug}
-            today={nil}
-            accent="border-transparent"
-            tier_color="text-base-content/60"
-            subtitle={"#{row.obligation.obligation_type.name} · #{assignee_label(row.obligation)}"}
-            due_label={format_completed_at(row.obligation.completed_at)}
-          />
-        </li>
-      </ul>
-    </section>
-    """
-  end
-
-  attr :rows, :list, required: true
-  attr :tier, :map, required: true
-  attr :today, Date, required: true
-  attr :slug, :string, required: true
-  attr :show_assignee, :boolean, default: false
-
-  defp obligation_rows(assigns) do
-    ~H"""
-    <ul class="argus-row-list">
-      <li
-        :for={row <- @rows}
-        id={"obligation-row-#{row.obligation.id}"}
-        data-event-count={row.event_count}
-        data-event-status={row.latest_event && row.latest_event.status}
-      >
-        <.obligation_row_link
-          row={row}
-          slug={@slug}
-          today={@today}
-          subtitle={obligation_subtitle(row, @show_assignee)}
-        />
-      </li>
-    </ul>
-    """
-  end
-
   attr :row, :map, required: true
   attr :slug, :string, required: true
-  attr :today, :any, default: nil
-  attr :accent, :string, default: nil
-  attr :tier_color, :string, default: nil
-  attr :subtitle, :string, required: true
-  attr :due_label, :string, default: nil
+  attr :today, :any, required: true
 
   defp obligation_row_link(assigns) do
-    assigns =
-      assigns
-      |> assign(:accent, assigns.accent || tier_border(assigns.row.tier))
-      |> assign(:tier_color, assigns.tier_color || urgency_text_class(assigns.row.tier))
-
     ~H"""
     <.link
       navigate={~p"/entities/#{@slug}/obligations/#{@row.obligation.id}"}
-      class={["argus-compact-row", @accent]}
+      class={[
+        "argus-compact-row",
+        if(@row.cycle_status == :live, do: tier_border(@row.tier), else: "border-transparent")
+      ]}
     >
-      <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+      <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5">
         <span class="font-medium">{@row.obligation.title}</span>
         <span :if={@row.obligation.completed_in_error_at} class="badge badge-xs badge-error">
           in error
         </span>
-        <span class="text-sm text-base-content/60">·</span>
-        <span class="text-sm">{format_date(@row.obligation.due_by)}</span>
-        <span :if={@due_label} class={["text-xs", @tier_color]}>{@due_label}</span>
-        <span
-          :if={!@due_label && @today}
-          class={["text-xs", @tier_color]}
-        >
+        <.urgency_badge
+          :if={@row.cycle_status == :live}
+          tier={@row.tier}
+          due_by={@row.obligation.due_by}
+          today={@today}
+        />
+        <.obligation_status_badge
+          :if={@row.cycle_status != :live}
+          cycle_status={@row.cycle_status}
+          in_error={!is_nil(@row.obligation.completed_in_error_at)}
+          detail={completion_detail(@row)}
+        />
+      </div>
+      <div class="flex flex-wrap items-baseline gap-x-2 text-sm mt-0.5">
+        <span class="text-base-content/60">{format_date(@row.obligation.due_by)}</span>
+        <span :if={@row.cycle_status == :live} class={["text-xs", urgency_text_class(@row.tier)]}>
           {due_label(@row.obligation.due_by, @today)}
         </span>
       </div>
-      <div class="text-sm text-base-content/60 mt-0.5">{@subtitle}</div>
+      <div class="text-sm text-base-content/60 mt-0.5">{obligation_subtitle(@row.obligation)}</div>
       <.event_meta
         :if={@row.latest_event}
         event={@row.latest_event}
@@ -358,212 +139,46 @@ defmodule ArgusWeb.DashboardLive.Index do
     """
   end
 
-  defp obligation_subtitle(row, show_assignee) do
-    type = row.obligation.obligation_type.name
-
-    if show_assignee do
-      "#{type} · #{assignee_label(row.obligation)}"
-    else
-      type
-    end
-  end
-
-  defp urgency_tiers do
-    [
-      %{
-        key: :overdue,
-        label: "Overdue",
-        color: "text-error",
-        dot: "bg-error"
-      },
-      %{
-        key: :due_soon,
-        label: "Due soon",
-        color: "text-warning",
-        dot: "bg-warning"
-      }
-    ]
-  end
-
-  defp on_track_tier do
-    %{
-      key: :ok,
-      label: "On track",
-      color: "text-base-content/60",
-      dot: "bg-base-300"
-    }
-  end
-
-  defp tier_rows(grouped, key), do: Map.get(grouped, key, [])
-
-  defp urgency_text_class(tier) when tier in [:overdue, :critical], do: "text-error"
-  defp urgency_text_class(tier) when tier in [:due_soon, :approaching], do: "text-warning"
-  defp urgency_text_class(_), do: "text-base-content/60"
-
-  defp assignee_label(%{primary_assignee: nil}), do: "Unassigned"
-  defp assignee_label(%{primary_assignee: assignee}), do: assignee.email
-
-  defp empty_dashboard?(:my_work, grouped, _, _) do
-    Enum.all?([:overdue, :due_soon, :ok], &(tier_rows(grouped, &1) == []))
-  end
-
-  defp empty_dashboard?(:team, grouped, unassigned, recently_completed_rows) do
-    Enum.all?([:overdue, :due_soon, :ok], &(tier_rows(grouped, &1) == [])) and
-      unassigned == [] and recently_completed_rows == []
-  end
-
   @impl true
   def mount(_params, _session, socket) do
     scope = socket.assigns.current_scope
     today = Urgency.today_for(scope.entity.timezone)
-    tab = default_tab(scope.role)
 
     {:ok,
      socket
      |> assign(:today, today)
-     |> assign(:tab, tab)
-     |> assign(:on_track_collapsed, true)
-     |> assign(:recent_collapsed, false)
-     |> load_dashboard(scope, tab, today)}
+     |> assign(:status, Index.default_status(scope))
+     |> assign(:query, "")
+     |> load_rows()}
   end
 
   @impl true
-  def handle_event("switch_tab", %{"tab" => tab}, socket) do
-    tab = if tab == "team", do: :team, else: :my_work
-
-    {:noreply,
-     socket
-     |> assign(:tab, tab)
-     |> load_dashboard(socket.assigns.current_scope, tab, socket.assigns.today)}
+  def handle_event("filter_status", %{"status" => status}, socket) do
+    {:noreply, socket |> assign(:status, Index.parse_status(status)) |> load_rows()}
   end
 
-  def handle_event("toggle_section", %{"section" => "on_track"}, socket) do
-    {:noreply, assign(socket, :on_track_collapsed, not socket.assigns.on_track_collapsed)}
+  def handle_event("search", %{"value" => query}, socket) do
+    {:noreply, socket |> assign(:query, query) |> load_rows()}
   end
 
-  def handle_event("toggle_section", %{"section" => "recent"}, socket) do
-    {:noreply, assign(socket, :recent_collapsed, not socket.assigns.recent_collapsed)}
+  def handle_event("close_modal_on_escape", _params, socket), do: {:noreply, socket}
+
+  defp load_rows(socket) do
+    %{current_scope: scope, today: today, status: status, query: query} = socket.assigns
+    assign(socket, :rows, Index.load_rows(scope, today, status, query))
   end
 
-  defp default_tab(:member), do: :my_work
-  defp default_tab(_), do: :team
-
-  defp load_dashboard(socket, scope, tab, today) do
-    obligations =
-      case tab do
-        :my_work -> Obligations.list_my_work(scope)
-        :team -> Obligations.list_team_overview(scope)
-      end
-
-    rows = build_rows(obligations, today)
-
-    grouped =
-      Map.merge(
-        %{overdue: [], due_soon: [], ok: []},
-        Enum.group_by(rows, & &1.urgency)
-      )
-
-    socket =
-      socket
-      |> assign(:rows, rows)
-      |> assign(:grouped, grouped)
-
-    if tab == :team do
-      unassigned_rows =
-        scope
-        |> Obligations.list_unassigned()
-        |> build_rows(today)
-
-      recently_completed_rows =
-        scope
-        |> Obligations.list_recently_completed()
-        |> build_completed_rows()
-
-      socket
-      |> assign(:unassigned_rows, unassigned_rows)
-      |> assign(:recently_completed_rows, recently_completed_rows)
-      |> assign(:summary_chips, summary_chips(grouped, unassigned_rows))
-    else
-      socket
-      |> assign(:unassigned_rows, [])
-      |> assign(:recently_completed_rows, [])
-      |> assign(:summary_chips, [])
-    end
+  defp obligation_subtitle(obligation) do
+    "#{obligation.obligation_type.name} · #{assignee_label(obligation)}"
   end
 
-  defp build_rows(obligations, today) do
-    summaries = Obligations.event_summaries_for(obligations)
+  defp assignee_label(%{primary_assignee: nil}), do: "Unassigned"
+  defp assignee_label(%{primary_assignee: assignee}), do: assignee.email
 
-    obligations
-    |> Enum.map(fn obligation ->
-      %{event_count: event_count, latest_event: latest_event} =
-        Map.fetch!(summaries, obligation.id)
+  defp completion_detail(%{cycle_status: :completed, obligation: o}),
+    do: format_completed_at(o.completed_at)
 
-      %{
-        obligation: obligation,
-        urgency: Urgency.classify(obligation.obligation_type, obligation.due_by, today),
-        tier: Urgency.tier(obligation.obligation_type, obligation.due_by, today),
-        event_count: event_count,
-        latest_event: latest_event
-      }
-    end)
-    |> sort_by_urgency()
-  end
-
-  defp build_completed_rows(obligations) do
-    summaries = Obligations.event_summaries_for(obligations)
-
-    Enum.map(obligations, fn obligation ->
-      %{event_count: event_count, latest_event: latest_event} =
-        Map.fetch!(summaries, obligation.id)
-
-      %{
-        obligation: obligation,
-        urgency: nil,
-        event_count: event_count,
-        latest_event: latest_event
-      }
-    end)
-  end
-
-  defp summary_chips(grouped, unassigned_rows) do
-    [
-      %{
-        key: "overdue",
-        label: "overdue",
-        count: length(tier_rows(grouped, :overdue)),
-        badge: "badge-error",
-        icon: "hero-exclamation-triangle-mini"
-      },
-      %{
-        key: "due-soon",
-        label: "due soon",
-        count: length(tier_rows(grouped, :due_soon)),
-        badge: "badge-warning",
-        icon: nil
-      },
-      %{
-        key: "unassigned",
-        label: "unassigned",
-        count: length(unassigned_rows),
-        badge: "badge-secondary",
-        icon: "hero-user-mini"
-      },
-      %{
-        key: "on-track",
-        label: "on track",
-        count: length(tier_rows(grouped, :ok)),
-        badge: "badge-ghost",
-        icon: nil
-      }
-    ]
-  end
-
-  defp sort_by_urgency(rows) do
-    Enum.sort_by(rows, fn %{obligation: o, urgency: urgency} ->
-      {@urgency_rank[urgency], o.due_by}
-    end)
-  end
+  defp completion_detail(_), do: nil
 
   defp format_completed_at(nil), do: "—"
 
@@ -572,6 +187,10 @@ defmodule ArgusWeb.DashboardLive.Index do
     |> DateTime.to_date()
     |> format_date()
   end
+
+  defp urgency_text_class(tier) when tier in [:overdue, :critical], do: "text-error"
+  defp urgency_text_class(tier) when tier in [:due_soon, :approaching], do: "text-warning"
+  defp urgency_text_class(_), do: "text-base-content/60"
 
   defp humanize_status("in_progress"), do: "In progress"
   defp humanize_status(status), do: String.capitalize(status)

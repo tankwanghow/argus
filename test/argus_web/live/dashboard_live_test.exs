@@ -8,7 +8,7 @@ defmodule ArgusWeb.DashboardLiveTest do
 
   setup :register_and_log_in_user
 
-  test "member defaults to My work tab", %{conn: conn} do
+  test "member defaults to the My Live filter", %{conn: conn} do
     {scope, _obligation} = assigned_member_scope_fixture()
 
     conn = log_in_user(conn, scope.user)
@@ -16,8 +16,19 @@ defmodule ArgusWeb.DashboardLiveTest do
     {:ok, view, _html} =
       live(conn, ~p"/entities/#{scope.entity.slug}")
 
-    assert has_element?(view, "#tab-my-work.tab-active")
-    refute has_element?(view, "#tab-team-overview.tab-active")
+    assert has_element?(view, "#filter-my_live.tab-active")
+    refute has_element?(view, "#filter-live.tab-active")
+  end
+
+  test "manager defaults to the Live filter", %{conn: conn} do
+    {scope, _obligation} = manager_obligation_scope_fixture()
+
+    conn = log_in_user(conn, scope.user)
+
+    {:ok, view, _html} =
+      live(conn, ~p"/entities/#{scope.entity.slug}")
+
+    assert has_element?(view, "#filter-live.tab-active")
   end
 
   test "user menu has all entities and members links", %{conn: conn} do
@@ -33,35 +44,37 @@ defmodule ArgusWeb.DashboardLiveTest do
     refute has_element?(view, "nav a", "Members")
   end
 
-  test "manager defaults to Team overview tab", %{conn: conn} do
-    {scope, _obligation} = manager_obligation_scope_fixture()
-
-    conn = log_in_user(conn, scope.user)
-
-    {:ok, view, _html} =
-      live(conn, ~p"/entities/#{scope.entity.slug}")
-
-    assert has_element?(view, "#tab-team-overview.tab-active")
-  end
-
-  test "switches tabs", %{conn: conn} do
+  test "switches the status filter", %{conn: conn} do
     {scope, _obligation} = manager_obligation_scope_fixture()
     conn = log_in_user(conn, scope.user)
 
     {:ok, view, _html} =
       live(conn, ~p"/entities/#{scope.entity.slug}")
 
-    view |> element("#tab-my-work") |> render_click()
-    assert has_element?(view, "#tab-my-work.tab-active")
+    view |> element("#filter-my_live") |> render_click()
+    assert has_element?(view, "#filter-my_live.tab-active")
   end
 
-  test "overdue obligations render in the overdue tier", %{conn: conn} do
+  test "manager sees the New obligation button", %{conn: conn} do
+    {scope, _obligation} = manager_obligation_scope_fixture()
+    conn = log_in_user(conn, scope.user)
+
+    {:ok, view, _html} = live(conn, ~p"/entities/#{scope.entity.slug}")
+
+    assert has_element?(
+             view,
+             "a[href='/entities/#{scope.entity.slug}/obligations/new']",
+             "New obligation"
+           )
+  end
+
+  test "overdue obligation renders with an overdue badge", %{conn: conn} do
     manager = Argus.EntitiesFixtures.manager_scope_fixture()
     conn = log_in_user(conn, manager.user)
     member = member_fixture(manager.entity)
     type = type_fixture(manager.entity)
 
-    {:ok, _} =
+    {:ok, obligation} =
       Obligations.create_obligation(manager, %{
         title: "Late filing",
         obligation_type_id: type.id,
@@ -72,11 +85,10 @@ defmodule ArgusWeb.DashboardLiveTest do
 
     {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}")
 
-    assert has_element?(view, "[data-tier=overdue]")
-    assert has_element?(view, "#summary-overdue")
+    assert has_element?(view, "#obligation-row-#{obligation.id} [data-urgency=overdue]")
   end
 
-  test "recently completed marks a completed-in-error cycle", %{conn: conn} do
+  test "completed filter marks a completed-in-error cycle", %{conn: conn} do
     manager = Argus.EntitiesFixtures.manager_scope_fixture()
     conn = log_in_user(conn, manager.user)
     type = type_fixture(manager.entity)
@@ -97,10 +109,11 @@ defmodule ArgusWeb.DashboardLiveTest do
 
     {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}")
 
-    assert has_element?(view, "#completed-row-#{original.id}", "in error")
+    view |> element("#filter-completed") |> render_click()
+    assert has_element?(view, "#obligation-row-#{original.id}", "in error")
   end
 
-  test "dashboard rows show latest event status and count", %{conn: conn} do
+  test "rows show latest event status and count", %{conn: conn} do
     {scope, obligation} = manager_obligation_scope_fixture()
     conn = log_in_user(conn, scope.user)
 
@@ -119,12 +132,12 @@ defmodule ArgusWeb.DashboardLiveTest do
     assert has_element?(view, "#obligation-row-#{obligation.id}", scope.user.email)
   end
 
-  test "team overview shows unassigned section", %{conn: conn} do
+  test "team (Live) list includes unassigned obligations", %{conn: conn} do
     manager = Argus.EntitiesFixtures.manager_scope_fixture()
     conn = log_in_user(conn, manager.user)
     type = type_fixture(manager.entity)
 
-    {:ok, _} =
+    {:ok, obligation} =
       Obligations.create_obligation(manager, %{
         title: "Unowned task",
         obligation_type_id: type.id,
@@ -135,7 +148,7 @@ defmodule ArgusWeb.DashboardLiveTest do
 
     {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}")
 
-    assert has_element?(view, "#tier-unassigned", "Unowned task")
-    assert has_element?(view, "#tier-unassigned", "Assign someone")
+    assert has_element?(view, "#obligation-row-#{obligation.id}", "Unowned task")
+    assert has_element?(view, "#obligation-row-#{obligation.id}", "Unassigned")
   end
 end

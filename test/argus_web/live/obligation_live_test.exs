@@ -8,7 +8,7 @@ defmodule ArgusWeb.ObligationLiveTest do
 
   setup :register_and_log_in_user
 
-  test "obligation index filters completed and cancelled cycles", %{conn: conn} do
+  test "dashboard filters completed and cancelled cycles", %{conn: conn} do
     manager = Argus.EntitiesFixtures.manager_scope_fixture()
     member_scope = member_scope_on_entity(manager.entity)
     conn = log_in_user(conn, manager.user)
@@ -47,33 +47,33 @@ defmodule ArgusWeb.ObligationLiveTest do
     assert {:ok, _} =
              Obligations.cancel_obligation(manager, to_cancel, %{note: "No longer needed"})
 
-    {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}/obligations")
+    {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}")
 
-    assert has_element?(view, "#obligation-#{live_obligation.id}")
-    refute has_element?(view, "#obligation-#{completed.id}")
+    assert has_element?(view, "#obligation-row-#{live_obligation.id}")
+    refute has_element?(view, "#obligation-row-#{completed.id}")
 
     view |> element("#filter-completed") |> render_click()
-    assert has_element?(view, "#obligation-#{completed.id}")
-    refute has_element?(view, "#obligation-#{live_obligation.id}")
+    assert has_element?(view, "#obligation-row-#{completed.id}")
+    refute has_element?(view, "#obligation-row-#{live_obligation.id}")
 
     view |> element("#filter-cancelled") |> render_click()
-    assert has_element?(view, "#obligation-#{to_cancel.id}")
+    assert has_element?(view, "#obligation-row-#{to_cancel.id}")
 
     member_conn = log_in_user(conn, member_scope.user)
 
     {:ok, member_view, _html} =
-      live(member_conn, ~p"/entities/#{manager.entity.slug}/obligations")
+      live(member_conn, ~p"/entities/#{manager.entity.slug}")
 
     member_view |> element("#filter-my_live") |> render_click()
-    assert has_element?(member_view, "#obligation-#{live_obligation.id}")
+    assert has_element?(member_view, "#obligation-row-#{live_obligation.id}")
 
     member_view |> element("#filter-my_completed") |> render_click()
-    assert has_element?(member_view, "#obligation-#{completed.id}")
+    assert has_element?(member_view, "#obligation-row-#{completed.id}")
 
     view |> element("#filter-live") |> render_click()
     view |> element("#obligation-search") |> render_keyup(%{"value" => "Alpha"})
-    assert has_element?(view, "#obligation-#{live_obligation.id}")
-    refute has_element?(view, "#obligation-#{to_cancel.id}")
+    assert has_element?(view, "#obligation-row-#{live_obligation.id}")
+    refute has_element?(view, "#obligation-row-#{to_cancel.id}")
   end
 
   test "manager creates obligation via form", %{conn: conn} do
@@ -475,7 +475,7 @@ defmodule ArgusWeb.ObligationLiveTest do
     })
     |> render_submit()
 
-    assert_redirect(view, ~p"/entities/#{scope.entity.slug}/obligations")
+    assert_redirect(view, ~p"/entities/#{scope.entity.slug}")
     assert Obligations.get_obligation!(scope, obligation.id).status == "cancelled"
 
     live_cycles =
@@ -534,7 +534,7 @@ defmodule ArgusWeb.ObligationLiveTest do
     |> form("#cancel-form", %{"cancel" => %{"note" => "Duplicate entry"}})
     |> render_submit()
 
-    assert_redirect(view, ~p"/entities/#{scope.entity.slug}/obligations")
+    assert_redirect(view, ~p"/entities/#{scope.entity.slug}")
     assert Obligations.get_obligation!(scope, obligation.id).status == "cancelled"
   end
 
@@ -809,7 +809,7 @@ defmodule ArgusWeb.ObligationLiveTest do
     |> form("#done-form", %{"done" => %{"next_due_by" => "2026-07-15", "note" => "Done"}})
     |> render_submit()
 
-    assert_redirect(view, ~p"/entities/#{scope.entity.slug}/obligations")
+    assert_redirect(view, ~p"/entities/#{scope.entity.slug}")
   end
 
   test "completion modal: satisfied slot shows file, unsatisfied shows uploader", %{conn: conn} do

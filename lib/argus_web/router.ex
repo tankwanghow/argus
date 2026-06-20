@@ -59,7 +59,6 @@ defmodule ArgusWeb.Router do
         {ArgusWeb.Locale, :default}
       ] do
       live "/entities/:entity_slug", DashboardLive.Index, :index
-      live "/entities/:entity_slug/obligations", ObligationLive.Index, :index
       live "/entities/:entity_slug/obligations/new", ObligationLive.Form, :new
       live "/entities/:entity_slug/obligations/:id", ObligationLive.Show, :show
       live "/entities/:entity_slug/obligation-types", ObligationTypeLive.Index, :index
@@ -67,7 +66,6 @@ defmodule ArgusWeb.Router do
       live "/entities/:entity_slug/invite-session/:role", MembershipLive.InviteSession, :show
 
       live "/m/:entity_slug", MobileLive.Dashboard, :show
-      live "/m/:entity_slug/obligations", MobileLive.Obligations, :index
       live "/m/:entity_slug/obligations/new", MobileLive.ObligationForm, :new
       live "/m/:entity_slug/obligations/:id", MobileLive.ObligationShow, :show
       live "/m/:entity_slug/invite-session/:role", MobileLive.InviteSession, :show
