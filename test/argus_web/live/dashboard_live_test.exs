@@ -114,7 +114,7 @@ defmodule ArgusWeb.DashboardLiveTest do
     assert has_element?(view, "#obligation-row-#{original.id}", "in error")
   end
 
-  test "rows show latest event status and count", %{conn: conn} do
+  test "rows show the latest event status and actor", %{conn: conn} do
     {scope, obligation} = manager_obligation_scope_fixture()
     conn = log_in_user(conn, scope.user)
 
@@ -129,7 +129,6 @@ defmodule ArgusWeb.DashboardLiveTest do
              "In progress"
            )
 
-    assert has_element?(view, "#obligation-row-#{obligation.id}", "2 events")
     assert has_element?(view, "#obligation-row-#{obligation.id}", scope.user.email)
   end
 

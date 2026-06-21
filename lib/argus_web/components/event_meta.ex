@@ -12,13 +12,12 @@ defmodule ArgusWeb.EventMeta do
 
   def event_meta(assigns) do
     ~H"""
-    <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-base-content/60 mt-1">
+    <div class="flex flex-wrap items-center gap-x-1 gap-y-0.5 text-xs text-base-content/60 mt-1">
       <span class={["badge badge-xs", status_badge_class(@event.status)]}>
         {humanize_status(@event.status)}
       </span>
-      <span>{event_count_label(@event_count)}</span>
       <span :if={@show_actor and @event.status_by}>by {@event.status_by.email}</span>
-      <span :if={@event.note} class="truncate max-w-[16rem] italic text-base-content/50">
+      <span :if={@event.note} class="truncate max-w-[15rem] italic text-base-content/100">
         “{truncate_note(@event.note)}”
       </span>
     </div>
@@ -34,9 +33,6 @@ defmodule ArgusWeb.EventMeta do
   defp status_badge_class("skipped"), do: "badge-warning badge-soft"
   defp status_badge_class("series_ended"), do: "badge-neutral badge-soft"
   defp status_badge_class(_), do: "badge-ghost"
-
-  defp event_count_label(1), do: "1 event"
-  defp event_count_label(count), do: "#{count} events"
 
   defp truncate_note(note) when is_binary(note) do
     if String.length(note) > 72, do: String.slice(note, 0, 69) <> "…", else: note

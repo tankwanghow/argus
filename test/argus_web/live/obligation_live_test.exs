@@ -623,7 +623,9 @@ defmodule ArgusWeb.ObligationLiveTest do
     assert has_element?(view, "#done-btn")
   end
 
-  test "completion files show in the summary, not under timeline events", %{conn: conn} do
+  test "completed slot shows satisfied in the summary, files not under timeline events", %{
+    conn: conn
+  } do
     manager = Argus.EntitiesFixtures.manager_scope_fixture()
     conn = log_in_user(conn, manager.user)
     type = type_fixture(manager.entity, complete_documents: "receipt")
@@ -657,8 +659,14 @@ defmodule ArgusWeb.ObligationLiveTest do
     view |> form("#completion-upload-form", %{"picker_slot" => "receipt"}) |> render_change()
     view |> element("#upload-slot-receipt") |> render_click()
 
-    # The completion file shows beside the slot in the summary, not in the timeline.
-    assert has_element?(view, "#completion-summary", "receipt.pdf")
+    # The slot is surfaced as satisfied in the summary (the file itself opens via the modal),
+    # and the file is not listed under the timeline events.
+    assert has_element?(
+             view,
+             "#completion-summary #open-completion-slot-receipt .hero-check-circle-mini"
+           )
+
+    refute has_element?(view, "#completion-summary .hero-x-circle-mini")
 
     obligation = Obligations.get_obligation!(manager, obligation.id)
 

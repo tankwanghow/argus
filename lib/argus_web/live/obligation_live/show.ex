@@ -147,14 +147,6 @@ defmodule ArgusWeb.ObligationLive.Show do
                 />
                 <span class={if live, do: "", else: "text-base-content/60"}>{slot}</span>
               </button>
-              <.link
-                :if={live}
-                href={"/entities/#{@current_scope.entity.slug}/obligations/#{@obligation.id}/documents/#{live.id}"}
-                target="_blank"
-                class="link link-hover truncate max-w-[8rem] text-base-content/70"
-              >
-                {file_name(live)}
-              </.link>
             </span>
           </div>
           <div

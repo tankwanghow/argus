@@ -23,8 +23,8 @@ defmodule ArgusWeb.MobileLive.Components do
         navigate={~p"/m/#{@slug}/obligations/#{@row.obligation.id}"}
         class={["block rounded-box border border-base-300 p-3 border-l-4", accent(@row)]}
       >
-        <div class="flex items-center justify-between gap-2">
-          <span class="font-medium truncate">{@row.obligation.title}</span>
+        <div class="flex items-center justify-between gap-1">
+          <span class="font-medium truncate max-w-[15rem]">{@row.obligation.title}</span>
           <.obligation_status_badge
             :if={@row.cycle_status != :live}
             cycle_status={@row.cycle_status}
@@ -37,11 +37,13 @@ defmodule ArgusWeb.MobileLive.Components do
             today={@today}
           />
         </div>
-        <div class="text-sm text-base-content/60 truncate mt-1">
-          {@row.obligation.obligation_type.name}
-        </div>
-        <div class={["text-xs mt-0.5", text_color(@row)]}>
-          {card_meta(@row)}
+        <div class="flex gap-1 text-xs">
+          <div class="text-info">
+            {@row.obligation.obligation_type.name}
+          </div>
+          <div class={[text_color(@row)]}>
+            {card_meta(@row)}
+          </div>
         </div>
         <.event_meta
           :if={@row.latest_event}

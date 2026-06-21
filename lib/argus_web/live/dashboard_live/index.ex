@@ -13,14 +13,13 @@ defmodule ArgusWeb.DashboardLive.Index do
         <div class="argus-page-toolbar space-y-3">
           <.header>
             Dashboard
-            <:subtitle>{@current_scope.entity.name}</:subtitle>
             <:actions>
               <.link
                 :if={Authorization.can?(@current_scope, :create_obligation)}
                 navigate={~p"/entities/#{@current_scope.entity.slug}/obligations/new"}
                 class="btn btn-primary btn-sm"
               >
-                New obligation
+                + New obligation
               </.link>
             </:actions>
           </.header>
@@ -125,10 +124,15 @@ defmodule ArgusWeb.DashboardLive.Index do
           detail={completion_detail(@row)}
         />
       </div>
-      <div class="text-sm text-base-content/60 mt-0.5">
-        due {format_date(@row.obligation.due_by)}
+      <div class="flex text-sm gap-1">
+        <div class="text-info">{@row.obligation.obligation_type.name}</div>
+        <div>·</div>
+        <div class="text-base-content/60">
+          due {format_date(@row.obligation.due_by)}
+        </div>
+        <div>·</div>
+        {assignee_label(@row.obligation.primary_assignee)}
       </div>
-      <div class="text-sm text-base-content/60 mt-0.5">{obligation_subtitle(@row.obligation)}</div>
       <.event_meta
         :if={@row.latest_event}
         event={@row.latest_event}
@@ -174,12 +178,17 @@ defmodule ArgusWeb.DashboardLive.Index do
     assign(socket, :rows, Index.load_rows(scope, today, mine?, lifecycle, query))
   end
 
-  defp obligation_subtitle(obligation) do
-    "#{obligation.obligation_type.name} · #{assignee_label(obligation)}"
+  defp assignee_label(assigns) when assigns == nil do
+    ~H"""
+    <div class="text-error">Unassigned</div>
+    """
   end
 
-  defp assignee_label(%{primary_assignee: nil}), do: "Unassigned"
-  defp assignee_label(%{primary_assignee: assignee}), do: assignee.email
+  defp assignee_label(assigns) do
+    ~H"""
+    <div>{assigns.email}</div>
+    """
+  end
 
   defp completion_detail(%{cycle_status: :completed, obligation: o}),
     do: format_completed_at(o.completed_at)

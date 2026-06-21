@@ -54,7 +54,7 @@ defmodule ArgusWeb.MobileLive.ObligationForm do
               id="m-collaborator-ids"
               name="obligation[collaborator_ids][]"
               multiple
-              class="select w-full h-32"
+              class="select w-full h-24"
             >
               <option :for={{label, id} <- @member_options} value={id}>{label}</option>
             </select>
@@ -62,9 +62,8 @@ defmodule ArgusWeb.MobileLive.ObligationForm do
         </.form>
 
         <section id="m-create-document-upload" class="fieldset">
-          <label class="label mb-1">Attachments (optional)</label>
           <p class="text-xs text-base-content/50 mb-2">
-            Add supporting files to the opening step. Completion documents can be uploaded after creation.
+            Add supporting files to the opening step(optional). Completion documents can be uploaded after creation.
           </p>
           <form
             id="m-create-document-form"

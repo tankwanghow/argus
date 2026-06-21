@@ -17,7 +17,7 @@ defmodule ArgusWeb.ObligationLive.Form do
           id="obligation-create-form"
           phx-change="validate"
           phx-submit="save"
-          class="mt-1 max-w-xl space-y-4"
+          class="mt-1 max-w-xl"
         >
           <.char_count_input field={@form[:title]} label="Title" max={60} required />
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -33,7 +33,6 @@ defmodule ArgusWeb.ObligationLive.Form do
           </div>
           <.input field={@form[:open_note]} type="textarea" label="Open note" required />
           <div class="fieldset">
-            <label class="label">Collaborators</label>
             <.input
               field={@form[:primary_assignee_id]}
               type="select"
@@ -41,25 +40,24 @@ defmodule ArgusWeb.ObligationLive.Form do
               options={@member_options}
               prompt="Unassigned"
             />
-            <label class="label mt-2" for="collaborator-ids">Also collaborating (optional)</label>
+            <label class="label" for="collaborator-ids">Also collaborating (optional)</label>
             <select
               id="collaborator-ids"
               name="obligation[collaborator_ids][]"
               multiple
-              class="select w-full h-32"
+              class="select w-full h-24"
             >
               <option :for={{label, id} <- @member_options} value={id}>{label}</option>
             </select>
-            <p class="text-xs text-base-content/50 mt-1">
+            <p class="text-xs text-base-content/50">
               Hold ⌘/Ctrl to select more than one.
             </p>
           </div>
         </.form>
 
-        <section id="create-document-upload" class="fieldset max-w-xl mt-4">
-          <label class="label mb-1">Attachments (optional)</label>
+        <section id="create-document-upload" class="fieldset max-w-xl">
           <p class="text-xs text-base-content/50 mb-2">
-            Add supporting files to the opening step. Completion documents can be uploaded after creation.
+            Add supporting files to the opening step(optional). Completion documents can be uploaded after creation.
           </p>
           <form
             id="create-document-form"

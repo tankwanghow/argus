@@ -16,14 +16,7 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
   def render(assigns) do
     ~H"""
     <Layouts.mobile_app flash={@flash} current_scope={@current_scope} active={:obligations}>
-      <div id="mobile-obligation-show" class="space-y-3 px-2 py-4">
-        <.link
-          navigate={~p"/m/#{@current_scope.entity.slug}"}
-          class="text-sm text-base-content/60 flex items-center gap-1"
-        >
-          <.icon name="hero-chevron-left-mini" class="size-4" /> Dashboard
-        </.link>
-
+      <div id="mobile-obligation-show" class="px-2 py-2">
         <section id="obligation-summary" class="argus-workbench argus-obligation-summary">
           <div
             id="obligation-meta"
@@ -99,14 +92,6 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
                 />
                 <span class={if live, do: "", else: "text-base-content/60"}>{slot}</span>
               </button>
-              <.link
-                :if={live}
-                href={"/entities/#{@current_scope.entity.slug}/obligations/#{@obligation.id}/documents/#{live.id}"}
-                target="_blank"
-                class="link link-hover truncate max-w-[9rem] text-base-content/70"
-              >
-                {file_name(live)}
-              </.link>
             </span>
           </div>
           <div
