@@ -12,8 +12,8 @@ defmodule ArgusWeb.ObligationTypeLive.Index do
     <Layouts.app flash={@flash} current_scope={@current_scope}>
       <div id="obligation-types">
         <.header>
-          Obligation types
-          <:subtitle>Reusable definitions for recurring and one-off obligations.</:subtitle>
+          Duty types
+          <:subtitle>Reusable definitions for recurring and one-off duties.</:subtitle>
           <:actions>
             <button
               :if={@can_manage?}
@@ -139,7 +139,7 @@ defmodule ArgusWeb.ObligationTypeLive.Index do
 
   @impl true
   def handle_event("new", _params, socket) do
-    {:noreply, open_modal(socket, %Type{}, nil, "New obligation type", "Create")}
+    {:noreply, open_modal(socket, %Type{}, nil, "New duty type", "Create")}
   end
 
   def handle_event("clone", %{"id" => id}, socket) do
@@ -152,12 +152,12 @@ defmodule ArgusWeb.ObligationTypeLive.Index do
       reminder_offsets: source.reminder_offsets
     }
 
-    {:noreply, open_modal(socket, template, nil, "Clone obligation type", "Create")}
+    {:noreply, open_modal(socket, template, nil, "Clone duty type", "Create")}
   end
 
   def handle_event("edit", %{"id" => id}, socket) do
     type = Obligations.get_type!(socket.assigns.current_scope, id)
-    {:noreply, open_modal(socket, type, type, "Edit obligation type", "Save")}
+    {:noreply, open_modal(socket, type, type, "Edit duty type", "Save")}
   end
 
   def handle_event("close_modal_on_escape", _params, socket) do

@@ -11,10 +11,10 @@ defmodule Argus.Authorization do
   def can?(%Scope{role: :manager}, :manage_types), do: true
   def can?(%Scope{role: :manager}, :create_obligation), do: true
   def can?(%Scope{role: :manager}, :edit_obligation), do: true
-  def can?(%Scope{role: :manager}, :cancel_obligation), do: true
-  def can?(%Scope{role: :manager}, :skip_cycle), do: true
+  def can?(%Scope{role: :manager}, :skip), do: true
   def can?(%Scope{role: :manager}, :end_series), do: true
   def can?(%Scope{role: :manager}, :void_document), do: true
+  def can?(%Scope{role: :manager}, :mark_completed_in_error), do: true
   def can?(%Scope{role: :manager}, _), do: false
 
   def can?(%Scope{}, _), do: false

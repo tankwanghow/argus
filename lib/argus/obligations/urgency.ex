@@ -6,6 +6,7 @@ defmodule Argus.Obligations.Urgency do
   alias Argus.Obligations.Type
 
   @type urgency :: :overdue | :due_soon | :ok
+  @type tier :: :overdue | :critical | :due_soon | :approaching | :ok
 
   @spec classify(Type.t(), Date.t(), Date.t()) :: urgency()
   def classify(%Type{reminder_offsets: offsets}, due_by, today) do
@@ -14,6 +15,36 @@ defmodule Argus.Obligations.Urgency do
       due_soon?(offsets, due_by, today) -> :due_soon
       true -> :ok
     end
+  end
+
+  @doc """
+  Graded urgency for color-coding a card's accent border.
+
+  The span between the smallest and largest reminder offset is divided into
+  three equal bands (critical → due_soon → approaching). A single offset is
+  widened by 7 days so it still yields three bands. `:overdue` (past due) and
+  `:ok` (beyond the largest offset) are fixed endpoints.
+  """
+  @spec tier(Type.t(), Date.t(), Date.t()) :: tier()
+  def tier(%Type{reminder_offsets: offsets}, due_by, today) do
+    days = Date.diff(due_by, today)
+    {min, max} = tier_bounds(offsets)
+    step = (max - min) / 3
+
+    cond do
+      days < 0 -> :overdue
+      days > max -> :ok
+      days <= min + step -> :critical
+      days <= min + 2 * step -> :due_soon
+      true -> :approaching
+    end
+  end
+
+  defp tier_bounds(offsets) do
+    parsed = offsets |> parse_offsets() |> Enum.sort()
+    min = List.first(parsed)
+    max = List.last(parsed)
+    if max > min, do: {min, max}, else: {min, min + 7}
   end
 
   @spec today_for(String.t()) :: Date.t()

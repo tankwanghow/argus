@@ -12,11 +12,19 @@ defmodule ArgusWeb.ModalEscape do
       socket.assigns[:voiding_document_id] ->
         Phoenix.Component.assign(socket, :voiding_document_id, nil)
 
-      socket.assigns[:documents_modal_event] ->
+      socket.assigns[:step_files_modal_event] ->
         socket
-        |> Phoenix.Component.assign(:documents_modal_event_id, nil)
-        |> Phoenix.Component.assign(:documents_modal_event, nil)
+        |> Phoenix.Component.assign(:step_files_modal_event_id, nil)
+        |> Phoenix.Component.assign(:step_files_modal_event, nil)
         |> Phoenix.Component.assign(:upload_slot_target, nil)
+        |> ArgusWeb.LiveUpload.clear_all_slot_entries()
+        |> Phoenix.Component.assign(:voiding_document_id, nil)
+
+      socket.assigns[:show_completion_modal] ->
+        socket
+        |> Phoenix.Component.assign(:show_completion_modal, false)
+        |> Phoenix.Component.assign(:upload_slot_target, nil)
+        |> ArgusWeb.LiveUpload.clear_all_slot_entries()
         |> Phoenix.Component.assign(:voiding_document_id, nil)
 
       socket.assigns[:show_done_modal] ->
@@ -28,14 +36,19 @@ defmodule ArgusWeb.ModalEscape do
       socket.assigns[:show_skip_modal] ->
         Phoenix.Component.assign(socket, :show_skip_modal, false)
 
-      socket.assigns[:show_cancel_modal] ->
-        Phoenix.Component.assign(socket, :show_cancel_modal, false)
+      socket.assigns[:show_correct_modal] ->
+        Phoenix.Component.assign(socket, :show_correct_modal, false)
 
       end_series? && socket.assigns[:show_end_series_modal] ->
         Phoenix.Component.assign(socket, :show_end_series_modal, false)
 
       socket.assigns[:show_edit_modal] ->
         Phoenix.Component.assign(socket, :show_edit_modal, false)
+
+      socket.assigns[:editing_note_id] ->
+        socket
+        |> Phoenix.Component.assign(:editing_note_id, nil)
+        |> Phoenix.Component.assign(:note_form, nil)
 
       true ->
         socket

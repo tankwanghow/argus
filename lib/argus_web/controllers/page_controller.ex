@@ -6,7 +6,7 @@ defmodule ArgusWeb.PageController do
     # single entity's dashboard, or shows the picker); anonymous users see the
     # marketing page.
     case conn.assigns.current_scope do
-      %{user: %{}} -> redirect(conn, to: ~p"/entities")
+      %{user: user} -> redirect(conn, to: ArgusWeb.UserAuth.default_entity_path(user))
       _ -> render(conn, :home)
     end
   end

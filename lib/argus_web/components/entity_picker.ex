@@ -4,7 +4,6 @@ defmodule ArgusWeb.EntityPicker do
 
   attr :memberships, :list, required: true
   attr :form, :any, required: true
-  attr :mobile?, :boolean, default: false
 
   def picker(assigns) do
     ~H"""
@@ -30,7 +29,7 @@ defmodule ArgusWeb.EntityPicker do
               Default
             </span>
           </div>
-          <.link navigate={enter_path(@mobile?, entity.slug)} class="btn btn-primary btn-sm shrink-0">
+          <.link href={~p"/entities/#{entity.slug}"} class="btn btn-primary btn-sm shrink-0">
             Enter
           </.link>
         </li>
@@ -65,7 +64,4 @@ defmodule ArgusWeb.EntityPicker do
     </div>
     """
   end
-
-  defp enter_path(true, slug), do: ~p"/m/#{slug}"
-  defp enter_path(false, slug), do: ~p"/entities/#{slug}"
 end

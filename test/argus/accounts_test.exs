@@ -402,6 +402,20 @@ defmodule Argus.AccountsTest do
     end
   end
 
+  describe "update_user_locale/2" do
+    test "updates locale for supported codes" do
+      user = user_fixture()
+      assert {:ok, updated} = Accounts.update_user_locale(user, "ms")
+      assert updated.locale == "ms"
+    end
+
+    test "rejects unsupported locale" do
+      user = user_fixture()
+      assert {:error, changeset} = Accounts.update_user_locale(user, "xx")
+      assert %{locale: ["is invalid"]} = errors_on(changeset)
+    end
+  end
+
   describe "identity constraints" do
     test "rejects a user with neither email nor username" do
       assert_raise Ecto.ConstraintError, ~r/users_email_or_username_required/, fn ->

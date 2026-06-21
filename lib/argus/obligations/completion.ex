@@ -25,9 +25,12 @@ defmodule Argus.Obligations.Completion do
        ) do
     required = parse_csv(complete_documents)
 
+    # Only the current required slots matter. Files tagged with old or extra slot
+    # names are ignored — they do not satisfy requirements and do not block Done.
     slots =
       cycle_documents
       |> Enum.reject(& &1.voided_at)
+      |> Enum.filter(&(&1.document_slot in required))
       |> Map.new(&{&1.document_slot, true})
 
     case Enum.find(required, &(not Map.has_key?(slots, &1))) do

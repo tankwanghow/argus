@@ -74,4 +74,29 @@ defmodule ArgusWeb.InvitationControllerTest do
     assert redirected_to(conn) == ~p"/"
     refute get_session(conn, :user_token)
   end
+
+  test "mobile_accept redirects to mobile entity home on success", %{conn: conn} do
+    %{admin: admin, encoded: encoded} = pending_invitation()
+
+    conn =
+      post(conn, ~p"/m/invitations/#{encoded}/accept", %{
+        "create" => %{"username" => "mobilejoin", "password" => "supersecret12"}
+      })
+
+    assert redirected_to(conn) == ~p"/m/#{admin.entity.slug}"
+    assert get_session(conn, :user_token)
+  end
+
+  test "mobile_accept wrong credentials redirect back to mobile invite", %{conn: conn} do
+    username_user_fixture(%{username: "mobilereturn"})
+    %{encoded: encoded} = pending_invitation()
+
+    conn =
+      post(conn, ~p"/m/invitations/#{encoded}/accept", %{
+        "login" => %{"identifier" => "mobilereturn", "password" => "wrong password here"}
+      })
+
+    assert redirected_to(conn) == ~p"/m/invitations/#{encoded}"
+    refute get_session(conn, :user_token)
+  end
 end

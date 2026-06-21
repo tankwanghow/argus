@@ -13,7 +13,7 @@ defmodule ArgusWeb.DoneDocumentChecklist do
 
   def done_document_checklist(assigns) do
     assigns =
-      assign(assigns, :missing?, Enum.any?(assigns.required_docs, fn {_, ok?} -> not ok? end))
+      assign(assigns, :missing?, Enum.any?(assigns.required_docs, fn {_, ok?} -> !ok? end))
 
     ~H"""
     <section
@@ -36,7 +36,7 @@ defmodule ArgusWeb.DoneDocumentChecklist do
           />
           <span class={if satisfied?, do: "", else: "text-base-content/80"}>{slot}</span>
           <span :if={satisfied?} class="text-xs text-success">Uploaded</span>
-          <span :if={not satisfied?} class="text-xs text-warning">Missing</span>
+          <span :if={!satisfied?} class="text-xs text-warning">Missing</span>
         </li>
       </ul>
       <p :if={@missing? and @can_upload?} class="text-xs text-base-content/60">

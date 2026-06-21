@@ -33,8 +33,25 @@ applies here too. Headlines:
   nullable. A `%Argus.Accounts.Scope{user, entity, membership, role}` struct flows as
   `@current_scope`; never `@current_user`/`@current_role` in templates.
 - **Dual UI:** Desktop `/entities/:entity_slug/...`, Mobile `/m/:entity_slug/...`, with an
-  `AutoRouteByDevice` plug + a `argus_view` cookie override. Separate LiveViews + layouts
-  (`Layouts.app/1` navbar, `Layouts.mobile_app/1` bottom-nav shell).
+  `AutoRouteByDevice` plug (mobile-capable tails: `""`, `/obligations/new`) + a
+  `argus_view` cookie override. Separate LiveViews + layouts (`Layouts.app/1` navbar,
+  `Layouts.mobile_app/1` bottom-nav shell — bottom nav is **New(+) · Dashboard · More**, the New
+  tab shown only when the role `can?(:create_obligation)`). New-obligation has both Desktop
+  (`ObligationLive.Form`) and Mobile (`MobileLive.ObligationForm`) LiveViews sharing all non-render
+  logic via `ObligationLive.CreateForm` (`load_form`/`validate`/`save` with a redirect-path fn).
+  **There is no separate obligation index page** — the **dashboard is the obligation list** on both
+  UIs (`DashboardLive.Index` at `/entities/:slug`, `MobileLive.Dashboard` at `/m/:slug`). It's a
+  flat, filtered list (status tabs + search), not a grouped view; both render via
+  `ObligationLive.IndexHelpers.load_rows` (status/`default_status` role-based default, urgency, tier,
+  event meta). Each card shows the **current (latest) event** via the shared
+  `ArgusWeb.EventMeta.event_meta/1` component (status badge, count, actor, note). The card's urgency
+  **countdown badge** is the only relative-due indicator — there is no separate "due in N days" text.
+  After create/complete/skip/end-series, forms and show redirect back to the dashboard.
+- **Shell-Escape contract:** both layout shells (`#argus-shell`) bind
+  `phx-window-keydown="close_modal_on_escape"`, so **every** LiveView rendered in them must define a
+  `handle_event("close_modal_on_escape", …)` clause (no-op if the page has no modals) or it crashes
+  on Escape. `ModalEscape.close_obligation_modals/2` is the shared closer (handles the document/
+  done/progress/skip/correct/edit modals **and** `editing_note_id` note editing).
 - LiveView: `to_form` + `<.form>`/`<.input>`, `<.icon name="hero-...">`, streams (never append),
   colocated hooks. Unauthorized context calls return **`:not_authorise`**.
 - Run `mix precommit` before declaring work done.
@@ -84,7 +101,7 @@ assigns). Contexts take `scope`/`current_scope` as their first argument; authori
 | Role | Can |
 |------|-----|
 | admin | everything |
-| manager | create/edit obligations, manage types, mark Done on **any** obligation, cancel, **skip cycle**, end series |
+| manager | create/edit obligations, manage types, mark Done on **any** obligation, **skip** a cycle (close without completing; spawns successor when recurring), **end series**, **mark completed-in-error** (spawn replacement) |
 | member | view assigned work, add notes/docs while in progress, mark Done **only if primary assignee** |
 
 Collaborators (join table) can move an obligation to `in_progress` and add notes/docs, but
@@ -98,23 +115,24 @@ who can mark it Done** — only a manager/admin can (or after a primary assignee
 `primary_assignee_id` to the user.
 
 **Every state transition requires a note.** Creating an obligation (the `open_note`),
-`start_progress`, cancel, **skip**, and end-series all reject a blank note via
+`start_progress`, **skip**, and end-series all reject a blank note via
 `validate_action_note`. The Done note is likewise **always required** (see rule 1). Notes are no
 longer optional context — treat them as mandatory on every write that produces an `Event`.
 
-**Skip cycle** (`Obligations.skip_cycle/3`, manager/admin) cancels the current live cycle (with a
-note) **and** spawns the next cycle in the series in one transaction — the recurrence equivalent of
-"close this cycle without doing the work." It requires a recurring, not-ended series and a
-`next_due_by`, mirroring the Done→spawn path.
+**Skip** (`Obligations.skip/3`, manager/admin) is the unified close-without-completing action: it
+stamps `closed_at` on the cycle, writes a `skipped` event, and — if the type is recurring and the
+series is not ended — requires `next_due_by` and spawns the next cycle (mirroring the Done→spawn
+path). For a one-off cycle (or an already-ended series), it just closes the cycle with no
+successor. This action replaced the former `cancel_obligation/3` and `skip_cycle/3` functions.
 
 ### Obligations domain — the core model (read the spec before editing)
 
 The single most important design decision: **one `Obligation` row per cycle**, not a standing
 series with a rolling `due_by`. A recurrence chain is linked by a shared `series_id` (UUID).
 
-- `Argus.Obligations.Obligation` — one cycle. `status` is `active | cancelled`; **done-ness is a separate `completed_at` timestamp**, not a status value (a completed cycle keeps `status = active`). A cycle is **live** while `status = active AND completed_at IS NULL` — that's the set dashboards show and that can be worked/completed/cancelled. This predicate is defined **once** as `Obligations.live/1` (a composable query builder) and every list/dashboard/report composes it — never hand-write it. A partial unique index on `series_id` (where live) enforces **one live cycle per series**. `series_ended_at` (when set) blocks future spawning. The row also **snapshots** `complete_documents` from the type at creation (see rule 1). `primary_assignee_id` is **nullable** (unassigned obligations).
-- `Argus.Obligations.Event` (`obligation_events`) — **append-only forward-only** status steps: `open → in_progress → done | cancelled`. New status = new row; rows are never deleted and status is never rewritten. The step `note` lives here (open context, done comment, cancel reason). `start_progress` is guarded — it only steps an `open` cycle forward, so double-clicks can't create duplicate `in_progress` rows.
-- `Argus.Obligations.EventDocument` — file uploads attached to an event; the per-file column is **`file`** (a `%{filename, original, path}` map), not `documents`. Wrong files are **voided** (`voided_at`/`voided_by_id`/`void_reason`), never deleted. `document_slot` matches a name in the obligation's snapshotted `complete_documents` for Done validation.
+- `Argus.Obligations.Obligation` — one cycle. There is **no `status` string column**; terminal state is expressed via timestamps. A cycle is **live** while `completed_at IS NULL AND closed_at IS NULL` — that's the set dashboards show and that can be worked/completed/skipped. Done stamps `completed_at`; Skip stamps `closed_at` (writes a `skipped` event); End series stamps `closed_at` + `series_ended_at` (writes a `series_ended` event). "Who performed" each terminal action is on the terminal event's `status_by_id` — there are no `done_by`/`skipped_by` columns. This liveness predicate is defined **once** as `Obligations.live/1` (a composable query builder) and every list/dashboard/report composes it — never hand-write it. A partial unique index on `series_id` (where live) enforces **one live cycle per series**. `series_ended_at` (when set) blocks future spawning. The row also **snapshots** `complete_documents` from the type at creation (see rule 1). `primary_assignee_id` is **nullable** (unassigned obligations). **Title is capped at 60 chars** (`validate_length` on the changeset; the UI uses the `char_count_input` component with a live "characters left" counter). The completed-in-error columns — `completed_in_error_at`/`_by_id`/`_reason`, plus self-referential `replaces_id`/`replaced_by_id` FKs — link a wrongly-completed cycle to its replacement (see rule 4).
+- `Argus.Obligations.Event` (`obligation_events`) — **append-only** status steps shaped `open → in_progress* → done | skipped | series_ended`. New status = new row; rows are never deleted and status is never rewritten. The step `note` lives here (open context, each progress note, done comment, skip/end-series reason). **`open` is singular** (one per cycle, created at creation) and the terminal event singular (created at completion/skip/end-series), but **`in_progress` may repeat** — every *Update progress* appends another logged `in_progress` event. `start_progress`'s guard (`ensure_progressable`) only rejects a cycle whose terminal event exists — i.e. `event.status in Event.terminal_statuses/0` (= `["done","skipped","series_ended"]`) — with `{:error, :not_live}`; it no longer blocks an already-in-progress cycle.
+- `Argus.Obligations.EventDocument` — file uploads attached to an event; the per-file column is **`file`** (a `%{filename, original, path}` map), not `documents`. A live file may be hard-**deleted within 48h** (`document_deletable?`); after that (or for admin-on-locked-cycle) it is **voided** (`voided_at`/`voided_by_id`/`void_reason`) — voided files are kept for audit and **remain downloadable**. `document_slot` matches a name in the obligation's snapshotted `complete_documents` for Done validation, and is **immutable after upload** — there is no Replace and no slot-editing; to change a slot's file, delete/void it and re-upload (uploading is only offered for an unsatisfied slot). A document is classified **required** when its `document_slot` is in the obligation's current snapshot `complete_documents`, otherwise **supporting** (no slot, or a slot no longer in the set).
 - `Argus.Obligations.AuditLog` — field-level before/after for **corrections** (title, due_by, assignee, note edits).
 - `Argus.Obligations.Type` — **per-entity only** (`entity_id` is **NOT NULL**). There are no
   global system presets; instead, when an entity is created, `Argus.Obligations.SampleTypes`
@@ -122,6 +140,33 @@ series with a rolling `due_by`. A recurrence chain is linked by a shared `series
   `create_entity` `Ecto.Multi`). Every entity therefore owns and can edit its full type set —
   `list_types`/`get_type!` filter strictly by `entity_id`, and there is no "immutable preset"
   case any more.
+
+### Documents UI — two surfaces
+
+The obligation Documents UI is split by what a file is **for**, with each file shown
+in exactly one place (no duplication):
+
+- **Completion Documents** (`ObligationCompletionDocuments`) — **cycle-level**, one
+  modal per obligation: a row per required slot (live file inline, or an inline
+  uploader if unsatisfied) plus a voided-required section. Slot uploads attach to the
+  cycle's current workable event (`DocumentHelpers.upload_event/1`: `in_progress`
+  else `open`). The obligation summary shows each required slot beside the title with
+  its live filename; **clicking the slot name opens this modal** (there is no separate
+  "Completion documents" button). The modal's Void button is hidden once the cycle is
+  no longer live.
+- **Step Files** (`ObligationStepFiles`) — **per-step**, a modal per timeline event:
+  that step's supporting (no-slot/stale-slot) files + a voided-other section + an
+  additional-file uploader.
+
+Classification and partitioning live in `ArgusWeb.ObligationLive.DocumentHelpers`
+(`completion_view/2`, `step_files/2`, `parse_slots/1`). When an admin edits a type's
+`complete_documents`, `propagate_complete_documents_to_live/3` updates **live**
+obligations' snapshot only (completed/closed cycles stay frozen); a file whose slot was
+removed/renamed is thereby **reclassified** required → supporting (no row mutation, so
+re-adding the slot re-links it). **The create form has no file upload** — a duty is
+created with fields only; files are attached afterward from the duty page (completion
+documents / step files). The old `ObligationDocumentUpload`/`ObligationDocumentList`
+components were removed.
 
 ### Three rules that are easy to get wrong
 
@@ -150,10 +195,18 @@ series with a rolling `due_by`. A recurrence chain is linked by a shared `series
    recurring. Interval naming is deliberate: `every_two_weeks` (not bi_weekly), `semiannual`,
    `annual`. `shift_month/2` must clamp end-of-month (Jan 31 + 1mo → Feb 28).
 
-3. **Corrections lock after Done/cancelled.** While a cycle is active: managers/admins edit
-   obligation fields; note authors edit their own note within **48 hours** (manager/admin
-   override anytime before Done). After Done/cancelled everything is locked except admin-only
-   void-with-reason. Every correction is logged in `AuditLog`.
+3. **Corrections lock once a cycle is no longer live.** While a cycle is live (`completed_at IS NULL AND closed_at IS NULL`): managers/admins edit obligation fields; note authors edit their own note within **48 hours** (manager/admin override anytime while live). After the cycle is Done or closed (skipped / series-ended) everything is locked except admin-only void-with-reason. Every correction is logged in `AuditLog`.
+
+4. **Completed-in-error is a stamp, not a revert.** `Obligations.mark_completed_in_error/3`
+   (manager/admin) **never** clears `completed_at` on the wrong cycle — it stamps
+   `completed_in_error_at/_by_id/_reason`, writes an `AuditLog` row (field `"completed_in_error"`),
+   and **spawns a standalone one-off replacement** to redo the work, cross-linked via
+   `replaced_by_id`/`replaces_id`. The replacement gets a **fresh `series_id` with `series_ended_at`
+   set at creation**, so completing it returns `{:ok, completed, nil}` (no spawn, no `next_due`
+   required) **even for a recurring type** — and because it's a separate series, a recurring
+   original's auto-spawned successor is untouched (Policy A). Guard `validate_correctable/1`:
+   must be completed (`completed_at` set), not closed (`closed_at` nil), not already corrected. No uncomplete and
+   no new event on the wrong cycle (the event FSM stays forward-only).
 
 ### Dashboard = the attention surface
 
@@ -164,12 +217,28 @@ dashboard is where overdue/due-soon work surfaces, computed at render time:
   `:due_soon` means `due_by` is within any offset in the type's `reminder_offsets`
   (comma-delimited days, e.g. `"30,7,1"`). `today` is **required and computed in the entity's
   timezone** via `Urgency.today_for(entity.timezone)` — never `Date.utc_today()`, which would
-  mis-date non-UTC tenants near midnight. Rendered by `UrgencyBadge` (red/amber/none).
+  mis-date non-UTC tenants near midnight. Used to **sort** the live list (overdue → due_soon → due_by).
+- `Obligations.Urgency.tier(type, due_by, today)` → `:overdue | :critical | :due_soon | :approaching
+  | :ok` is the **graded** refinement used for **color-coding card borders**. It splits the span
+  between the smallest and largest `reminder_offset` into three equal bands (critical → due_soon →
+  approaching); `:overdue` (past due) and `:ok` (beyond the largest offset) are fixed endpoints. A
+  **single offset** is widened by 7 days so it still yields three bands. Only `min`/`max` drive the
+  bands — intermediate offsets are decorative. Rendered by `ArgusWeb.UrgencyBadge`: `tier_border/1`
+  (the shared left-accent class `error → error/60 → warning → warning/40 → transparent`, used by
+  the desktop dashboard rows and the mobile card so they don't drift) and `urgency_badge/1` (a
+  **tier-coloured countdown badge** — "Nd overdue" / "Due today" / "Nd left", nothing when `:ok`).
+  Every live row map carries both `urgency` and `tier`.
 - `reminder_offsets` / `complete_documents` are validated and normalized on the `Type` changeset
   (write time), so the render path can't crash on bad input; `parse_offsets` still parses defensively.
-- Split view: **My work** (default for member) vs **Team overview** (default for manager/admin),
-  filtered to **live cycles** (`status = active AND completed_at IS NULL`), sorted overdue →
-  due_soon → `due_by` asc.
+- Filter (single flat list, no grouping) is **two orthogonal controls**, not one tab strip: a
+  **scope toggle** (`Mine` / `Team`) and a **status dropdown** (`Live · Completed · Skipped · All`),
+  plus title/type/assignee search. `IndexHelpers` keeps a `mine?` boolean + a `lifecycle` atom and
+  maps them to the combined `list_obligations` status atom via `status_atom/2` (mine → `my_*`). The
+  **Skipped** lifecycle selects `closed_at IS NOT NULL` (covers both skipped and series-ended cycles;
+  their badges differentiate). Defaults are role-based via `default_mine?/1` — members land on
+  **Mine + Live**, managers/admins on **Team + Live**. The Live lifecycle is sorted overdue →
+  due_soon → `due_by` asc; completed by `completed_at` desc, skipped by `closed_at` desc, all by
+  `due_by` desc.
 
 ### Out of scope for v1
 
@@ -180,11 +249,13 @@ Oban reminder jobs, REST API/mobile, billing beyond `plan`/`seat_limit` fields.
 
 - **TDD per the plan:** write the failing test, watch it fail, implement, watch it pass, commit. One commit per task.
 - **Context modules own domain logic.** LiveViews call `Argus.Obligations`, `Argus.Entities`, `Argus.Accounts` — not Repo directly.
-- **Multi-step writes use `Ecto.Multi`/transactions** (create obligation + open event; Done + spawn next; cancel + event).
+- **Multi-step writes use `Ecto.Multi`/transactions** (create obligation + open event; Done + spawn next; skip + event).
 - File uploads (v1) go to the local filesystem under a **configurable** `:uploads_dir`
   (`config :argus, :uploads_dir`), laid out `:entity_id/:obligation_id/`; it defaults to the priv
   path in dev but must point at a persistent volume in prod (`:code.priv_dir` is not writable in a
-  release). Reads are served by a scope-gated controller, never a static route.
+  release). Reads are served by a scope-gated controller (`DocumentController`), never a static
+  route; it serves voided files too (they stay downloadable for audit). Files are uploaded only
+  from the duty page (completion documents / step files), never during create.
 
 ## Deployment (Linode + Docker, peggy parity)
 

@@ -5,5 +5,6 @@ defmodule ArgusWeb.QRTest do
     svg = ArgusWeb.QR.svg("https://example.com/invitations/abc")
     assert is_binary(svg)
     assert svg =~ "<svg"
+    assert svg =~ ~s(width="240.0")
   end
 end

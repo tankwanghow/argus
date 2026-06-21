@@ -8,7 +8,7 @@ defmodule ArgusWeb.ObligationLiveTest do
 
   setup :register_and_log_in_user
 
-  test "obligation index filters completed and cancelled cycles", %{conn: conn} do
+  test "dashboard filters completed and skipped cycles", %{conn: conn} do
     manager = Argus.EntitiesFixtures.manager_scope_fixture()
     member_scope = member_scope_on_entity(manager.entity)
     conn = log_in_user(conn, manager.user)
@@ -35,45 +35,46 @@ defmodule ArgusWeb.ObligationLiveTest do
     assert {:ok, completed, _} =
              Obligations.complete(member_scope, to_complete, %{note: "Done"})
 
-    {:ok, to_cancel} =
+    {:ok, to_skip} =
       Obligations.create_obligation(manager, %{
-        title: "Gamma Cancelled",
+        title: "Gamma Skipped",
         obligation_type_id: type.id,
         primary_assignee_id: member_scope.user.id,
         due_by: ~D[2026-04-30],
         open_note: "Gamma"
       })
 
-    assert {:ok, _} =
-             Obligations.cancel_obligation(manager, to_cancel, %{note: "No longer needed"})
+    assert {:ok, _skipped, nil} =
+             Obligations.skip(manager, to_skip, %{note: "No longer needed"})
 
-    {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}/obligations")
+    {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}")
 
-    assert has_element?(view, "#obligation-#{live_obligation.id}")
-    refute has_element?(view, "#obligation-#{completed.id}")
+    assert has_element?(view, "#obligation-row-#{live_obligation.id}")
+    refute has_element?(view, "#obligation-row-#{completed.id}")
 
-    view |> element("#filter-completed") |> render_click()
-    assert has_element?(view, "#obligation-#{completed.id}")
-    refute has_element?(view, "#obligation-#{live_obligation.id}")
+    view |> form("#obligation-status-filter", %{lifecycle: "completed"}) |> render_change()
+    assert has_element?(view, "#obligation-row-#{completed.id}")
+    refute has_element?(view, "#obligation-row-#{live_obligation.id}")
 
-    view |> element("#filter-cancelled") |> render_click()
-    assert has_element?(view, "#obligation-#{to_cancel.id}")
+    view |> form("#obligation-status-filter", %{lifecycle: "skipped"}) |> render_change()
+    assert has_element?(view, "#obligation-row-#{to_skip.id}")
 
     member_conn = log_in_user(conn, member_scope.user)
 
     {:ok, member_view, _html} =
-      live(member_conn, ~p"/entities/#{manager.entity.slug}/obligations")
+      live(member_conn, ~p"/entities/#{manager.entity.slug}")
 
-    member_view |> element("#filter-my_live") |> render_click()
-    assert has_element?(member_view, "#obligation-#{live_obligation.id}")
+    # member defaults to Mine + Live
+    assert has_element?(member_view, "#scope-mine.tab-active")
+    assert has_element?(member_view, "#obligation-row-#{live_obligation.id}")
 
-    member_view |> element("#filter-my_completed") |> render_click()
-    assert has_element?(member_view, "#obligation-#{completed.id}")
+    member_view |> form("#obligation-status-filter", %{lifecycle: "completed"}) |> render_change()
+    assert has_element?(member_view, "#obligation-row-#{completed.id}")
 
-    view |> element("#filter-live") |> render_click()
+    view |> form("#obligation-status-filter", %{lifecycle: "live"}) |> render_change()
     view |> element("#obligation-search") |> render_keyup(%{"value" => "Alpha"})
-    assert has_element?(view, "#obligation-#{live_obligation.id}")
-    refute has_element?(view, "#obligation-#{to_cancel.id}")
+    assert has_element?(view, "#obligation-row-#{live_obligation.id}")
+    refute has_element?(view, "#obligation-row-#{to_skip.id}")
   end
 
   test "manager creates obligation via form", %{conn: conn} do
@@ -84,6 +85,9 @@ defmodule ArgusWeb.ObligationLiveTest do
 
     {:ok, view, _html} =
       live(conn, ~p"/entities/#{scope.entity.slug}/obligations/new")
+
+    # The app shell binds a global Escape keydown; the form must not crash on it.
+    assert view |> element("#argus-shell") |> render_keydown() =~ "New duty"
 
     view
     |> form("#obligation-create-form", %{
@@ -99,58 +103,6 @@ defmodule ArgusWeb.ObligationLiveTest do
 
     {path, _flash} = assert_redirect(view)
     assert path =~ "/obligations/"
-  end
-
-  test "manager creates obligation with general file attachment", %{conn: conn} do
-    manager = Argus.EntitiesFixtures.manager_scope_fixture()
-    conn = log_in_user(conn, manager.user)
-    assignee = member_fixture(manager.entity)
-    type = type_fixture(manager.entity, complete_documents: "receipt")
-
-    {:ok, view, _html} =
-      live(conn, ~p"/entities/#{manager.entity.slug}/obligations/new")
-
-    refute has_element?(view, "#create-slot-upload-new-receipt")
-
-    view |> element("#create-select-upload-new") |> render_click()
-
-    file =
-      file_input(view, "#create-document-form-new-active", :document, [
-        %{name: "notes.pdf", content: "extra", type: "application/pdf"}
-      ])
-
-    render_upload(file, "notes.pdf")
-
-    view
-    |> form("#create-document-form-new-active", %{})
-    |> render_submit()
-
-    assert has_element?(view, "#staged-documents", "notes.pdf")
-
-    view
-    |> form("#obligation-create-form", %{
-      "obligation" => %{
-        "title" => "EPF with notes",
-        "obligation_type_id" => type.id,
-        "primary_assignee_id" => assignee.id,
-        "due_by" => "2026-06-30",
-        "open_note" => "Opened with notes"
-      }
-    })
-    |> render_submit()
-
-    {path, _flash} = assert_redirect(view)
-    obligation_id = path |> String.split("/") |> List.last()
-
-    obligation = Obligations.get_obligation!(manager, obligation_id)
-    documents = Obligations.list_cycle_documents(obligation)
-
-    assert Enum.any?(
-             documents,
-             &(is_nil(&1.document_slot) and &1.file["original"] == "notes.pdf")
-           )
-
-    refute Enum.any?(documents, &(&1.document_slot == "receipt"))
   end
 
   test "manager creates obligation with collaborators", %{conn: conn} do
@@ -183,11 +135,55 @@ defmodule ArgusWeb.ObligationLiveTest do
     assert Enum.map(obligation.collaborators, & &1.user_id) == [collaborator.id]
   end
 
-  test "manager uploads a document on the show page", %{conn: conn} do
+  test "primary assignee becomes a dropdown listing other collaborators", %{conn: conn} do
+    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    conn = log_in_user(conn, manager.user)
+    assignee = member_fixture(manager.entity)
+    collaborator = member_fixture(manager.entity)
+    type = type_fixture(manager.entity)
+
+    {:ok, with_collab} =
+      Obligations.create_obligation(manager, %{
+        title: "Shared work",
+        obligation_type_id: type.id,
+        primary_assignee_id: assignee.id,
+        collaborator_ids: [collaborator.id],
+        due_by: ~D[2026-06-30],
+        open_note: "open"
+      })
+
+    {:ok, view, _html} =
+      live(conn, ~p"/entities/#{manager.entity.slug}/obligations/#{with_collab.id}")
+
+    assert has_element?(view, "#assignees-toggle", assignee.email)
+    assert has_element?(view, "#assignees-dropdown", collaborator.email)
+
+    # With no other collaborators, the primary stays a plain badge (no dropdown).
+    {:ok, solo} =
+      Obligations.create_obligation(manager, %{
+        title: "Solo work",
+        obligation_type_id: type.id,
+        primary_assignee_id: assignee.id,
+        due_by: ~D[2026-06-30],
+        open_note: "open"
+      })
+
+    {:ok, solo_view, _html} =
+      live(conn, ~p"/entities/#{manager.entity.slug}/obligations/#{solo.id}")
+
+    refute has_element?(solo_view, "#assignees-toggle")
+    assert render(solo_view) =~ assignee.email
+  end
+
+  test "completion modal: manager stages files for two slots and uploads individually", %{
+    conn: conn
+  } do
     manager = Argus.EntitiesFixtures.manager_scope_fixture()
     conn = log_in_user(conn, manager.user)
     member = member_fixture(manager.entity)
-    type = type_fixture(manager.entity, complete_documents: "receipt")
+
+    type =
+      type_fixture(manager.entity, complete_documents: "receipt,statutory_form")
 
     {:ok, obligation} =
       Obligations.create_obligation(manager, %{
@@ -198,40 +194,52 @@ defmodule ArgusWeb.ObligationLiveTest do
         open_note: "EPF opened"
       })
 
-    obligation = Obligations.get_obligation!(manager, obligation.id)
-    [open_event] = Enum.filter(obligation.events, &(&1.status == "open"))
-
     {:ok, view, _html} =
       live(conn, ~p"/entities/#{manager.entity.slug}/obligations/#{obligation.id}")
 
-    view |> element("#documents-btn-#{open_event.id}") |> render_click()
-    assert has_element?(view, "#document-modal-#{open_event.id}")
+    view |> element("#open-completion-slot-receipt") |> render_click()
 
-    assert has_element?(view, "#slot-upload-#{open_event.id}-receipt")
-
-    view
-    |> element("#select-slot-#{open_event.id}-receipt")
-    |> render_click()
+    # Stage receipt slot.
+    view |> element("#select-slot-receipt") |> render_click()
 
     file =
-      file_input(view, "#document-form-#{open_event.id}-active", :document, [
+      file_input(view, "#completion-upload-form", :document, [
         %{name: "receipt.pdf", content: "scan", type: "application/pdf"}
       ])
 
     render_upload(file, "receipt.pdf")
+    view |> form("#completion-upload-form", %{"picker_slot" => "receipt"}) |> render_change()
+    assert has_element?(view, "#upload-slot-receipt")
+
+    # Upload receipt slot; statutory_form should still have its uploader.
+    view |> element("#upload-slot-receipt") |> render_click()
+    assert render(view) =~ "Document added"
+    assert has_element?(view, "#select-slot-statutory_form")
+    refute has_element?(view, "#upload-slot-receipt")
+
+    # Stage and upload statutory_form slot.
+    view |> element("#select-slot-statutory_form") |> render_click()
+
+    file2 =
+      file_input(view, "#completion-upload-form", :document, [
+        %{name: "form.pdf", content: "scan", type: "application/pdf"}
+      ])
+
+    render_upload(file2, "form.pdf")
 
     view
-    |> form("#document-form-#{open_event.id}-active", %{
-      "document_slot" => "receipt",
-      "event_id" => open_event.id
-    })
-    |> render_submit()
+    |> form("#completion-upload-form", %{"picker_slot" => "statutory_form"})
+    |> render_change()
 
+    view |> element("#upload-slot-statutory_form") |> render_click()
+    assert render(view) =~ "Document added"
     assert render(view) =~ "receipt.pdf"
-    assert has_element?(view, "[data-status] .badge", "receipt")
+    assert render(view) =~ "form.pdf"
   end
 
-  test "manager uploads additional file without required slot", %{conn: conn} do
+  test "completion modal: deleting a required-slot file within 48h reopens the slot uploader", %{
+    conn: conn
+  } do
     manager = Argus.EntitiesFixtures.manager_scope_fixture()
     conn = log_in_user(conn, manager.user)
     member = member_fixture(manager.entity)
@@ -246,33 +254,38 @@ defmodule ArgusWeb.ObligationLiveTest do
         open_note: "EPF opened"
       })
 
-    obligation = Obligations.get_obligation!(manager, obligation.id)
-    [open_event] = Enum.filter(obligation.events, &(&1.status == "open"))
-
     {:ok, view, _html} =
       live(conn, ~p"/entities/#{manager.entity.slug}/obligations/#{obligation.id}")
 
-    view |> element("#documents-btn-#{open_event.id}") |> render_click()
+    view |> element("#open-completion-slot-receipt") |> render_click()
 
-    view
-    |> element("#select-additional-#{open_event.id}")
-    |> render_click()
+    # Upload a file into the "receipt" slot.
+    view |> element("#select-slot-receipt") |> render_click()
 
     file =
-      file_input(view, "#document-form-#{open_event.id}-active", :document, [
-        %{name: "notes.pdf", content: "extra", type: "application/pdf"}
+      file_input(view, "#completion-upload-form", :document, [
+        %{name: "receipt.pdf", content: "scan", type: "application/pdf"}
       ])
 
-    render_upload(file, "notes.pdf")
+    render_upload(file, "receipt.pdf")
+    view |> form("#completion-upload-form", %{"picker_slot" => "receipt"}) |> render_change()
+    view |> element("#upload-slot-receipt") |> render_click()
 
-    view
-    |> form("#document-form-#{open_event.id}-active", %{
-      "event_id" => open_event.id
-    })
-    |> render_submit()
+    # Slot is now satisfied: file shown, select button gone.
+    obligation = Obligations.get_obligation!(manager, obligation.id)
+    [open_event] = Enum.filter(obligation.events, &(&1.status == "open"))
+    document = hd(open_event.documents)
 
-    assert render(view) =~ "notes.pdf"
-    refute has_element?(view, "#event-#{open_event.id} .badge", "receipt")
+    assert has_element?(view, "#completion-slot-receipt", "receipt.pdf")
+    assert has_element?(view, "#delete-doc-#{document.id}")
+    refute has_element?(view, "#select-slot-receipt")
+
+    # Deleting requires confirmation, then reopens the slot's uploader.
+    view |> element("#delete-doc-#{document.id}") |> render_click()
+    assert has_element?(view, "#confirm-delete-doc-#{document.id}")
+    view |> element("#confirm-delete-doc-#{document.id}") |> render_click()
+    assert render(view) =~ "Document deleted"
+    assert has_element?(view, "#select-slot-receipt")
   end
 
   test "start_progress from show page requires progress note modal", %{conn: conn} do
@@ -314,23 +327,23 @@ defmodule ArgusWeb.ObligationLiveTest do
     refute html =~ "days overdue"
   end
 
-  test "cancelled obligation hides urgency and relative due label", %{conn: conn} do
+  test "skipped obligation hides urgency and relative due label", %{conn: conn} do
     {scope, obligation} = manager_obligation_scope_fixture()
     conn = log_in_user(conn, scope.user)
 
-    assert {:ok, _} =
-             Obligations.cancel_obligation(scope, obligation, %{note: "No longer needed"})
+    assert {:ok, _, nil} =
+             Obligations.skip(scope, obligation, %{note: "No longer needed"})
 
     {:ok, view, html} =
       live(conn, ~p"/entities/#{scope.entity.slug}/obligations/#{obligation.id}")
 
     refute has_element?(view, "[data-urgency]")
-    assert html =~ "Cancelled"
+    assert html =~ "Skipped"
     refute html =~ "overdue"
     refute html =~ "Due soon"
   end
 
-  test "recurring obligation shows skip instead of cancel", %{conn: conn} do
+  test "skip button is shown for all live cycles (recurring and one-off)", %{conn: conn} do
     {scope, obligation} = recurring_manager_scope_fixture(interval: "monthly")
     conn = log_in_user(conn, scope.user)
 
@@ -339,6 +352,15 @@ defmodule ArgusWeb.ObligationLiveTest do
 
     refute has_element?(view, "#cancel-btn")
     assert has_element?(view, "#skip-btn")
+
+    {scope2, obligation2} = manager_obligation_scope_fixture()
+    conn2 = log_in_user(build_conn(), scope2.user)
+
+    {:ok, view2, _html} =
+      live(conn2, ~p"/entities/#{scope2.entity.slug}/obligations/#{obligation2.id}")
+
+    refute has_element?(view2, "#cancel-btn")
+    assert has_element?(view2, "#skip-btn")
   end
 
   test "skip modal requires reason and next due", %{conn: conn} do
@@ -381,8 +403,8 @@ defmodule ArgusWeb.ObligationLiveTest do
     })
     |> render_submit()
 
-    assert_redirect(view, ~p"/entities/#{scope.entity.slug}/obligations")
-    assert Obligations.get_obligation!(scope, obligation.id).status == "cancelled"
+    assert_redirect(view, ~p"/entities/#{scope.entity.slug}")
+    assert Obligations.get_obligation!(scope, obligation.id).closed_at
 
     live_cycles =
       scope
@@ -400,11 +422,11 @@ defmodule ArgusWeb.ObligationLiveTest do
     {:ok, view, _html} =
       live(conn, ~p"/entities/#{scope.entity.slug}/obligations/#{obligation.id}")
 
-    view |> element("#cancel-btn") |> render_click()
-    assert has_element?(view, "#cancel-modal")
+    view |> element("#skip-btn") |> render_click()
+    assert has_element?(view, "#skip-modal")
 
     view |> element("#argus-shell") |> render_keydown()
-    refute has_element?(view, "#cancel-modal")
+    refute has_element?(view, "#skip-modal")
 
     view |> element("#done-btn") |> render_click()
     assert has_element?(view, "#done-modal")
@@ -413,35 +435,36 @@ defmodule ArgusWeb.ObligationLiveTest do
     refute has_element?(view, "#done-modal")
   end
 
-  test "cancel modal requires a reason", %{conn: conn} do
+  test "skip modal closes a one-off cycle", %{conn: conn} do
     {scope, obligation} = manager_obligation_scope_fixture()
     conn = log_in_user(conn, scope.user)
 
     {:ok, view, _html} =
       live(conn, ~p"/entities/#{scope.entity.slug}/obligations/#{obligation.id}")
 
-    view |> element("#cancel-btn") |> render_click()
-    assert has_element?(view, "#cancel-modal")
-
-    view |> form("#cancel-form", %{"cancel" => %{"note" => ""}}) |> render_submit()
-    assert render(view) =~ "A reason is required"
-  end
-
-  test "cancel modal submits reason and redirects", %{conn: conn} do
-    {scope, obligation} = manager_obligation_scope_fixture()
-    conn = log_in_user(conn, scope.user)
-
-    {:ok, view, _html} =
-      live(conn, ~p"/entities/#{scope.entity.slug}/obligations/#{obligation.id}")
-
-    view |> element("#cancel-btn") |> render_click()
+    view |> element("#skip-btn") |> render_click()
+    assert has_element?(view, "#skip-modal")
 
     view
-    |> form("#cancel-form", %{"cancel" => %{"note" => "Duplicate entry"}})
+    |> form("#skip-form", %{"skip" => %{"note" => "Not needed"}})
     |> render_submit()
 
-    assert_redirect(view, ~p"/entities/#{scope.entity.slug}/obligations")
-    assert Obligations.get_obligation!(scope, obligation.id).status == "cancelled"
+    assert_redirect(view, ~p"/entities/#{scope.entity.slug}")
+    assert Obligations.get_obligation!(scope, obligation.id).closed_at
+  end
+
+  test "skip modal requires a reason for one-off", %{conn: conn} do
+    {scope, obligation} = manager_obligation_scope_fixture()
+    conn = log_in_user(conn, scope.user)
+
+    {:ok, view, _html} =
+      live(conn, ~p"/entities/#{scope.entity.slug}/obligations/#{obligation.id}")
+
+    view |> element("#skip-btn") |> render_click()
+    assert has_element?(view, "#skip-modal")
+
+    view |> form("#skip-form", %{"skip" => %{"note" => ""}}) |> render_submit()
+    assert render(view) =~ "A reason is required"
   end
 
   test "end series modal requires a reason", %{conn: conn} do
@@ -458,7 +481,7 @@ defmodule ArgusWeb.ObligationLiveTest do
     assert render(view) =~ "A reason is required"
   end
 
-  test "done modal shows document checklist and opens uploads for missing slots", %{conn: conn} do
+  test "mark done is hidden while a required document is missing", %{conn: conn} do
     manager = Argus.EntitiesFixtures.manager_scope_fixture()
     member_scope = member_scope_on_entity(manager.entity)
     type = type_fixture(manager.entity, complete_documents: "receipt")
@@ -472,49 +495,102 @@ defmodule ArgusWeb.ObligationLiveTest do
         open_note: "Open"
       })
 
-    obligation = Obligations.get_obligation!(member_scope, obligation.id)
-    open_event = Enum.find(obligation.events, &(&1.status == "open"))
     conn = log_in_user(conn, member_scope.user)
 
     {:ok, view, _html} =
       live(conn, ~p"/entities/#{manager.entity.slug}/obligations/#{obligation.id}")
 
-    view |> element("#done-btn") |> render_click()
-    assert has_element?(view, "#done-document-checklist")
-    assert has_element?(view, "#done-document-checklist-receipt", "Missing")
-    assert has_element?(view, "#done-doc-upload-now")
-
-    view |> element("#done-doc-upload-now") |> render_click()
-    refute has_element?(view, "#done-modal")
-    assert has_element?(view, "#document-modal-#{open_event.id}")
+    # Required "receipt" is missing → no Mark done, but the completion path is offered.
+    refute has_element?(view, "#done-btn")
+    assert has_element?(view, "#open-completion-slot-receipt")
   end
 
-  test "done modal reports missing document on submit", %{conn: conn} do
+  test "mark done appears once required documents are fulfilled", %{conn: conn} do
     manager = Argus.EntitiesFixtures.manager_scope_fixture()
-    member_scope = member_scope_on_entity(manager.entity)
+    conn = log_in_user(conn, manager.user)
     type = type_fixture(manager.entity, complete_documents: "receipt")
 
     {:ok, obligation} =
       Obligations.create_obligation(manager, %{
         title: "EPF Jan",
         obligation_type_id: type.id,
-        primary_assignee_id: member_scope.user.id,
+        primary_assignee_id: manager.user.id,
         due_by: ~D[2026-06-15],
         open_note: "Open"
       })
 
-    conn = log_in_user(conn, member_scope.user)
+    {:ok, view, _html} =
+      live(conn, ~p"/entities/#{manager.entity.slug}/obligations/#{obligation.id}")
+
+    refute has_element?(view, "#done-btn")
+
+    # Upload the required receipt via the completion modal.
+    view |> element("#open-completion-slot-receipt") |> render_click()
+    view |> element("#select-slot-receipt") |> render_click()
+
+    file =
+      file_input(view, "#completion-upload-form", :document, [
+        %{name: "receipt.pdf", content: "scan", type: "application/pdf"}
+      ])
+
+    render_upload(file, "receipt.pdf")
+    view |> form("#completion-upload-form", %{"picker_slot" => "receipt"}) |> render_change()
+    view |> element("#upload-slot-receipt") |> render_click()
+
+    # Slot satisfied → Mark done becomes available.
+    assert has_element?(view, "#done-btn")
+  end
+
+  test "completed slot shows satisfied in the summary, files not under timeline events", %{
+    conn: conn
+  } do
+    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    conn = log_in_user(conn, manager.user)
+    type = type_fixture(manager.entity, complete_documents: "receipt")
+
+    {:ok, obligation} =
+      Obligations.create_obligation(manager, %{
+        title: "EPF Jan",
+        obligation_type_id: type.id,
+        primary_assignee_id: manager.user.id,
+        due_by: ~D[2026-06-15],
+        open_note: "Open"
+      })
 
     {:ok, view, _html} =
       live(conn, ~p"/entities/#{manager.entity.slug}/obligations/#{obligation.id}")
 
-    view |> element("#done-btn") |> render_click()
+    # Move to in_progress so the workable event is the in_progress one.
+    view |> element("#start-progress-btn") |> render_click()
+    view |> form("#progress-form", %{"progress" => %{"note" => "Working"}}) |> render_submit()
 
-    view
-    |> form("#done-form", %{"done" => %{"note" => "Done"}})
-    |> render_submit()
+    # Upload the required receipt — it physically attaches to the in_progress event.
+    view |> element("#open-completion-slot-receipt") |> render_click()
+    view |> element("#select-slot-receipt") |> render_click()
 
-    assert render(view) =~ "Missing required document: receipt"
+    file =
+      file_input(view, "#completion-upload-form", :document, [
+        %{name: "receipt.pdf", content: "scan", type: "application/pdf"}
+      ])
+
+    render_upload(file, "receipt.pdf")
+    view |> form("#completion-upload-form", %{"picker_slot" => "receipt"}) |> render_change()
+    view |> element("#upload-slot-receipt") |> render_click()
+
+    # The slot is surfaced as satisfied in the summary (the file itself opens via the modal),
+    # and the file is not listed under the timeline events.
+    assert has_element?(
+             view,
+             "#completion-summary #open-completion-slot-receipt .hero-check-circle-mini"
+           )
+
+    refute has_element?(view, "#completion-summary .hero-x-circle-mini")
+
+    obligation = Obligations.get_obligation!(manager, obligation.id)
+
+    for event <- obligation.events do
+      refute has_element?(view, "#event-files-#{event.id}", "receipt.pdf")
+    end
   end
 
   test "done modal requires next due for recurring obligations", %{conn: conn} do
@@ -670,6 +746,310 @@ defmodule ArgusWeb.ObligationLiveTest do
     |> form("#done-form", %{"done" => %{"next_due_by" => "2026-07-15", "note" => "Done"}})
     |> render_submit()
 
-    assert_redirect(view, ~p"/entities/#{scope.entity.slug}/obligations")
+    assert_redirect(view, ~p"/entities/#{scope.entity.slug}")
+  end
+
+  test "completion modal: satisfied slot shows file, unsatisfied shows uploader", %{conn: conn} do
+    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    conn = log_in_user(conn, manager.user)
+    member = member_fixture(manager.entity)
+    type = type_fixture(manager.entity, complete_documents: "receipt,form")
+
+    {:ok, obligation} =
+      Obligations.create_obligation(manager, %{
+        title: "EPF June",
+        obligation_type_id: type.id,
+        primary_assignee_id: member.id,
+        due_by: ~D[2026-06-30],
+        open_note: "EPF opened"
+      })
+
+    obligation = Obligations.get_obligation!(manager, obligation.id)
+    [_open_event] = Enum.filter(obligation.events, &(&1.status == "open"))
+
+    {:ok, view, _html} =
+      live(conn, ~p"/entities/#{manager.entity.slug}/obligations/#{obligation.id}")
+
+    view |> element("#open-completion-slot-receipt") |> render_click()
+
+    # Upload into the "receipt" slot from the cycle modal (no event id in the form).
+    view |> element("#select-slot-receipt") |> render_click()
+
+    file =
+      file_input(view, "#completion-upload-form", :document, [
+        %{name: "receipt.pdf", content: "scan", type: "application/pdf"}
+      ])
+
+    render_upload(file, "receipt.pdf")
+    view |> form("#completion-upload-form", %{"picker_slot" => "receipt"}) |> render_change()
+    view |> element("#upload-slot-receipt") |> render_click()
+
+    # receipt satisfied (shows file + Delete), form still unsatisfied (shows uploader).
+    obligation = Obligations.get_obligation!(manager, obligation.id)
+    [open_event] = Enum.filter(obligation.events, &(&1.status == "open"))
+    doc = hd(open_event.documents)
+
+    assert has_element?(view, "#completion-slot-receipt", "receipt.pdf")
+    assert has_element?(view, "#delete-doc-#{doc.id}")
+    assert has_element?(view, "#select-slot-form")
+    # the file attached to the cycle's workable (open) event
+    assert doc.document_slot == "receipt"
+  end
+
+  test "completion modal: voided required file shows in voided section, downloadable", %{
+    conn: conn
+  } do
+    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    conn = log_in_user(conn, manager.user)
+    type = type_fixture(manager.entity, complete_documents: "receipt")
+
+    {:ok, obligation} =
+      Obligations.create_obligation(manager, %{
+        title: "EPF",
+        obligation_type_id: type.id,
+        due_by: ~D[2026-06-30],
+        open_note: "open"
+      })
+
+    event = hd(Obligations.list_events(obligation))
+
+    {:ok, doc} =
+      Obligations.add_document(manager, obligation, event, upload_fixture("r.pdf"), "receipt")
+
+    # Backdate inserted_at past the 48-hour edit window so the doc becomes voidable.
+    old_doc =
+      doc
+      |> Ecto.Changeset.change(
+        inserted_at: DateTime.add(DateTime.utc_now(:second), -49 * 3600, :second)
+      )
+      |> Argus.Repo.update!()
+
+    {:ok, _} = Obligations.void_document(manager, obligation, old_doc, %{reason: "wrong"})
+
+    {:ok, view, _html} =
+      live(conn, ~p"/entities/#{manager.entity.slug}/obligations/#{obligation.id}")
+
+    view |> element("#open-completion-slot-receipt") |> render_click()
+
+    assert has_element?(view, "#completion-voided", "r.pdf")
+    assert has_element?(view, "#voided-doc-#{doc.id} a[href*='/documents/#{doc.id}']")
+  end
+
+  test "completion modal: void button hidden once the cycle is completed", %{conn: conn} do
+    # Entity creator is admin — for whom voiding a locked-cycle file is otherwise allowed.
+    admin = Argus.EntitiesFixtures.entity_scope_fixture()
+    conn = log_in_user(conn, admin.user)
+    type = type_fixture(admin.entity, complete_documents: "receipt")
+
+    {:ok, obligation} =
+      Obligations.create_obligation(admin, %{
+        title: "EPF",
+        obligation_type_id: type.id,
+        primary_assignee_id: admin.user.id,
+        due_by: ~D[2026-06-30],
+        open_note: "open"
+      })
+
+    event = hd(Obligations.list_events(obligation))
+
+    {:ok, doc} =
+      Obligations.add_document(admin, obligation, event, upload_fixture("r.pdf"), "receipt")
+
+    obligation = Obligations.get_obligation!(admin, obligation.id)
+    {:ok, completed, _} = Obligations.complete(admin, obligation, %{note: "Done"})
+
+    # Admin could void this locked-cycle file at the context level...
+    assert Obligations.document_voidable?(admin, completed, doc)
+
+    {:ok, view, _html} =
+      live(conn, ~p"/entities/#{admin.entity.slug}/obligations/#{completed.id}")
+
+    view |> element("#open-completion-slot-receipt") |> render_click()
+
+    # ...but the modal hides the Void button for a non-live cycle.
+    assert has_element?(view, "#completion-slot-receipt", "r.pdf")
+    refute has_element?(view, "#void-doc-#{doc.id}")
+  end
+
+  test "step files modal: additional (no-slot) file appears per step, not in completion view", %{
+    conn: conn
+  } do
+    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    conn = log_in_user(conn, manager.user)
+    type = type_fixture(manager.entity, complete_documents: "receipt")
+
+    {:ok, obligation} =
+      Obligations.create_obligation(manager, %{
+        title: "EPF",
+        obligation_type_id: type.id,
+        due_by: ~D[2026-06-30],
+        open_note: "open"
+      })
+
+    obligation = Obligations.get_obligation!(manager, obligation.id)
+    [open_event] = Enum.filter(obligation.events, &(&1.status == "open"))
+
+    {:ok, view, _html} =
+      live(conn, ~p"/entities/#{manager.entity.slug}/obligations/#{obligation.id}")
+
+    view |> element("#step-files-btn-#{open_event.id}") |> render_click()
+    view |> element("#select-additional-#{open_event.id}") |> render_click()
+
+    file =
+      file_input(view, "#step-upload-form-#{open_event.id}", :document, [
+        %{name: "notes.pdf", content: "x", type: "application/pdf"}
+      ])
+
+    render_upload(file, "notes.pdf")
+
+    view
+    |> form("#step-upload-form-#{open_event.id}", %{"picker_slot" => "additional"})
+    |> render_change()
+
+    view |> element("#upload-additional-#{open_event.id}") |> render_click()
+
+    assert has_element?(view, "#step-files-#{open_event.id}", "notes.pdf")
+
+    obligation = Obligations.get_obligation!(manager, obligation.id)
+    documents = Obligations.list_cycle_documents(obligation)
+
+    assert Enum.any?(
+             documents,
+             &(is_nil(&1.document_slot) and &1.file["original"] == "notes.pdf")
+           )
+  end
+
+  test "step files modal: voided other file shows in step voided area, downloadable", %{
+    conn: conn
+  } do
+    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    conn = log_in_user(conn, manager.user)
+    type = type_fixture(manager.entity, complete_documents: "receipt")
+
+    {:ok, obligation} =
+      Obligations.create_obligation(manager, %{
+        title: "EPF",
+        obligation_type_id: type.id,
+        due_by: ~D[2026-06-30],
+        open_note: "open"
+      })
+
+    event = hd(Obligations.list_events(obligation))
+
+    {:ok, doc} =
+      Obligations.add_document(manager, obligation, event, upload_fixture("n.pdf"), nil)
+
+    # Backdate inserted_at past the 48-hour edit window so the doc becomes voidable.
+    old_doc =
+      doc
+      |> Ecto.Changeset.change(
+        inserted_at: DateTime.add(DateTime.utc_now(:second), -49 * 3600, :second)
+      )
+      |> Argus.Repo.update!()
+
+    {:ok, _} = Obligations.void_document(manager, obligation, old_doc, %{reason: "dup"})
+
+    {:ok, view, _html} =
+      live(conn, ~p"/entities/#{manager.entity.slug}/obligations/#{obligation.id}")
+
+    view |> element("#step-files-btn-#{event.id}") |> render_click()
+
+    assert has_element?(view, "#step-voided-#{event.id}", "n.pdf")
+    assert has_element?(view, "#voided-doc-#{doc.id} a[href*='/documents/#{doc.id}']")
+  end
+
+  test "removing a required slot reclassifies a live obligation's file as supporting", %{
+    conn: conn
+  } do
+    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    conn = log_in_user(conn, manager.user)
+    type = type_fixture(manager.entity, complete_documents: "receipt")
+
+    {:ok, obligation} =
+      Obligations.create_obligation(manager, %{
+        title: "EPF",
+        obligation_type_id: type.id,
+        due_by: ~D[2026-06-30],
+        open_note: "open"
+      })
+
+    event = hd(Obligations.list_events(obligation))
+
+    {:ok, _doc} =
+      Obligations.add_document(manager, obligation, event, upload_fixture("r.pdf"), "receipt")
+
+    # Admin drops the "receipt" slot from the type.
+    {:ok, _type} = Obligations.update_type(manager, type, %{complete_documents: "form"})
+
+    {:ok, view, _html} =
+      live(conn, ~p"/entities/#{manager.entity.slug}/obligations/#{obligation.id}")
+
+    obligation = Obligations.get_obligation!(manager, obligation.id)
+    [open_event] = Enum.filter(obligation.events, &(&1.status == "open"))
+
+    # Completion view: receipt gone, "form" now required and unsatisfied; r.pdf not in slot rows.
+    view |> element("#open-completion-slot-form") |> render_click()
+    assert has_element?(view, "#completion-slot-form")
+    refute has_element?(view, "#completion-slot-receipt")
+    refute has_element?(view, "#completion-docs", "r.pdf")
+    view |> element("#close-completion-modal") |> render_click()
+
+    # Step files: r.pdf now a supporting file on its step.
+    view |> element("#step-files-btn-#{open_event.id}") |> render_click()
+    assert has_element?(view, "#step-files-#{open_event.id}", "r.pdf")
+  end
+
+  test "manager marks a completed cycle in error and is taken to the replacement", %{conn: conn} do
+    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    conn = log_in_user(conn, manager.user)
+    type = type_fixture(manager.entity)
+
+    {:ok, obligation} =
+      Obligations.create_obligation(manager, %{
+        title: "EPF Jan",
+        obligation_type_id: type.id,
+        primary_assignee_id: manager.user.id,
+        due_by: ~D[2026-06-15],
+        open_note: "open"
+      })
+
+    {:ok, done, _} = Obligations.complete(manager, obligation, %{note: "Done"})
+
+    {:ok, view, _html} =
+      live(conn, ~p"/entities/#{manager.entity.slug}/obligations/#{done.id}")
+
+    assert has_element?(view, "#mark-error-btn")
+
+    view |> element("#mark-error-btn") |> render_click()
+    assert has_element?(view, "#correct-modal")
+
+    view
+    |> form("#correct-form", %{"correct" => %{"reason" => "Wrong figures"}})
+    |> render_submit()
+
+    {path, _flash} = assert_redirect(view)
+    replacement_id = path |> String.split("/") |> List.last()
+    refute replacement_id == done.id
+
+    # Original now shows the completed-in-error banner; replacement shows the replaces banner.
+    {:ok, original_view, _} =
+      live(conn, ~p"/entities/#{manager.entity.slug}/obligations/#{done.id}")
+
+    assert has_element?(original_view, "#completed-in-error-banner")
+    refute has_element?(original_view, "#mark-error-btn")
+
+    {:ok, replacement_view, _} = live(conn, path)
+    assert has_element?(replacement_view, "#replaces-banner")
+  end
+
+  defp upload_fixture(filename, content \\ "hello") do
+    path = Path.join(System.tmp_dir!(), "#{System.unique_integer()}_#{filename}")
+    File.write!(path, content)
+
+    %Plug.Upload{
+      path: path,
+      filename: filename,
+      content_type: "application/pdf"
+    }
   end
 end

@@ -1,36 +1,50 @@
 defmodule ArgusWeb.Plugs.AutoRouteByDevice do
   @moduledoc """
-  Routes the user to the device-appropriate UI:
+  Routes the user to the device-appropriate UI on first visit:
 
     * `/entities/<slug>/...` (desktop) → `/m/<slug>/...` for mobile UAs
     * `/m/<slug>/...` (mobile)          → `/entities/<slug>/...` for desktop UAs
+    * `/invitations/<token>`            ↔ `/m/invitations/<token>`
 
-  An `argus_view=mobile|desktop` cookie overrides UA detection.
+  An `argus_view=mobile|desktop` cookie short-circuits the UA check so
+  the user's explicit choice (via the Mobile / Desktop toggle links)
+  is respected on every subsequent request.
 
-  Only redirects when the destination route exists on the other side
-  (field-work surface: dashboard, obligations list, obligation show).
+  Only redirects when the destination route is known to exist on the
+  other side. Pages that exist on only one UI (types, members, etc.)
+  pass through untouched so we never 404 the user out.
   """
   @behaviour Plug
   import Plug.Conn
 
-  @mobile_capable_tails ["", "/obligations"]
+  @mobile_capable_tails ["", "/obligations/new"]
 
   def init(opts), do: opts
 
   def call(conn, _opts) do
-    conn = fetch_cookies(conn)
+    if conn.method != "GET" do
+      conn
+    else
+      do_route(fetch_cookies(conn))
+    end
+  end
+
+  defp do_route(conn) do
     cookie = conn.cookies["argus_view"]
     path = conn.request_path
 
     cond do
-      cookie == "mobile" and path == "/entities" ->
-        redirect_picker(conn, "/entities", "/m/entities")
-
-      cookie == "desktop" and path == "/m/entities" ->
-        redirect_picker(conn, "/m/entities", "/entities")
+      malformed_mobile_entity_path?(path) ->
+        redirect_swap(conn, path, "/entities/m/", "/m/")
 
       cookie == "mobile" and desktop_url?(path) ->
         maybe_redirect_to_mobile(conn, path)
+
+      cookie == "mobile" and invitation_landing?(path) ->
+        redirect_swap(conn, path, "/invitations/", "/m/invitations/")
+
+      cookie == "desktop" and mobile_invitation_landing?(path) ->
+        redirect_swap(conn, path, "/m/invitations/", "/invitations/")
 
       cookie == "desktop" and mobile_url?(path) ->
         redirect_swap(conn, path, "/m/", "/entities/")
@@ -38,14 +52,14 @@ defmodule ArgusWeb.Plugs.AutoRouteByDevice do
       cookie ->
         conn
 
-      mobile_ua?(conn) and path == "/entities" ->
-        redirect_picker(conn, "/entities", "/m/entities")
-
-      not mobile_ua?(conn) and path == "/m/entities" ->
-        redirect_picker(conn, "/m/entities", "/entities")
-
       mobile_ua?(conn) and desktop_url?(path) ->
         maybe_redirect_to_mobile(conn, path)
+
+      mobile_ua?(conn) and invitation_landing?(path) ->
+        redirect_swap(conn, path, "/invitations/", "/m/invitations/")
+
+      not mobile_ua?(conn) and mobile_invitation_landing?(path) ->
+        redirect_swap(conn, path, "/m/invitations/", "/invitations/")
 
       not mobile_ua?(conn) and mobile_url?(path) ->
         redirect_swap(conn, path, "/m/", "/entities/")
@@ -61,12 +75,28 @@ defmodule ArgusWeb.Plugs.AutoRouteByDevice do
   defp desktop_url?(path), do: String.starts_with?(path, "/entities/")
   defp mobile_url?(path), do: String.starts_with?(path, "/m/")
 
+  defp malformed_mobile_entity_path?(path), do: String.starts_with?(path, "/entities/m/")
+
+  defp invitation_landing?(path) do
+    case String.split(path, "/invitations/", parts: 2) do
+      ["", token] -> token != "" and not String.contains?(token, "/")
+      _ -> false
+    end
+  end
+
+  defp mobile_invitation_landing?(path) do
+    case String.split(path, "/m/invitations/", parts: 2) do
+      ["", token] -> token != "" and not String.contains?(token, "/")
+      _ -> false
+    end
+  end
+
   defp mobile_ua?(conn), do: ArgusWeb.Device.mobile_ua?(conn)
 
   defp maybe_redirect_to_mobile(conn, path) do
     case path_tail(path, "/entities/") do
       {:ok, _slug, tail} ->
-        if tail in @mobile_capable_tails or obligation_show?(tail) do
+        if tail in @mobile_capable_tails or obligation_show?(tail) or invite_session?(tail) do
           redirect_swap(conn, path, "/entities/", "/m/")
         else
           conn
@@ -75,14 +105,6 @@ defmodule ArgusWeb.Plugs.AutoRouteByDevice do
       :error ->
         conn
     end
-  end
-
-  defp redirect_picker(conn, _from, to) do
-    qs = if conn.query_string == "", do: "", else: "?" <> conn.query_string
-
-    conn
-    |> Phoenix.Controller.redirect(to: to <> qs)
-    |> halt()
   end
 
   defp redirect_swap(conn, path, from, to) do
@@ -109,4 +131,7 @@ defmodule ArgusWeb.Plugs.AutoRouteByDevice do
   end
 
   defp obligation_show?(tail), do: String.match?(tail, ~r{^/obligations/[0-9a-f-]+$})
+
+  defp invite_session?(tail),
+    do: String.match?(tail, ~r{^/invite-session/(manager|member)$})
 end
