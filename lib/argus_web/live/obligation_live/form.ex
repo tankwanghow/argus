@@ -7,9 +7,7 @@ defmodule ArgusWeb.ObligationLive.Form do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope}>
-      <div id="obligation-form">
-
-
+      <div id="obligation-form" class="mx-auto max-w-xl">
         <.form
           for={@form}
           id="obligation-create-form"
@@ -17,7 +15,7 @@ defmodule ArgusWeb.ObligationLive.Form do
           phx-submit="save"
           class="mt-1"
         >
-        <div class="text-2xl font-bold">New duty</div>
+          <div class="text-2xl font-bold mb-2">New duty</div>
           <.char_count_input field={@form[:title]} label="Title" max={60} required />
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <.input

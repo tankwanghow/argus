@@ -85,8 +85,8 @@ defmodule ArgusWeb.ObligationLive.Show do
           </div>
           <div class="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 mt-2">
             <h1 class="text-lg font-semibold leading-tight min-w-0">{@obligation.title}</h1>
-            <.urgency_badge :if={@live?} tier={@tier} due_by={@obligation.due_by} today={@today} />
             <div class="flex">
+              <.urgency_badge :if={@live?} tier={@tier} due_by={@obligation.due_by} today={@today} />
               <.obligation_status_badge
                 :if={!@live?}
                 cycle_status={@cycle_status}
