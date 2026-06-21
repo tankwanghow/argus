@@ -278,7 +278,7 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
             for={@edit_form}
             id="m-edit-obligation-form"
             phx-submit="save_obligation"
-            class="mt-2 space-y-3"
+            class="mt-2"
           >
             <.char_count_input field={@edit_form[:title]} label="Title" max={60} required />
             <.input field={@edit_form[:due_by]} type="date" label="Due by" required />
@@ -295,7 +295,7 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
                 id="m-edit-collaborator-ids"
                 name="obligation[collaborator_ids][]"
                 multiple
-                class="select w-full h-32"
+                class="select w-full h-28"
               >
                 <option
                   :for={{label, id} <- @member_options}

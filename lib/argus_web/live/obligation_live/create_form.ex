@@ -3,12 +3,13 @@ defmodule ArgusWeb.ObligationLive.CreateForm do
   Shared new-obligation form logic for the Desktop (`ObligationLive.Form`) and
   Mobile (`MobileLive.ObligationForm`) LiveViews. The two differ only in render
   (layout/shell) and in the post-create redirect path; everything else — option
-  loading, validation, create + file attachment — lives here.
+  loading, validation, and create — lives here. Files are attached later from the
+  duty page, not at creation time.
   """
   use ArgusWeb, :verified_routes
 
   import Phoenix.Component, only: [assign: 3, to_form: 2]
-  import Phoenix.LiveView, only: [put_flash: 3, push_navigate: 2, consume_uploaded_entries: 3]
+  import Phoenix.LiveView, only: [put_flash: 3, push_navigate: 2]
 
   alias Argus.Entities
   alias Argus.Obligations
@@ -36,28 +37,18 @@ defmodule ArgusWeb.ObligationLive.CreateForm do
   end
 
   @doc """
-  Creates the obligation, attaches any staged uploads to its open event, then
-  redirects to `redirect_path.(scope, obligation)` on success.
+  Creates the obligation, then redirects to `redirect_path.(scope, obligation)`
+  on success.
   """
   def save(socket, params, redirect_path) when is_function(redirect_path, 2) do
     scope = socket.assigns.current_scope
 
     case Obligations.create_obligation(scope, map_create_params(params)) do
       {:ok, obligation} ->
-        socket =
-          case attach_uploaded_documents(socket, scope, obligation) do
-            :ok ->
-              put_flash(socket, :info, "Duty created.")
-
-            :partial ->
-              put_flash(
-                socket,
-                :error,
-                "Duty created, but some files could not be attached."
-              )
-          end
-
-        {:noreply, push_navigate(socket, to: redirect_path.(scope, obligation))}
+        {:noreply,
+         socket
+         |> put_flash(:info, "Duty created.")
+         |> push_navigate(to: redirect_path.(scope, obligation))}
 
       {:error, %Ecto.Changeset{} = changeset} ->
         {:noreply, assign_form(socket, changeset)}
@@ -67,37 +58,6 @@ defmodule ArgusWeb.ObligationLive.CreateForm do
 
       :not_authorise ->
         {:noreply, put_flash(socket, :error, "Not authorized.")}
-    end
-  end
-
-  @doc "Human-readable upload error text (used by both render templates)."
-  def upload_error_to_string(:too_large), do: "File is too large (max 20 MB)."
-  def upload_error_to_string(:too_many_files), do: "Too many files selected (max 10)."
-  def upload_error_to_string(:not_accepted), do: "This file type is not accepted."
-  def upload_error_to_string(_), do: "Invalid file."
-
-  defp attach_uploaded_documents(socket, scope, obligation) do
-    obligation = Obligations.get_obligation!(scope, obligation.id)
-    open_event = open_event!(obligation)
-
-    results =
-      consume_uploaded_entries(socket, :document, fn %{path: path}, entry ->
-        upload = %Plug.Upload{
-          path: path,
-          filename: entry.client_name,
-          content_type: entry.client_type
-        }
-
-        {:ok, Obligations.add_document(scope, obligation, open_event, upload, nil)}
-      end)
-
-    if Enum.all?(results, &match?({:ok, _}, &1)), do: :ok, else: :partial
-  end
-
-  defp open_event!(%Obligation{} = obligation) do
-    case Enum.find(obligation.events, &(&1.status == "open")) do
-      %{} = event -> event
-      nil -> raise "open event not found for obligation #{obligation.id}"
     end
   end
 

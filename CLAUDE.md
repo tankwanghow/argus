@@ -163,9 +163,10 @@ Classification and partitioning live in `ArgusWeb.ObligationLive.DocumentHelpers
 `complete_documents`, `propagate_complete_documents_to_live/3` updates **live**
 obligations' snapshot only (completed/closed cycles stay frozen); a file whose slot was
 removed/renamed is thereby **reclassified** required → supporting (no row mutation, so
-re-adding the slot re-links it). Create-form uploads are **consumed on save** (no
-disk staging). The old `ObligationDocumentUpload`/`ObligationDocumentList` components
-were removed.
+re-adding the slot re-links it). **The create form has no file upload** — a duty is
+created with fields only; files are attached afterward from the duty page (completion
+documents / step files). The old `ObligationDocumentUpload`/`ObligationDocumentList`
+components were removed.
 
 ### Three rules that are easy to get wrong
 
@@ -253,8 +254,8 @@ Oban reminder jobs, REST API/mobile, billing beyond `plan`/`seat_limit` fields.
   (`config :argus, :uploads_dir`), laid out `:entity_id/:obligation_id/`; it defaults to the priv
   path in dev but must point at a persistent volume in prod (`:code.priv_dir` is not writable in a
   release). Reads are served by a scope-gated controller (`DocumentController`), never a static
-  route; it serves voided files too (they stay downloadable for audit). Create-form attachments are
-  held as LiveView upload entries and **consumed on save**, not staged to disk first.
+  route; it serves voided files too (they stay downloadable for audit). Files are uploaded only
+  from the duty page (completion documents / step files), never during create.
 
 ## Deployment (Linode + Docker, peggy parity)
 

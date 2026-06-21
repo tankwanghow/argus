@@ -1,8 +1,6 @@
 defmodule ArgusWeb.ObligationLive.Form do
   use ArgusWeb, :live_view
 
-  import ArgusWeb.ObligationLive.CreateForm, only: [upload_error_to_string: 1]
-
   alias ArgusWeb.ObligationLive.CreateForm
 
   @impl true
@@ -10,15 +8,16 @@ defmodule ArgusWeb.ObligationLive.Form do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope}>
       <div id="obligation-form">
-        <div class="text-2xl font-bold">New duty</div>
+
 
         <.form
           for={@form}
           id="obligation-create-form"
           phx-change="validate"
           phx-submit="save"
-          class="mt-1 max-w-xl"
+          class="mt-1"
         >
+        <div class="text-2xl font-bold">New duty</div>
           <.char_count_input field={@form[:title]} label="Title" max={60} required />
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <.input
@@ -55,54 +54,6 @@ defmodule ArgusWeb.ObligationLive.Form do
           </div>
         </.form>
 
-        <section id="create-document-upload" class="fieldset max-w-xl">
-          <p class="text-xs text-base-content/50 mb-2">
-            Add supporting files to the opening step(optional). Completion documents can be uploaded after creation.
-          </p>
-          <form
-            id="create-document-form"
-            phx-change="validate_create_upload"
-            phx-submit="validate_create_upload"
-          >
-            <label class="btn btn-primary btn-sm cursor-pointer">
-              <.icon name="hero-paper-clip-mini" class="size-4" /> Choose files
-              <.live_file_input upload={@uploads.document} class="sr-only" />
-            </label>
-          </form>
-
-          <ul
-            :if={@uploads.document.entries != []}
-            id="staged-documents"
-            class="mt-3 space-y-1.5 text-sm"
-          >
-            <li
-              :for={entry <- @uploads.document.entries}
-              id={"staged-document-#{entry.ref}"}
-              class="flex flex-wrap items-center gap-2 rounded-box border border-base-300 px-2.5 py-1.5"
-            >
-              <.icon name="hero-paper-clip-mini" class="size-3.5 text-base-content/50" />
-              <span class="font-medium truncate min-w-0 flex-1">{entry.client_name}</span>
-              <button
-                type="button"
-                phx-click="cancel_create_upload"
-                phx-value-ref={entry.ref}
-                class="btn btn-ghost btn-xs ml-auto"
-              >
-                Remove
-              </button>
-              <p
-                :for={err <- upload_errors(@uploads.document, entry)}
-                class="basis-full text-xs text-error"
-              >
-                {upload_error_to_string(err)}
-              </p>
-            </li>
-          </ul>
-          <p :for={err <- upload_errors(@uploads.document)} class="text-xs text-error mt-1">
-            {upload_error_to_string(err)}
-          </p>
-        </section>
-
         <button
           type="submit"
           form="obligation-create-form"
@@ -119,15 +70,7 @@ defmodule ArgusWeb.ObligationLive.Form do
   @impl true
   def mount(_params, _session, socket) do
     if Argus.Authorization.can?(socket.assigns.current_scope, :create_obligation) do
-      {:ok,
-       socket
-       |> allow_upload(:document,
-         accept: :any,
-         max_entries: ArgusWeb.LiveUpload.max_document_entries(),
-         max_file_size: 20_000_000,
-         auto_upload: true
-       )
-       |> CreateForm.load_form()}
+      {:ok, CreateForm.load_form(socket)}
     else
       {:ok,
        socket
@@ -145,14 +88,6 @@ defmodule ArgusWeb.ObligationLive.Form do
     CreateForm.save(socket, params, fn scope, obligation ->
       ~p"/entities/#{scope.entity.slug}/obligations/#{obligation.id}"
     end)
-  end
-
-  def handle_event("validate_create_upload", _params, socket) do
-    {:noreply, socket}
-  end
-
-  def handle_event("cancel_create_upload", %{"ref" => ref}, socket) do
-    {:noreply, cancel_upload(socket, :document, ref)}
   end
 
   # The app shell binds a global Escape keydown; this page has no modals.
