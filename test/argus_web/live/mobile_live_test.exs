@@ -328,10 +328,10 @@ defmodule ArgusWeb.MobileLiveTest do
 
     {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}/obligations/new")
 
-    assert has_element?(view, "#m-obligation-form", "New obligation")
+    assert has_element?(view, "#m-obligation-form", "New duty")
 
     # The mobile shell binds a global Escape keydown; the form must not crash on it.
-    assert view |> element("#argus-shell") |> render_keydown() =~ "New obligation"
+    assert view |> element("#argus-shell") |> render_keydown() =~ "New duty"
 
     view
     |> form("#m-obligation-create-form", %{

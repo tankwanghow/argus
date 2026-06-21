@@ -36,10 +36,10 @@ defmodule ArgusWeb.ObligationLive.IndexHelpers do
     who = if mine?, do: " assigned to you", else: ""
 
     case lifecycle do
-      :live -> "No live obligations#{who}."
-      :completed -> "No completed obligations#{who}."
-      :skipped -> "No skipped obligations#{who}."
-      :all -> "No obligations#{who}."
+      :live -> "No live duties#{who}."
+      :completed -> "No completed duties#{who}."
+      :skipped -> "No skipped duties#{who}."
+      :all -> "No duties#{who}."
     end
   end
 

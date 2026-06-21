@@ -21,7 +21,7 @@ defmodule ArgusWeb.MobileLive.ObligationForm do
         >
           <.icon name="hero-chevron-left-mini" class="size-4" /> Dashboard
         </.link>
-        <h1 class="text-lg font-semibold">New obligation</h1>
+        <h1 class="text-lg font-semibold">New duty</h1>
 
         <.form
           for={@form}
@@ -115,7 +115,7 @@ defmodule ArgusWeb.MobileLive.ObligationForm do
           class="btn btn-primary w-full"
           phx-disable-with="Creating..."
         >
-          Create obligation
+          Create duty
         </button>
       </div>
     </Layouts.mobile_app>
@@ -137,7 +137,7 @@ defmodule ArgusWeb.MobileLive.ObligationForm do
     else
       {:ok,
        socket
-       |> put_flash(:error, "You are not authorized to create obligations.")
+       |> put_flash(:error, "You are not authorized to create duties.")
        |> push_navigate(to: ~p"/m/#{socket.assigns.current_scope.entity.slug}")}
     end
   end

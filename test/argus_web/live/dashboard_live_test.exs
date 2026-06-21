@@ -56,7 +56,7 @@ defmodule ArgusWeb.DashboardLiveTest do
     refute has_element?(view, "#scope-team.tab-active")
   end
 
-  test "manager sees the New obligation button", %{conn: conn} do
+  test "manager sees the New duty button", %{conn: conn} do
     {scope, _obligation} = manager_obligation_scope_fixture()
     conn = log_in_user(conn, scope.user)
 
@@ -65,7 +65,7 @@ defmodule ArgusWeb.DashboardLiveTest do
     assert has_element?(
              view,
              "a[href='/entities/#{scope.entity.slug}/obligations/new']",
-             "New obligation"
+             "New duty"
            )
   end
 

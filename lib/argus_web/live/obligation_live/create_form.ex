@@ -47,13 +47,13 @@ defmodule ArgusWeb.ObligationLive.CreateForm do
         socket =
           case attach_uploaded_documents(socket, scope, obligation) do
             :ok ->
-              put_flash(socket, :info, "Obligation created.")
+              put_flash(socket, :info, "Duty created.")
 
             :partial ->
               put_flash(
                 socket,
                 :error,
-                "Obligation created, but some files could not be attached."
+                "Duty created, but some files could not be attached."
               )
           end
 

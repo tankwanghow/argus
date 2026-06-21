@@ -273,7 +273,7 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
 
       <div :if={@show_edit_modal} id="m-edit-modal" class="modal modal-bottom modal-open">
         <div class="modal-box">
-          <h3 class="font-bold text-lg">Edit obligation</h3>
+          <h3 class="font-bold text-lg">Edit duty</h3>
           <.form
             for={@edit_form}
             id="m-edit-obligation-form"
@@ -565,7 +565,7 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
             {:noreply,
              reload(socket)
              |> assign(:show_edit_modal, false)
-             |> put_flash(:info, "Obligation updated.")}
+             |> put_flash(:info, "Duty updated.")}
 
           :not_authorise ->
             {:noreply, put_flash(socket, :error, "Not authorized to update collaborators.")}
@@ -684,7 +684,7 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
       {:ok, _completed, _spawned} ->
         {:noreply,
          socket
-         |> put_flash(:info, "Obligation completed.")
+         |> put_flash(:info, "Duty completed.")
          |> push_navigate(to: ~p"/m/#{scope.entity.slug}")}
 
       {:error, :next_due_required} ->

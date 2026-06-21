@@ -384,7 +384,7 @@ defmodule ArgusWeb.ObligationLive.Show do
 
       <div :if={@show_edit_modal} id="edit-modal" class="modal modal-open">
         <div class="modal-box">
-          <h3 class="font-bold text-lg">Edit obligation</h3>
+          <h3 class="font-bold text-lg">Edit duty</h3>
           <.form for={@edit_form} id="edit-obligation-form" phx-submit="save_obligation" class="mt-2">
             <.char_count_input field={@edit_form[:title]} label="Title" max={60} required />
             <.input field={@edit_form[:due_by]} type="date" label="Due by" required />
@@ -773,7 +773,7 @@ defmodule ArgusWeb.ObligationLive.Show do
             {:noreply,
              reload(socket)
              |> assign(:show_edit_modal, false)
-             |> put_flash(:info, "Obligation updated.")}
+             |> put_flash(:info, "Duty updated.")}
 
           :not_authorise ->
             {:noreply, put_flash(socket, :error, "Not authorized to update collaborators.")}
@@ -864,7 +864,7 @@ defmodule ArgusWeb.ObligationLive.Show do
       {:ok, _completed, _spawned} ->
         {:noreply,
          socket
-         |> put_flash(:info, "Obligation completed.")
+         |> put_flash(:info, "Duty completed.")
          |> push_navigate(to: ~p"/entities/#{scope.entity.slug}")}
 
       {:error, :next_due_required} ->

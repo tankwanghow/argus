@@ -10,7 +10,7 @@ defmodule ArgusWeb.ObligationLive.Form do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope}>
       <div id="obligation-form">
-        <div class="text-2xl font-bold">New obligation</div>
+        <div class="text-2xl font-bold">New duty</div>
 
         <.form
           for={@form}
@@ -109,7 +109,7 @@ defmodule ArgusWeb.ObligationLive.Form do
           class="btn btn-primary mt-4"
           phx-disable-with="Creating..."
         >
-          Create obligation
+          Create duty
         </button>
       </div>
     </Layouts.app>
@@ -131,7 +131,7 @@ defmodule ArgusWeb.ObligationLive.Form do
     else
       {:ok,
        socket
-       |> put_flash(:error, "You are not authorized to create obligations.")
+       |> put_flash(:error, "You are not authorized to create duties.")
        |> push_navigate(to: ~p"/entities/#{socket.assigns.current_scope.entity.slug}")}
     end
   end

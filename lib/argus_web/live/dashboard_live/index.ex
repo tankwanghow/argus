@@ -19,7 +19,7 @@ defmodule ArgusWeb.DashboardLive.Index do
                 navigate={~p"/entities/#{@current_scope.entity.slug}/obligations/new"}
                 class="btn btn-primary btn-sm"
               >
-                + New obligation
+                + New duty
               </.link>
             </:actions>
           </.header>
