@@ -2,6 +2,7 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
   use ArgusWeb, :live_view
 
   import ArgusWeb.ObligationCompletionDocuments
+  import ArgusWeb.ObligationDocumentThumb
   import ArgusWeb.ObligationStepFiles
 
   alias ArgusWeb.ModalEscape
@@ -73,26 +74,27 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
           </div>
           <div
             :if={@required_docs != []}
-            class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5"
+            id="m-completion-summary"
+            class={ArgusWeb.ObligationDocumentThumb.thumb_grid_classes(:mobile)}
           >
-            <span
-              :for={{slot, live} <- @required_docs}
-              class="border rounded-xl p-1 inline-flex items-center gap-2 text-sm"
-            >
-              <button
-                id={"m-open-completion-slot-#{slot}"}
-                type="button"
-                phx-click="open_completion_modal"
-                class="shrink-0 inline-flex items-center gap-1 cursor-pointer"
-                title="Manage completion documents"
-              >
-                <.icon
-                  name={if live, do: "hero-check-circle-mini", else: "hero-x-circle-mini"}
-                  class={["size-3.5", if(live, do: "text-success", else: "text-base-content/40")]}
+            <%= for {slot, live} <- @required_docs do %>
+              <%= if live do %>
+                <.doc_thumb_tile
+                  id={"m-summary-slot-#{slot}"}
+                  manage_id={"m-open-completion-slot-#{slot}"}
+                  href={doc_href(@current_scope.entity.slug, @obligation, live)}
+                  name={file_name(live)}
+                  label={slot}
                 />
-                <span class={if live, do: "", else: "text-base-content/60"}>{slot}</span>
-              </button>
-            </span>
+              <% else %>
+                <.doc_thumb_tile
+                  id={"m-summary-slot-#{slot}"}
+                  manage_id={"m-open-completion-slot-#{slot}"}
+                  label={slot}
+                  empty?={true}
+                />
+              <% end %>
+            <% end %>
           </div>
           <div
             :if={@live?}
@@ -222,28 +224,19 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
                   <.icon name="hero-pencil-square-mini" class="size-4" />
                 </button>
               </div>
-              <ul
+              <div
                 :if={timeline_files(event, @doc_slots) != []}
                 id={"m-event-files-#{event.id}"}
-                class="argus-event-attachments"
+                class={ArgusWeb.ObligationDocumentThumb.thumb_grid_classes(:mobile)}
               >
-                <li
+                <.doc_thumb_preview
                   :for={doc <- timeline_files(event, @doc_slots)}
-                  class="argus-event-attachment-chip"
-                >
-                  <span :if={doc.document_slot} class="badge badge-xs badge-ghost shrink-0">
-                    {doc.document_slot}
-                  </span>
-                  <.doc_link
-                    href={
-                      ~p"/entities/#{@current_scope.entity.slug}/obligations/#{@obligation.id}/documents/#{doc.id}"
-                    }
-                    name={file_name(doc)}
-                    icon_class="size-3.5 shrink-0 text-base-content/40"
-                    class="link link-hover truncate min-w-0 flex-1"
-                  />
-                </li>
-              </ul>
+                  id={"m-event-file-#{doc.id}"}
+                  href={doc_href(@current_scope.entity.slug, @obligation, doc)}
+                  name={file_name(doc)}
+                  label={file_name(doc)}
+                />
+              </div>
             </li>
           </ol>
         </section>
@@ -1203,6 +1196,10 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
     |> String.split(",")
     |> Enum.map(&String.trim/1)
     |> Enum.reject(&(&1 == ""))
+  end
+
+  defp doc_href(entity_slug, obligation, doc) do
+    ~p"/entities/#{entity_slug}/obligations/#{obligation.id}/documents/#{doc.id}"
   end
 
   defp file_name(%{file: file}) when is_map(file) do

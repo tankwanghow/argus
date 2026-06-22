@@ -30,11 +30,36 @@ import * as pdfjsLib from "../vendor/pdfjs/pdf.min.mjs"
 // asset; the browser only fetches it when a PDF is actually previewed.
 pdfjsLib.GlobalWorkerOptions.workerSrc = "/assets/js/pdf.worker.js"
 
+// First-page PDF thumbnail for mobile obligation show document tiles.
+const PdfThumb = {
+  async mounted() {
+    const url = this.el.dataset.src
+    if (!url) return
+
+    try {
+      const pdf = await pdfjsLib.getDocument(url).promise
+      const page = await pdf.getPage(1)
+      const cssWidth = this.el.clientWidth || 100
+      const dpr = window.devicePixelRatio || 1
+      const cssScale = cssWidth / page.getViewport({scale: 1}).width
+      const viewport = page.getViewport({scale: cssScale * dpr})
+      const canvas = this.el
+      canvas.width = viewport.width
+      canvas.height = viewport.height
+      canvas.style.width = "100%"
+      canvas.style.height = "100%"
+      await page.render({canvasContext: canvas.getContext("2d"), viewport}).promise
+    } catch (_e) {
+      // Tile falls back to the generic PDF icon in HEEx if rendering fails.
+    }
+  },
+}
+
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
-  hooks: {...colocatedHooks},
+  hooks: {...colocatedHooks, PdfThumb},
 })
 
 // Show progress bar on live navigation and form submits

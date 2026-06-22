@@ -611,14 +611,13 @@ defmodule ArgusWeb.ObligationLiveTest do
     view |> form("#completion-upload-form", %{"picker_slot" => "receipt"}) |> render_change()
     view |> element("#upload-slot-receipt") |> render_click()
 
-    # The slot is surfaced as satisfied in the summary (the file itself opens via the modal),
-    # and the file is not listed under the timeline events.
+    # The slot is surfaced as a thumbnail in the summary; required files stay off the timeline.
     assert has_element?(
              view,
-             "#completion-summary #open-completion-slot-receipt .hero-check-circle-mini"
+             "#completion-summary #summary-slot-receipt a[data-doc-kind='pdf'][data-doc-name='receipt.pdf']"
            )
 
-    refute has_element?(view, "#completion-summary .hero-x-circle-mini")
+    refute has_element?(view, "#completion-summary #summary-slot-receipt .hero-plus-mini")
 
     obligation = Obligations.get_obligation!(manager, obligation.id)
 
