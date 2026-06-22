@@ -1,7 +1,7 @@
 defmodule Argus.Uploads.FileKind do
   @moduledoc false
 
-  @image_exts ~w(jpg jpeg png gif webp svg avif bmp)
+  @image_exts ~w(jpg jpeg png gif webp svg avif bmp heic heif)
   @video_exts ~w(mp4 webm mov ogg ogv m4v)
 
   @doc """

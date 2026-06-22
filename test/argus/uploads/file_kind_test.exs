@@ -8,5 +8,7 @@ defmodule Argus.Uploads.FileKindTest do
     assert FileKind.classify("clip.mp4") == :video
     assert FileKind.classify("report.pdf") == :pdf
     assert FileKind.classify("notes.txt") == :other
+    assert FileKind.classify("IMG_1234.HEIC") == :image
+    assert FileKind.classify("photo.heif") == :image
   end
 end

@@ -95,9 +95,17 @@ function csrfToken() {
 
 export const UploadDirect = {
   mounted() {
+    this._busy = false
+    this._cancelled = false
+    this._xhr = null
+
     this._onClick = e => {
       e.preventDefault()
-      this.pick()
+      if (this._busy) {
+        this.cancel()
+      } else {
+        this.pick()
+      }
     }
     this.el.addEventListener("click", this._onClick)
 
@@ -162,10 +170,15 @@ export const UploadDirect = {
     // a large photo gets resized rather than rejected.
     let toSend = file
     if (kind === "image") {
+      this.setCompressing()
       try {
         toSend = await resizeImageFile(file, this.opts())
       } catch (_e) {
         toSend = file
+      }
+      if (this._cancelled) {
+        cleanup()
+        return
       }
     }
     cleanup()
@@ -189,6 +202,7 @@ export const UploadDirect = {
     if (d.eventId) form.append("event_id", d.eventId)
 
     const xhr = new XMLHttpRequest()
+    this._xhr = xhr
     xhr.open("POST", d.uploadUrl)
     xhr.setRequestHeader("x-csrf-token", csrfToken())
     // NB: don't send `Accept: application/json` — the :browser pipeline runs
@@ -203,7 +217,11 @@ export const UploadDirect = {
       }
     }
 
+    xhr.onabort = () => this.clearBusy()
+
     xhr.onload = () => {
+      if (this._cancelled) return
+
       if (xhr.status >= 200 && xhr.status < 300) {
         // Reset the button: for the always-present "additional" uploader the
         // element persists across the refresh, and its static "Choose file"
@@ -215,8 +233,23 @@ export const UploadDirect = {
         this.fail(slot, errorMessage(xhr))
       }
     }
-    xhr.onerror = () => this.fail(slot, "Upload failed. Please try again.")
+    xhr.onerror = () => {
+      if (!this._cancelled) this.fail(slot, "Upload failed. Please try again.")
+    }
     xhr.send(form)
+  },
+
+  cancel() {
+    this._cancelled = true
+    if (this._xhr) this._xhr.abort()
+    this.clearBusy()
+  },
+
+  setCompressing() {
+    this._busy = true
+    this._cancelled = false
+    if (this._origLabel === undefined) this._origLabel = this.el.textContent
+    this.el.textContent = "Cancel"
   },
 
   fail(slot, message) {
@@ -227,13 +260,17 @@ export const UploadDirect = {
   },
 
   setBusy(percent) {
+    this._busy = true
+    this._cancelled = false
     if (this._origLabel === undefined) this._origLabel = this.el.textContent
-    this.el.disabled = true
-    this.el.textContent = percent > 0 && percent < 100 ? `Uploading ${percent}%` : "Uploading…"
+    this.el.textContent =
+      percent > 0 && percent < 100 ? `Cancel (${percent}%)` : "Cancel"
   },
 
   clearBusy() {
-    this.el.disabled = false
+    this._busy = false
+    this._cancelled = false
+    this._xhr = null
     if (this._origLabel !== undefined) this.el.textContent = this._origLabel
   },
 

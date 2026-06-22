@@ -7,7 +7,7 @@ defmodule ArgusWeb.DocumentController do
   alias Argus.Obligations.{Event, EventDocument, Obligation}
   alias Argus.Repo
   alias Argus.Uploads
-  alias Argus.Uploads.Limits
+  alias Argus.Uploads.{FileKind, Limits}
   alias ArgusWeb.ObligationLive.DocumentHelpers
 
   import Ecto.Query
@@ -31,9 +31,18 @@ defmodule ArgusWeb.DocumentController do
          %Event{} = event <- event,
          :ok <- Limits.validate_size(filename, file_size(path)) do
       case Obligations.add_document(scope, obligation, event, upload, document_slot) do
-        {:ok, document} -> json(conn, %{ok: true, id: document.id})
-        :not_authorise -> error_json(conn, 403, "Not authorized.")
-        {:error, _} -> error_json(conn, 422, "Could not add document.")
+        {:ok, document} ->
+          json(conn, %{ok: true, id: document.id})
+
+        :not_authorise ->
+          error_json(conn, 403, "Not authorized.")
+
+        {:error, :file_too_large} ->
+          kind = FileKind.classify(filename)
+          error_json(conn, 413, Limits.too_large_message(kind, Limits.limit_bytes(filename)))
+
+        {:error, _} ->
+          error_json(conn, 422, "Could not add document.")
       end
     else
       {:error, message} when is_binary(message) -> error_json(conn, 413, message)
