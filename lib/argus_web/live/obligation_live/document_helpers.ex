@@ -29,6 +29,33 @@ defmodule ArgusWeb.ObligationLive.DocumentHelpers do
   """
   def file_kind(name), do: Argus.Uploads.FileKind.classify(name)
 
+  def cycle_documents(%{events: events}) when is_list(events) do
+    Enum.flat_map(events, & &1.documents)
+  end
+
+  def find_event(events, event_id) when is_list(events) do
+    Enum.find(events, &(to_string(&1.id) == to_string(event_id)))
+  end
+
+  def find_event_document(events, nil, document_id) when is_list(events) do
+    events
+    |> cycle_documents_from_events()
+    |> Enum.find(&(to_string(&1.id) == to_string(document_id)))
+  end
+
+  def find_event_document(events, event_id, document_id) when is_list(events) do
+    case find_event(events, event_id) do
+      nil -> nil
+      event -> Enum.find(event.documents, &(to_string(&1.id) == to_string(document_id)))
+    end
+  end
+
+  def event_uploadable?(event, assigns) do
+    assigns[:live?] and assigns[:can_add_document?] and event.status in @uploadable_statuses
+  end
+
+  defp cycle_documents_from_events(events), do: Enum.flat_map(events, & &1.documents)
+
   def parse_slots(nil), do: []
   def parse_slots(""), do: []
 

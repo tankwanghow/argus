@@ -27,9 +27,11 @@ defmodule ArgusWeb.DocumentController do
     document_slot = blank_to_nil(params["document_slot"])
     event = resolve_event(obligation, params["event_id"])
 
-    with %Plug.Upload{path: path, filename: filename} <- upload,
+    with %Plug.Upload{path: path, filename: filename, content_type: content_type} = upload <-
+           upload,
          %Event{} = event <- event,
-         :ok <- Limits.validate_size(filename, file_size(path)) do
+         size when is_integer(size) <- file_size(path),
+         :ok <- Limits.validate_size(filename, size, content_type) do
       case Obligations.add_document(scope, obligation, event, upload, document_slot) do
         {:ok, document} ->
           json(conn, %{ok: true, id: document.id})
@@ -38,14 +40,39 @@ defmodule ArgusWeb.DocumentController do
           error_json(conn, 403, "Not authorized.")
 
         {:error, :file_too_large} ->
-          kind = FileKind.classify(filename)
-          error_json(conn, 413, Limits.too_large_message(kind, Limits.limit_bytes(filename)))
+          kind = FileKind.classify(filename, content_type)
+
+          error_json(
+            conn,
+            413,
+            Limits.too_large_message(kind, Limits.limit_bytes(filename, content_type))
+          )
+
+        {:error, :invalid_slot} ->
+          error_json(conn, 422, "That document slot is not required for this obligation.")
+
+        {:error, :slot_taken} ->
+          error_json(
+            conn,
+            409,
+            "This slot already has a file. Delete or void it before uploading again."
+          )
+
+        {:error, :not_workable} ->
+          error_json(conn, 422, "This step is no longer open for uploads.")
+
+        {:error, :not_found} ->
+          error_json(conn, 404, "Step not found.")
+
+        {:error, :invalid_size} ->
+          error_json(conn, 422, "Could not read uploaded file.")
 
         {:error, _} ->
           error_json(conn, 422, "Could not add document.")
       end
     else
       {:error, message} when is_binary(message) -> error_json(conn, 413, message)
+      {:error, :invalid_size} -> error_json(conn, 422, "Could not read uploaded file.")
       nil -> error_json(conn, 422, "No step available to attach documents to.")
       _ -> error_json(conn, 400, "Choose a file to upload.")
     end
@@ -88,7 +115,7 @@ defmodule ArgusWeb.DocumentController do
   defp file_size(path) do
     case File.stat(path) do
       {:ok, %{size: size}} -> size
-      _ -> 0
+      _ -> {:error, :invalid_size}
     end
   end
 

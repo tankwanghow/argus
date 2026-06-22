@@ -5,6 +5,7 @@ defmodule Argus.Obligations.DocumentsTest do
 
   import Argus.EntitiesFixtures
   import Argus.ObligationsFixtures
+  import Argus.UploadFixtures
 
   describe "add_document/5 and void_document/4" do
     test "voided documents are excluded from completion validation" do
@@ -186,7 +187,7 @@ defmodule Argus.Obligations.DocumentsTest do
       event = hd(Obligations.list_events(obligation))
 
       assert {:ok, document} =
-               Obligations.add_document(manager, obligation, event, upload_fixture(), "receipt")
+               Obligations.add_document(manager, obligation, event, upload_fixture(), nil)
 
       assert {:ok, _} = Obligations.delete_document(manager, obligation, document)
       refute Argus.Repo.get(Argus.Obligations.EventDocument, document.id)
@@ -277,16 +278,5 @@ defmodule Argus.Obligations.DocumentsTest do
       assert :not_authorise =
                Obligations.void_document(member_scope, obligation, old, %{})
     end
-  end
-
-  defp upload_fixture(filename \\ "test.txt", content \\ "hello") do
-    path = Path.join(System.tmp_dir!(), "#{System.unique_integer()}_#{filename}")
-    File.write!(path, content)
-
-    %Plug.Upload{
-      path: path,
-      filename: filename,
-      content_type: "text/plain"
-    }
   end
 end

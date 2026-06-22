@@ -93,7 +93,6 @@ export const UploadUiPersist = {
     let pendingError = null
     const errorRaw = sessionStorage.getItem(errorKey(this.obligationId))
     if (errorRaw) {
-      sessionStorage.removeItem(errorKey(this.obligationId))
       try {
         pendingError = JSON.parse(errorRaw)
       } catch (_e) {
@@ -104,9 +103,15 @@ export const UploadUiPersist = {
     // Re-show the stashed slot error once the restored modal has been patched in.
     const showErr = () => {
       if (!pendingError) return
-      requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        const controls = document.querySelector(
+          `[data-upload-slot-controls="${pendingError.idPrefix}${pendingError.slot}"]`
+        )
+        if (!controls) return
+
         showClientSlotError(pendingError.idPrefix, pendingError.slot, pendingError.message)
-      )
+        clearUploadError(this.obligationId)
+      })
     }
 
     if (modalFlag === "1") {

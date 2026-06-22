@@ -1,4 +1,4 @@
-defmodule ArgusWeb.LiveUpload do
+defmodule ArgusWeb.UploadClientConfig do
   @moduledoc """
   Client-side upload configuration for the `UploadDirect` hook. Documents are
   uploaded over a plain HTTP request (see `ArgusWeb.DocumentController.create/2`),

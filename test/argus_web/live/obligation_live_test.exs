@@ -3,6 +3,7 @@ defmodule ArgusWeb.ObligationLiveTest do
 
   import Phoenix.LiveViewTest
   import Argus.ObligationsFixtures
+  import Argus.UploadFixtures
 
   alias Argus.Obligations
 
@@ -1040,32 +1041,5 @@ defmodule ArgusWeb.ObligationLiveTest do
 
     {:ok, replacement_view, _} = live(conn, path)
     assert has_element?(replacement_view, "#replaces-banner")
-  end
-
-  defp upload_fixture(filename, content \\ "hello") do
-    path = Path.join(System.tmp_dir!(), "#{System.unique_integer()}_#{filename}")
-    File.write!(path, content)
-
-    %Plug.Upload{
-      path: path,
-      filename: filename,
-      content_type: "application/pdf"
-    }
-  end
-
-  # Attach a document to the obligation's current workable event, mirroring what
-  # the UploadDirect/controller path does — so LiveView tests can exercise the
-  # rendered result without simulating the browser upload.
-  defp seed_document(scope, obligation, slot, filename) do
-    obligation = Obligations.get_obligation!(scope, obligation.id)
-
-    event =
-      Enum.find(obligation.events, &(&1.status == "in_progress")) ||
-        Enum.find(obligation.events, &(&1.status == "open"))
-
-    {:ok, doc} =
-      Obligations.add_document(scope, obligation, event, upload_fixture(filename, "scan"), slot)
-
-    doc
   end
 end

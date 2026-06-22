@@ -7,6 +7,15 @@ defmodule Argus.Uploads.LimitsTest do
     assert Limits.max_upload_bytes() == 20_000_000
   end
 
+  test "multipart_max_length adds framing headroom above max upload bytes" do
+    assert Limits.multipart_max_length() == Limits.max_upload_bytes() + 10_000_000
+  end
+
+  test "validate_size rejects invalid size values" do
+    assert {:error, "Invalid file size."} = Limits.validate_size("photo.jpg", -1)
+    assert {:error, "Invalid file size."} = Limits.validate_size("photo.jpg", "big")
+  end
+
   test "validate_size accepts files within per-type limits" do
     assert :ok = Limits.validate_size("photo.jpg", 4_000_000)
     assert :ok = Limits.validate_size("clip.mp4", 9_000_000)

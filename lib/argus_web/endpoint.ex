@@ -46,7 +46,7 @@ defmodule ArgusWeb.Endpoint do
     # the largest per-kind limit (20 MB); the default ~8 MB multipart cap would
     # reject them before the controller's own size check runs. Headroom for
     # multipart framing on top of the file bytes.
-    length: 30_000_000,
+    length: Argus.Uploads.Limits.multipart_max_length(),
     json_decoder: Phoenix.json_library()
 
   plug Plug.MethodOverride

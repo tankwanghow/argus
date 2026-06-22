@@ -1,5 +1,6 @@
 defmodule ArgusWeb.MobileLive.ObligationShow do
   use ArgusWeb, :live_view
+  use ArgusWeb.ObligationLive.DocumentEvents
 
   import ArgusWeb.ObligationCompletionDocuments
   import ArgusWeb.ObligationDocumentThumb
@@ -7,6 +8,10 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
 
   alias ArgusWeb.ModalEscape
   alias ArgusWeb.ObligationLive.DocumentHelpers
+
+  import ArgusWeb.ObligationLive.DocumentHelpers,
+    only: [cycle_documents: 1, event_uploadable?: 2, parse_slots: 1, find_event: 2]
+
   alias ArgusWeb.ObligationLive.IndexHelpers, as: Index
   alias Argus.Authorization
   alias Argus.Entities
@@ -659,14 +664,6 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
     {:noreply, assign(socket, :show_done_modal, true)}
   end
 
-  def handle_event("open_documents_from_done", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:show_done_modal, false)
-     |> assign(:show_completion_modal, true)
-     |> Phoenix.LiveView.push_event("persist_completion_modal", %{})}
-  end
-
   def handle_event("close_done_modal", _params, socket) do
     {:noreply, assign(socket, :show_done_modal, false)}
   end
@@ -796,149 +793,6 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
     end
   end
 
-  def handle_event("open_step_files", %{"event_id" => event_id}, socket) do
-    case find_event(socket.assigns.obligation.events, event_id) do
-      nil ->
-        {:noreply, put_flash(socket, :error, "Step not found.")}
-
-      event ->
-        {:noreply,
-         socket
-         |> assign(:step_files_modal_event_id, event.id)
-         |> assign(:step_files_modal_event, event)
-         |> Phoenix.LiveView.push_event("persist_step_files", %{event_id: event.id})}
-    end
-  end
-
-  def handle_event("restore_step_files", %{"event_id" => event_id}, socket) do
-    case find_event(socket.assigns.obligation.events, event_id) do
-      nil ->
-        {:noreply, Phoenix.LiveView.push_event(socket, "clear_step_files_persist", %{})}
-
-      event ->
-        {:noreply,
-         socket
-         |> assign(:step_files_modal_event_id, event.id)
-         |> assign(:step_files_modal_event, event)}
-    end
-  end
-
-  def handle_event("close_step_files", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:step_files_modal_event_id, nil)
-     |> assign(:step_files_modal_event, nil)
-     |> Phoenix.LiveView.push_event("clear_step_files_persist", %{})
-     |> assign(:voiding_document_id, nil)}
-  end
-
-  def handle_event("open_completion_modal", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:show_completion_modal, true)
-     |> Phoenix.LiveView.push_event("persist_completion_modal", %{})}
-  end
-
-  def handle_event("restore_completion_modal", _params, socket) do
-    {:noreply, assign(socket, :show_completion_modal, true)}
-  end
-
-  def handle_event("close_completion_modal", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:show_completion_modal, false)
-     |> Phoenix.LiveView.push_event("clear_completion_modal_persist", %{})
-     |> assign(:voiding_document_id, nil)}
-  end
-
-  def handle_event("document_uploaded", _params, socket) do
-    {:noreply, reload(socket)}
-  end
-
-  def handle_event("request_delete_document", %{"document_id" => document_id}, socket) do
-    {:noreply,
-     socket
-     |> assign(:deleting_document_id, document_id)
-     |> assign(:voiding_document_id, nil)}
-  end
-
-  def handle_event("cancel_delete_document", _params, socket) do
-    {:noreply, assign(socket, :deleting_document_id, nil)}
-  end
-
-  def handle_event("delete_document", %{"document_id" => document_id} = params, socket) do
-    scope = socket.assigns.current_scope
-    obligation = socket.assigns.obligation
-    event_id = params["event_id"]
-
-    case find_event_document(obligation.events, event_id, document_id) do
-      nil ->
-        {:noreply, put_flash(socket, :error, "Document not found.")}
-
-      document ->
-        case Obligations.delete_document(scope, obligation, document) do
-          {:ok, _} ->
-            {:noreply,
-             socket
-             |> reload()
-             |> assign(:deleting_document_id, nil)
-             |> put_flash(:info, "Document deleted.")}
-
-          :not_authorise ->
-            {:noreply, put_flash(socket, :error, "Not authorized.")}
-
-          {:error, _} ->
-            {:noreply, put_flash(socket, :error, "Could not delete document.")}
-        end
-    end
-  end
-
-  def handle_event("void_document", %{"document_id" => document_id}, socket) do
-    {:noreply,
-     socket
-     |> assign(:voiding_document_id, document_id)
-     |> assign(:deleting_document_id, nil)}
-  end
-
-  def handle_event("cancel_void_document", _params, socket) do
-    {:noreply, assign(socket, :voiding_document_id, nil)}
-  end
-
-  def handle_event("confirm_void_document", %{"document_id" => document_id} = params, socket) do
-    scope = socket.assigns.current_scope
-    obligation = socket.assigns.obligation
-    reason = Map.get(params, "reason")
-    event_id = Map.get(params, "event_id")
-
-    case find_event_document(socket.assigns.obligation.events, event_id, document_id) do
-      nil ->
-        {:noreply, put_flash(socket, :error, "Document not found.")}
-
-      document ->
-        case Obligations.void_document(scope, obligation, document, %{reason: reason}) do
-          {:ok, _} ->
-            {:noreply,
-             socket
-             |> reload()
-             |> assign(:voiding_document_id, nil)
-             |> put_flash(:info, "Document voided.")}
-
-          :not_authorise ->
-            {:noreply, put_flash(socket, :error, "Not authorized to void this document.")}
-
-          {:error, :reason_required} ->
-            {:noreply, put_flash(socket, :error, "A reason is required to void this document.")}
-
-          {:error, _} ->
-            {:noreply, put_flash(socket, :error, "Could not void document.")}
-        end
-    end
-  end
-
-  defp cycle_documents(obligation) do
-    Enum.flat_map(obligation.events, & &1.documents)
-  end
-
   defp other_file_count(event, required_slots) do
     {live_other, _voided} = DocumentHelpers.step_files(event.documents, required_slots)
     live_other
@@ -1045,10 +899,6 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
 
   defp parse_collaborator_ids(id), do: [id]
 
-  defp find_event(events, event_id) do
-    Enum.find(events, &(to_string(&1.id) == to_string(event_id)))
-  end
-
   defp member_options(scope) do
     Entities.list_entity_members(scope.entity)
     |> Enum.map(fn {user, _membership} -> {user.email, user.id} end)
@@ -1082,39 +932,9 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
     end
   end
 
-  defp find_event_document(events, nil, document_id) do
-    events
-    |> Enum.flat_map(& &1.documents)
-    |> Enum.find(&(to_string(&1.id) == to_string(document_id)))
-  end
-
-  defp find_event_document(events, event_id, document_id) do
-    case find_event(events, event_id) do
-      nil ->
-        nil
-
-      event ->
-        Enum.find(event.documents, &(to_string(&1.id) == to_string(document_id)))
-    end
-  end
-
-  defp event_uploadable?(event, assigns) do
-    assigns[:live?] and assigns[:can_add_document?] and event.status in ~w(open in_progress)
-  end
-
   defp can_add_document?(scope, obligation) do
     Authorization.can?(scope, :edit_obligation) or
       Authorization.can?(scope, :start_progress, obligation)
-  end
-
-  defp parse_slots(nil), do: []
-  defp parse_slots(""), do: []
-
-  defp parse_slots(csv) do
-    csv
-    |> String.split(",")
-    |> Enum.map(&String.trim/1)
-    |> Enum.reject(&(&1 == ""))
   end
 
   defp doc_href(entity_slug, obligation, doc) do

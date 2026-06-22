@@ -10,27 +10,35 @@ defmodule Argus.Uploads.Limits do
     other: 20_000_000
   }
 
+  @multipart_framing_headroom 10_000_000
+
   def max_upload_bytes do
     limits()
     |> Map.values()
     |> Enum.max()
   end
 
-  def limit_bytes(filename) when is_binary(filename) do
-    Map.fetch!(limits(), FileKind.classify(filename))
+  def multipart_max_length do
+    max_upload_bytes() + @multipart_framing_headroom
   end
 
-  def validate_size(filename, size) when is_integer(size) and size >= 0 do
-    limit = limit_bytes(filename)
+  def limit_bytes(filename, content_type \\ nil) when is_binary(filename) do
+    Map.fetch!(limits(), FileKind.classify(filename, content_type))
+  end
 
-    if size <= limit do
-      :ok
-    else
-      {:error, too_large_message(FileKind.classify(filename), limit)}
+  def validate_size(filename, size, content_type \\ nil) do
+    cond do
+      not is_integer(size) or size < 0 ->
+        {:error, "Invalid file size."}
+
+      size <= limit_bytes(filename, content_type) ->
+        :ok
+
+      true ->
+        kind = FileKind.classify(filename, content_type)
+        {:error, too_large_message(kind, limit_bytes(filename, content_type))}
     end
   end
-
-  def validate_size(_filename, _size), do: :ok
 
   def too_large_message(kind, limit_bytes) do
     "File is too large (max #{human_mb(limit_bytes)} for #{kind_label(kind)})."

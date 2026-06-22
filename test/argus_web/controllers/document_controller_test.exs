@@ -142,6 +142,79 @@ defmodule ArgusWeb.DocumentControllerTest do
       assert body["error"] =~ "max 10 MB for videos"
     end
 
+    test "rejects an unknown completion slot with 422", %{conn: conn} do
+      manager = manager_scope_fixture()
+      conn = log_in_user(conn, manager.user)
+      type = type_fixture(manager.entity, complete_documents: "receipt")
+
+      {:ok, obligation} =
+        Obligations.create_obligation(manager, %{
+          title: "EPF",
+          obligation_type_id: type.id,
+          due_by: ~D[2026-06-30],
+          open_note: "open"
+        })
+
+      path = Path.join(System.tmp_dir!(), "bad_slot_#{System.unique_integer()}.pdf")
+      File.write!(path, "x")
+
+      conn =
+        post(conn, ~p"/entities/#{manager.entity.slug}/obligations/#{obligation.id}/documents", %{
+          "file" => %Plug.Upload{
+            path: path,
+            filename: "extra.pdf",
+            content_type: "application/pdf"
+          },
+          "document_slot" => "not_a_slot"
+        })
+
+      body = json_response(conn, 422)
+      assert body["error"] =~ "not required"
+    end
+
+    test "rejects a duplicate completion slot upload with 409", %{conn: conn} do
+      manager = manager_scope_fixture()
+      conn = log_in_user(conn, manager.user)
+      type = type_fixture(manager.entity, complete_documents: "receipt")
+
+      {:ok, obligation} =
+        Obligations.create_obligation(manager, %{
+          title: "EPF",
+          obligation_type_id: type.id,
+          due_by: ~D[2026-06-30],
+          open_note: "open"
+        })
+
+      path1 = Path.join(System.tmp_dir!(), "slot1_#{System.unique_integer()}.pdf")
+      path2 = Path.join(System.tmp_dir!(), "slot2_#{System.unique_integer()}.pdf")
+      File.write!(path1, "first")
+      File.write!(path2, "second")
+
+      base = ~p"/entities/#{manager.entity.slug}/obligations/#{obligation.id}/documents"
+
+      post(conn, base, %{
+        "file" => %Plug.Upload{
+          path: path1,
+          filename: "receipt.pdf",
+          content_type: "application/pdf"
+        },
+        "document_slot" => "receipt"
+      })
+
+      conn =
+        post(conn, base, %{
+          "file" => %Plug.Upload{
+            path: path2,
+            filename: "receipt2.pdf",
+            content_type: "application/pdf"
+          },
+          "document_slot" => "receipt"
+        })
+
+      body = json_response(conn, 409)
+      assert body["error"] =~ "already has a file"
+    end
+
     test "returns 403 when the member is not allowed to add documents", %{conn: conn} do
       manager = manager_scope_fixture()
       member = member_fixture(manager.entity)

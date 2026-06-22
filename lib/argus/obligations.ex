@@ -341,6 +341,7 @@ defmodule Argus.Obligations do
 
     with true <- can_add_document?(scope, obligation),
          :ok <- ensure_event_workable(event, obligation),
+         :ok <- validate_document_slot(obligation, document_slot),
          {:ok, file} <- store_upload(upload, obligation),
          {:ok, document} <- insert_document(scope, event, file, document_slot) do
       {:ok, document}
@@ -1036,6 +1037,7 @@ defmodule Argus.Obligations do
   defp store_upload(upload, obligation) do
     case Uploads.store(upload, obligation.entity_id, obligation.id) do
       {:error, :file_too_large} -> {:error, :file_too_large}
+      {:error, :invalid_size} -> {:error, :invalid_size}
       file when is_map(file) -> {:ok, file}
     end
   end
@@ -1141,6 +1143,30 @@ defmodule Argus.Obligations do
       event.status not in ["open", "in_progress"] -> {:error, :not_workable}
       true -> :ok
     end
+  end
+
+  defp validate_document_slot(_obligation, slot) when slot in [nil, ""], do: :ok
+
+  defp validate_document_slot(%Obligation{} = obligation, slot) when is_binary(slot) do
+    required = obligation.complete_documents |> parse_slot_csv() |> MapSet.new()
+
+    cond do
+      slot not in required ->
+        {:error, :invalid_slot}
+
+      slot_taken?(obligation, slot) ->
+        {:error, :slot_taken}
+
+      true ->
+        :ok
+    end
+  end
+
+  defp slot_taken?(obligation, slot) do
+    obligation
+    |> list_cycle_documents()
+    |> Enum.reject(& &1.voided_at)
+    |> Enum.any?(&(&1.document_slot == slot))
   end
 
   defp live_cycle?(%Obligation{completed_at: nil, closed_at: nil}), do: true

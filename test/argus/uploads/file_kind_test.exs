@@ -11,4 +11,11 @@ defmodule Argus.Uploads.FileKindTest do
     assert FileKind.classify("IMG_1234.HEIC") == :image
     assert FileKind.classify("photo.heif") == :image
   end
+
+  test "classify/2 falls back to MIME type when extension is missing" do
+    assert FileKind.classify("blob", "image/jpeg") == :image
+    assert FileKind.classify("blob", "video/mp4") == :video
+    assert FileKind.classify("blob", "application/pdf") == :pdf
+    assert FileKind.classify("blob", "text/plain") == :other
+  end
 end

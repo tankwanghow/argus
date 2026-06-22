@@ -10,7 +10,7 @@ defmodule ArgusWeb.UploadSlotControls do
   """
   use Phoenix.Component
 
-  alias ArgusWeb.LiveUpload
+  alias ArgusWeb.UploadClientConfig
 
   attr :slot, :string, required: true
   attr :id_prefix, :string, required: true
@@ -40,7 +40,7 @@ defmodule ArgusWeb.UploadSlotControls do
           data-slot={@slot}
           data-document-slot={if(@completion_slot?, do: @slot, else: "")}
           data-event-id={@event_id || ""}
-          {LiveUpload.client_size_attrs()}
+          {UploadClientConfig.client_size_attrs()}
           class={@choose_button_class}
         >
           Choose file
