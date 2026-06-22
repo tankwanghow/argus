@@ -33,6 +33,17 @@ config :argus,
   ecto_repos: [Argus.Repo],
   generators: [timestamp_type: :utc_datetime, binary_id: true]
 
+config :argus, :upload_limits,
+  image: 5_000_000,
+  video: 10_000_000,
+  pdf: 20_000_000,
+  other: 20_000_000
+
+config :argus, :upload_client_image_resize,
+  max_edge: 1920,
+  quality: 85,
+  min_bytes: 50_000
+
 # Configure the endpoint
 config :argus, ArgusWeb.Endpoint,
   url: [host: "localhost"],
@@ -57,7 +68,7 @@ config :argus, Argus.Mailer, adapter: Swoosh.Adapters.Local
 config :esbuild,
   argus: [
     args:
-      ~w(js/app.js --bundle --target=es2022 --outdir=../priv/static/assets/js --external:/fonts/* --external:/images/* --alias:@=.),
+      ~w(js/app.js js/pdf.worker.js --bundle --target=es2022 --outdir=../priv/static/assets/js --external:/fonts/* --external:/images/* --alias:@=.),
     cd: Path.expand("../assets", __DIR__),
     env: %{"NODE_PATH" => [Path.expand("../deps", __DIR__), Mix.Project.build_path()]}
   ]

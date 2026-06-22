@@ -30,6 +30,19 @@ defmodule ArgusWeb.ObligationLive.DocumentHelpersTest do
     assert voided_required == [form_voided]
   end
 
+  test "file_kind classifies by filename extension (case-insensitive)" do
+    assert H.file_kind("photo.JPG") == :image
+    assert H.file_kind("scan.png") == :image
+    assert H.file_kind("animation.webp") == :image
+    assert H.file_kind("clip.mp4") == :video
+    assert H.file_kind("movie.MOV") == :video
+    assert H.file_kind("receipt.pdf") == :pdf
+    assert H.file_kind("report.docx") == :other
+    assert H.file_kind("archive.zip") == :other
+    assert H.file_kind("noextension") == :other
+    assert H.file_kind(nil) == :other
+  end
+
   test "step_files returns this event's live and voided other files (slot nil or stale)" do
     live_no_slot = doc(nil)
     live_stale = doc("old_slot")

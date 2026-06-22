@@ -23,6 +23,12 @@ defmodule ArgusWeb.ObligationLive.DocumentHelpers do
     end)
   end
 
+  @doc """
+  Classifies an uploaded file by its filename extension into a preview kind:
+  `:image`, `:video`, `:pdf`, or `:other` (no inline preview — download only).
+  """
+  def file_kind(name), do: Argus.Uploads.FileKind.classify(name)
+
   def parse_slots(nil), do: []
   def parse_slots(""), do: []
 
