@@ -4,8 +4,33 @@ defmodule ArgusWeb.LiveUpload do
   import Phoenix.LiveView, only: [cancel_upload: 3, consume_uploaded_entry: 3]
 
   @max_document_entries 10
+  @max_document_file_size 20_000_000
 
   def max_document_entries, do: @max_document_entries
+  def max_document_file_size, do: @max_document_file_size
+
+  @doc """
+  Human-readable messages for an upload entry's errors (e.g. an oversized file).
+  Returns `[]` when there is no entry or no error.
+  """
+  def entry_error_messages(uploads, entry) do
+    uploads
+    |> entry_errors(entry)
+    |> Enum.map(&error_message/1)
+  end
+
+  defp entry_errors(%{document: conf}, %{} = entry),
+    do: Phoenix.Component.upload_errors(conf, entry)
+
+  defp entry_errors(_uploads, _entry), do: []
+
+  defp error_message(:too_large),
+    do: "File is too large (max #{div(@max_document_file_size, 1_000_000)} MB)."
+
+  defp error_message(:not_accepted), do: "This file type is not allowed."
+  defp error_message(:too_many_files), do: "Too many files selected."
+  defp error_message(:external_client_failure), do: "Upload failed. Please try again."
+  defp error_message(_other), do: "This file can't be uploaded."
 
   def slot_key("additional"), do: "additional"
   def slot_key(:additional), do: "additional"

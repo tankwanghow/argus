@@ -41,6 +41,7 @@ defmodule ArgusWeb.Layouts do
       phx-key="Escape"
       class="argus-app min-h-screen flex flex-col"
     >
+      <.doc_preview_modal />
       <header class="navbar px-4 sm:px-6 lg:px-8 border-b border-base-300">
         <div class="flex-1">
           <.link navigate={~p"/"} class="flex items-center gap-2 font-bold text-lg">
@@ -344,6 +345,7 @@ defmodule ArgusWeb.Layouts do
       phx-key="Escape"
       class="min-h-screen bg-base-100 pb-20"
     >
+      <.doc_preview_modal />
       {render_slot(@inner_block)}
     </div>
 

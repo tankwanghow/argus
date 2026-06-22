@@ -501,6 +501,82 @@ defmodule ArgusWeb.CoreComponents do
   end
 
   @doc """
+  Renders a link to an uploaded document.
+
+  Renders a leading file-type icon (photo / film / document-text / paperclip)
+  followed by the filename link. Images, videos and PDFs open in the shared
+  in-page preview modal (handled client-side in `app.js`, which reads the
+  `data-doc-*` attributes); other file types fall back to opening/downloading in
+  a new tab. The preview kind and the icon are both classified server-side from
+  the filename via `file_kind/1`, so they stay in sync. Requires
+  `doc_preview_modal/1` to be present once on the page.
+  """
+  attr :href, :string, required: true
+  attr :name, :string, required: true
+  attr :class, :any, default: nil
+  attr :icon_class, :any, default: "size-3.5 text-base-content/40 shrink-0"
+  attr :rest, :global
+
+  def doc_link(assigns) do
+    assigns =
+      assign(assigns, :kind, ArgusWeb.ObligationLive.DocumentHelpers.file_kind(assigns.name))
+
+    ~H"""
+    <.icon name={doc_kind_icon(@kind)} class={@icon_class} />
+    <a
+      href={@href}
+      target="_blank"
+      rel="noopener"
+      data-doc-preview
+      data-doc-kind={@kind}
+      data-doc-name={@name}
+      class={@class}
+      {@rest}
+    >{@name}</a>
+    """
+  end
+
+  defp doc_kind_icon(:image), do: "hero-photo-mini"
+  defp doc_kind_icon(:video), do: "hero-film-mini"
+  defp doc_kind_icon(:pdf), do: "hero-document-text-mini"
+  defp doc_kind_icon(_), do: "hero-paper-clip-mini"
+
+  @doc """
+  Renders the shared, page-level document preview modal that `doc_link/1` opens.
+
+  Populated client-side (`#doc-preview-name`, `#doc-preview-download`,
+  `#doc-preview-body`); render it once per layout shell.
+  """
+  def doc_preview_modal(assigns) do
+    ~H"""
+    <dialog id="doc-preview-modal" class="modal">
+      <div class="modal-box w-11/12 max-w-4xl p-4">
+        <div class="mb-3 flex items-center justify-between gap-2">
+          <h3 id="doc-preview-name" class="min-w-0 truncate font-semibold"></h3>
+          <div class="flex shrink-0 items-center gap-2">
+            <a id="doc-preview-download" href="#" download class="btn btn-sm btn-primary">
+              <.icon name="hero-arrow-down-tray-mini" class="size-4" />
+              <span class="hidden sm:inline">Download</span>
+            </a>
+            <form id="doc-preview-close" method="dialog">
+              <button class="btn btn-sm btn-circle btn-ghost" aria-label="Close">✕</button>
+            </form>
+          </div>
+        </div>
+        <div
+          id="doc-preview-body"
+          class="max-h-[75vh] min-h-[40vh] overflow-auto text-center"
+        >
+        </div>
+      </div>
+      <form id="doc-preview-backdrop" method="dialog" class="modal-backdrop">
+        <button aria-label="Close">close</button>
+      </form>
+    </dialog>
+    """
+  end
+
+  @doc """
   Formats a `Date` for display, e.g. `15 Jan 2026`.
   """
   def format_date(nil), do: "—"

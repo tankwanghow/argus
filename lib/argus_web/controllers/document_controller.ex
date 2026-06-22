@@ -8,16 +8,19 @@ defmodule ArgusWeb.DocumentController do
 
   import Ecto.Query
 
-  def show(conn, %{"entity_slug" => slug, "obligation_id" => obligation_id, "id" => id}) do
+  def show(conn, %{"entity_slug" => slug, "obligation_id" => obligation_id, "id" => id} = params) do
     user = conn.assigns.current_scope.user
     entity = Entities.get_entity_by_slug_for_user!(slug, user)
     obligation = get_obligation!(obligation_id, entity.id)
     document = get_document!(id, obligation.id)
 
+    # Inline by default so previews can embed the file; ?download=1 forces a "Save as".
+    disposition = if params["download"] in ~w(1 true), do: :attachment, else: :inline
+
     if File.exists?(Uploads.path(document)) do
       send_download(conn, {:file, Uploads.path(document)},
         filename: original_filename(document),
-        disposition: :inline
+        disposition: disposition
       )
     else
       conn |> put_status(:not_found) |> text("Not found")

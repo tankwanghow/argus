@@ -45,6 +45,39 @@ defmodule ArgusWeb.DocumentControllerTest do
     assert response(conn, 200)
   end
 
+  test "serves inline by default and as attachment with ?download=1", %{conn: conn, user: user} do
+    manager = manager_scope_fixture()
+
+    %Entities.Membership{
+      user_id: user.id,
+      entity_id: manager.entity.id,
+      role: "member",
+      accepted_at: DateTime.utc_now(:second)
+    }
+    |> Entities.Membership.changeset(%{})
+    |> Argus.Repo.insert!()
+
+    {_, obligation} = obligation_fixture(manager)
+    event = hd(Obligations.list_events(obligation))
+
+    path = Path.join(System.tmp_dir!(), "disp_test_#{System.unique_integer()}.txt")
+    File.write!(path, "file contents")
+
+    upload = %Plug.Upload{path: path, filename: "disp_test.txt", content_type: "text/plain"}
+    {:ok, document} = Obligations.add_document(manager, obligation, event, upload, nil)
+
+    base =
+      ~p"/entities/#{manager.entity.slug}/obligations/#{obligation.id}/documents/#{document.id}"
+
+    inline_conn = get(conn, base)
+    assert [disp] = get_resp_header(inline_conn, "content-disposition")
+    assert disp =~ "inline"
+
+    download_conn = get(conn, base <> "?download=1")
+    assert [disp] = get_resp_header(download_conn, "content-disposition")
+    assert disp =~ "attachment"
+  end
+
   test "serves a voided document so it can still be downloaded", %{conn: conn} do
     manager = manager_scope_fixture()
     conn = log_in_user(conn, manager.user)

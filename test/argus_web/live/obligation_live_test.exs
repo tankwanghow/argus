@@ -237,6 +237,40 @@ defmodule ArgusWeb.ObligationLiveTest do
     assert render(view) =~ "form.pdf"
   end
 
+  test "completion modal: shows an error when a staged file exceeds the size limit", %{
+    conn: conn
+  } do
+    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    conn = log_in_user(conn, manager.user)
+    type = type_fixture(manager.entity, complete_documents: "receipt")
+
+    {:ok, obligation} =
+      Obligations.create_obligation(manager, %{
+        title: "EPF June",
+        obligation_type_id: type.id,
+        due_by: ~D[2026-06-30],
+        open_note: "EPF opened"
+      })
+
+    {:ok, view, _html} =
+      live(conn, ~p"/entities/#{manager.entity.slug}/obligations/#{obligation.id}")
+
+    view |> element("#open-completion-slot-receipt") |> render_click()
+    view |> element("#select-slot-receipt") |> render_click()
+
+    file =
+      file_input(view, "#completion-upload-form", :document, [
+        %{name: "huge.pdf", content: String.duplicate("x", 20_000_001), type: "application/pdf"}
+      ])
+
+    render_upload(file, "huge.pdf")
+    view |> form("#completion-upload-form", %{"picker_slot" => "receipt"}) |> render_change()
+
+    assert render(view) =~ "too large"
+    # The confirm button is hidden so the oversized file can't be saved (only clear remains).
+    refute has_element?(view, "#upload-slot-receipt")
+  end
+
   test "completion modal: deleting a required-slot file within 48h reopens the slot uploader", %{
     conn: conn
   } do

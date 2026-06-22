@@ -58,14 +58,12 @@ defmodule ArgusWeb.ObligationCompletionDocuments do
             />
             <span class="font-medium shrink-0 whitespace-nowrap">{slot}</span>
 
-            <.link
+            <.doc_link
               :if={live}
               href={"/entities/#{@entity_slug}/obligations/#{@obligation.id}/documents/#{live.id}"}
-              target="_blank"
+              name={file_name(live)}
               class="link link-hover truncate min-w-0 flex-1"
-            >
-              {file_name(live)}
-            </.link>
+            />
             <span
               :if={live && @show_dates?}
               class="text-xs text-base-content/50 shrink-0 whitespace-nowrap"
@@ -126,6 +124,7 @@ defmodule ArgusWeb.ObligationCompletionDocuments do
               :if={is_nil(live) and @uploadable?}
               slot={slot}
               id_prefix={@id_prefix}
+              uploads={@uploads}
               pending_entry={LiveUpload.entry_for_slot(@uploads, @upload_slot_entries, slot)}
             />
           </div>
@@ -148,14 +147,12 @@ defmodule ArgusWeb.ObligationCompletionDocuments do
             class="px-2.5 py-2 text-sm"
           >
             <div class="flex items-center gap-x-2">
-              <.icon name="hero-paper-clip-mini" class="size-3.5 text-base-content/40 shrink-0" />
-              <.link
+              <.doc_link
                 href={"/entities/#{@entity_slug}/obligations/#{@obligation.id}/documents/#{doc.id}"}
-                target="_blank"
+                name={file_name(doc)}
+                icon_class="size-3.5 text-base-content/40 shrink-0"
                 class="link link-hover truncate min-w-0 flex-1 line-through text-base-content/40"
-              >
-                {file_name(doc)}
-              </.link>
+              />
               <span :if={doc.document_slot} class="badge badge-xs badge-ghost shrink-0">{doc.document_slot}</span>
               <span class="badge badge-xs badge-error shrink-0">voided</span>
               <span
@@ -202,17 +199,25 @@ defmodule ArgusWeb.ObligationCompletionDocuments do
 
   attr :slot, :string, required: true
   attr :id_prefix, :string, required: true
+  attr :uploads, :map, required: true
   attr :pending_entry, :any, default: nil
 
   defp slot_uploader(assigns) do
-    assigns = assign(assigns, :ready?, LiveUpload.entry_ready?(assigns.pending_entry))
+    assigns =
+      assigns
+      |> assign(:ready?, LiveUpload.entry_ready?(assigns.pending_entry))
+      |> assign(:errors, LiveUpload.entry_error_messages(assigns.uploads, assigns.pending_entry))
 
     ~H"""
     <div class="flex items-center gap-1 justify-between flex-1 min-w-0">
       <%= if @pending_entry do %>
-        <span class="text-sm font-medium truncate min-w-0">{@pending_entry.client_name}</span>
+        <div class="min-w-0 flex-1">
+          <span class="text-sm font-medium truncate block">{@pending_entry.client_name}</span>
+          <p :if={@errors != []} class="text-xs text-error mt-0.5">{hd(@errors)}</p>
+        </div>
         <div class="shrink-0">
           <button
+            :if={@errors == []}
             id={"#{@id_prefix}upload-slot-#{@slot}"}
             type="button"
             phx-click="add_document"

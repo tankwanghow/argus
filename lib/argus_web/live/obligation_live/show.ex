@@ -26,7 +26,7 @@ defmodule ArgusWeb.ObligationLive.Show do
             class="flex items-center justify-between text-sm text-base-content/70"
           >
             <div class="flex flex-wrap items-center gap-1.5 min-w-0">
-              <span class="font-medium text-base-content">{@obligation.obligation_type.name}</span>
+              <span class="font-medium text-info">{@obligation.obligation_type.name}</span>
             </div>
             <div class="mt-2 flex flex-wrap items-center gap-1.5">
               <span
@@ -686,7 +686,7 @@ defmodule ArgusWeb.ObligationLive.Show do
      |> allow_upload(:document,
        accept: :any,
        max_entries: ArgusWeb.LiveUpload.max_document_entries(),
-       max_file_size: 20_000_000,
+       max_file_size: ArgusWeb.LiveUpload.max_document_file_size(),
        auto_upload: true
      )
      |> assign_obligation(obligation)

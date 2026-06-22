@@ -231,19 +231,17 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
                   :for={doc <- timeline_files(event, @doc_slots)}
                   class="argus-event-attachment-chip"
                 >
-                  <.icon name="hero-paper-clip-mini" class="size-3.5 shrink-0 text-base-content/40" />
                   <span :if={doc.document_slot} class="badge badge-xs badge-ghost shrink-0">
                     {doc.document_slot}
                   </span>
-                  <.link
+                  <.doc_link
                     href={
                       ~p"/entities/#{@current_scope.entity.slug}/obligations/#{@obligation.id}/documents/#{doc.id}"
                     }
-                    target="_blank"
+                    name={file_name(doc)}
+                    icon_class="size-3.5 shrink-0 text-base-content/40"
                     class="link link-hover truncate min-w-0 flex-1"
-                  >
-                    {file_name(doc)}
-                  </.link>
+                  />
                 </li>
               </ul>
             </li>
@@ -315,6 +313,9 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
             </div>
           </.form>
         </div>
+        <form method="dialog" class="modal-backdrop">
+          <button type="button" phx-click="close_edit_modal">close</button>
+        </form>
       </div>
 
       <div :if={@show_completion_modal} id="m-completion-modal" class="modal modal-bottom modal-open">
@@ -347,6 +348,9 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
             >Close</button>
           </div>
         </div>
+        <form method="dialog" class="modal-backdrop">
+          <button type="button" phx-click="close_completion_modal">close</button>
+        </form>
       </div>
 
       <div
@@ -378,6 +382,9 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
             <button type="button" class="btn" phx-click="close_step_files">Close</button>
           </div>
         </div>
+        <form method="dialog" class="modal-backdrop">
+          <button type="button" phx-click="close_step_files">close</button>
+        </form>
       </div>
 
       <div :if={@show_done_modal} id="m-done-modal" class="modal modal-bottom modal-open">
@@ -404,6 +411,9 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
             </div>
           </.form>
         </div>
+        <form method="dialog" class="modal-backdrop">
+          <button type="button" phx-click="close_done_modal">close</button>
+        </form>
       </div>
 
       <div :if={@show_progress_modal} id="m-progress-modal" class="modal modal-bottom modal-open">
@@ -430,6 +440,9 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
             </div>
           </.form>
         </div>
+        <form method="dialog" class="modal-backdrop">
+          <button type="button" phx-click="close_progress_modal">close</button>
+        </form>
       </div>
 
       <div :if={@show_skip_modal} id="m-skip-modal" class="modal modal-bottom modal-open">
@@ -463,6 +476,9 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
             </div>
           </.form>
         </div>
+        <form method="dialog" class="modal-backdrop">
+          <button type="button" phx-click="close_skip_modal">close</button>
+        </form>
       </div>
 
       <div :if={@show_correct_modal} id="m-correct-modal" class="modal modal-bottom modal-open">
@@ -523,7 +539,7 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
      |> allow_upload(:document,
        accept: :any,
        max_entries: ArgusWeb.LiveUpload.max_document_entries(),
-       max_file_size: 20_000_000,
+       max_file_size: ArgusWeb.LiveUpload.max_document_file_size(),
        auto_upload: true
      )
      |> load(id, scope)}
