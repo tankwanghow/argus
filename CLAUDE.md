@@ -168,6 +168,27 @@ created with fields only; files are attached afterward from the duty page (compl
 documents / step files). The old `ObligationDocumentUpload`/`ObligationDocumentList`
 components were removed.
 
+**Upload mechanism — plain HTTP, not LiveView socket upload.** Documents are
+**not** uploaded over the LiveView channel (no `allow_upload`/`live_file_input`).
+A long mobile camera/file pick backgrounds the page, times out the socket, and
+remounts on return — which discarded any in-flight socket upload, regardless of
+size. Instead, each "Choose file" button (`ArgusWeb.UploadSlotControls`) runs the
+**`UploadDirect`** client hook (`assets/js/upload_direct.js`): it opens a
+**transient `<input type=file>` created in `document.body`** (outside LiveView's
+managed DOM, so a remount can't destroy the selection), validates size + downscales
+images **client-side** (resize *before* the limit check; image detected by
+extension **or** MIME type), then `XHR`-POSTs the file to
+`ArgusWeb.DocumentController.create/2`
+(`POST /entities/:entity_slug/obligations/:obligation_id/documents`, device-agnostic
+— mobile pages post the same `/entities/...` path). The controller rebuilds the full
+`Scope` and is **server-authoritative** on per-kind size limits
+(`Argus.Uploads.Limits`); a plain HTTP request survives backgrounding. On success
+the hook pushes `document_uploaded` (both show LiveViews `reload`) or reloads if the
+socket is down. The endpoint's `Plug.Parsers` multipart `:length` is raised to 30 MB
+(above the 20 MB max). Per-slot errors are shown client-side (inline error row), and
+modal + slot-error state survive a reconnect via `UploadUiPersist` (sessionStorage).
+`Argus.Obligations.add_document/5` remains the context entry point.
+
 ### Three rules that are easy to get wrong
 
 1. **Done validation is enforced only on Done**, never earlier. A Done **note is always
@@ -253,9 +274,11 @@ Oban reminder jobs, REST API/mobile, billing beyond `plan`/`seat_limit` fields.
 - File uploads (v1) go to the local filesystem under a **configurable** `:uploads_dir`
   (`config :argus, :uploads_dir`), laid out `:entity_id/:obligation_id/`; it defaults to the priv
   path in dev but must point at a persistent volume in prod (`:code.priv_dir` is not writable in a
-  release). Reads are served by a scope-gated controller (`DocumentController`), never a static
-  route; it serves voided files too (they stay downloadable for audit). Files are uploaded only
-  from the duty page (completion documents / step files), never during create.
+  release). Both **writes and reads** go through the scope-gated `DocumentController`
+  (`create/2` for multipart upload, `show/2` for download), never a static route or the LiveView
+  socket; it serves voided files too (they stay downloadable for audit). Files are uploaded only
+  from the duty page (completion documents / step files), never during create — see the upload
+  mechanism note under "Documents UI" above.
 
 ## Deployment (Linode + Docker, peggy parity)
 
