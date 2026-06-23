@@ -6,7 +6,8 @@ defmodule ArgusWeb.DashboardFilter do
   alias ArgusWeb.ObligationLive.IndexHelpers, as: Index
 
   @session_key "dashboard_filters"
-  @lifecycles ~w(live someday completed skipped all)
+  @lifecycles ~w(live completed skipped all)
+  @date_filters ~w(dated someday all_dates)
   @sorts ~w(due_asc due_desc title urgency recent)
 
   def assign_filters(socket, session) do
@@ -17,6 +18,7 @@ defmodule ArgusWeb.DashboardFilter do
     |> Phoenix.Component.assign(:lifecycle, filters.lifecycle)
     |> Phoenix.Component.assign(:query, filters.query)
     |> Phoenix.Component.assign(:sort, filters.sort)
+    |> Phoenix.Component.assign(:date_filter, filters.date_filter)
   end
 
   def load(session, %Scope{user: %{id: user_id}, entity: %{slug: slug}} = scope) do
@@ -38,7 +40,8 @@ defmodule ArgusWeb.DashboardFilter do
       mine: entry["mine"],
       lifecycle: entry["lifecycle"],
       query: entry["query"],
-      sort: entry["sort"]
+      sort: entry["sort"],
+      date_filter: entry["date_filter"]
     })
   end
 
@@ -83,7 +86,8 @@ defmodule ArgusWeb.DashboardFilter do
       "mine" => if(socket.assigns.mine?, do: "true", else: "false"),
       "lifecycle" => Atom.to_string(socket.assigns.lifecycle),
       "query" => socket.assigns.query,
-      "sort" => Atom.to_string(socket.assigns.sort)
+      "sort" => Atom.to_string(socket.assigns.sort),
+      "date_filter" => Atom.to_string(socket.assigns.date_filter)
     })
   end
 
@@ -92,7 +96,8 @@ defmodule ArgusWeb.DashboardFilter do
       "mine" => param_mine(params["mine"]),
       "lifecycle" => param_lifecycle(params["lifecycle"]),
       "query" => param_query(params["query"]),
-      "sort" => param_sort(params["sort"])
+      "sort" => param_sort(params["sort"]),
+      "date_filter" => param_date_filter(params["date_filter"])
     }
   end
 
@@ -103,7 +108,8 @@ defmodule ArgusWeb.DashboardFilter do
       mine?: parse_mine(mine, defaults.mine?),
       lifecycle: Index.parse_lifecycle(lifecycle),
       query: query || "",
-      sort: parse_sort(Map.get(saved, "sort"))
+      sort: parse_sort(Map.get(saved, "sort")),
+      date_filter: parse_date_filter(Map.get(saved, "date_filter"))
     }
   end
 
@@ -114,7 +120,8 @@ defmodule ArgusWeb.DashboardFilter do
       mine?: Index.default_mine?(scope),
       lifecycle: :live,
       query: "",
-      sort: :due_asc
+      sort: :due_asc,
+      date_filter: :dated
     }
   end
 
@@ -153,4 +160,11 @@ defmodule ArgusWeb.DashboardFilter do
   defp parse_sort("title"), do: :title
   defp parse_sort("urgency"), do: :urgency
   defp parse_sort(_), do: :due_asc
+
+  defp param_date_filter(df) when df in @date_filters, do: df
+  defp param_date_filter(_), do: "dated"
+
+  defp parse_date_filter("someday"), do: :someday
+  defp parse_date_filter("all_dates"), do: :all_dates
+  defp parse_date_filter(_), do: :dated
 end
