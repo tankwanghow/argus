@@ -97,7 +97,12 @@ defmodule ArgusWeb.ObligationLive.Show do
           <div class="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 mt-2">
             <h1 class="text-lg font-semibold leading-tight min-w-0">{@obligation.title}</h1>
             <div class="flex">
-              <.urgency_badge :if={@live?} tier={@tier} due_by={@obligation.due_by} today={@today} />
+              <.urgency_badge
+                :if={@live? and @obligation.due_by}
+                tier={@tier}
+                due_by={@obligation.due_by}
+                today={@today}
+              />
               <.obligation_status_badge
                 :if={!@live?}
                 cycle_status={@cycle_status}
@@ -382,9 +387,22 @@ defmodule ArgusWeb.ObligationLive.Show do
       <div :if={@show_edit_modal} id="edit-modal" class="modal modal-open">
         <div class="modal-box">
           <h3 class="font-bold text-lg">Edit duty</h3>
-          <.form for={@edit_form} id="edit-obligation-form" phx-submit="save_obligation" class="mt-2">
+          <.form
+            for={@edit_form}
+            id="edit-obligation-form"
+            phx-change="validate_edit"
+            phx-submit="save_obligation"
+            class="mt-2"
+          >
             <.char_count_input field={@edit_form[:title]} label="Title" max={60} required />
-            <.input field={@edit_form[:due_by]} type="date" label="Due by" required />
+            <.input field={@edit_form[:someday]} type="checkbox" label="No due date (Someday)" />
+            <.input
+              :if={!someday?(@edit_form)}
+              field={@edit_form[:due_by]}
+              type="date"
+              label="Due by"
+              required
+            />
             <div class="fieldset mb-2">
               <.input
                 field={@edit_form[:primary_assignee_id]}
@@ -472,7 +490,7 @@ defmodule ArgusWeb.ObligationLive.Show do
             />
             <.input
               name="correct[replacement_due_by]"
-              value={Date.to_iso8601(@obligation.due_by)}
+              value={@obligation.due_by && Date.to_iso8601(@obligation.due_by)}
               type="date"
               label="Replacement due date"
             />
@@ -738,12 +756,28 @@ defmodule ArgusWeb.ObligationLive.Show do
     {:noreply, assign(socket, :show_edit_modal, false)}
   end
 
+  def handle_event("validate_edit", %{"obligation" => params}, socket) do
+    form =
+      to_form(
+        %{
+          "title" => params["title"],
+          "someday" => params["someday"],
+          "due_by" => params["due_by"],
+          "primary_assignee_id" => params["primary_assignee_id"]
+        },
+        as: "obligation"
+      )
+
+    {:noreply, assign(socket, :edit_form, form)}
+  end
+
   def handle_event("save_obligation", %{"obligation" => params}, socket) do
     scope = socket.assigns.current_scope
     obligation = socket.assigns.obligation
 
     attrs = %{
       title: params["title"],
+      someday: params["someday"],
       due_by: parse_date(params["due_by"]),
       primary_assignee_id: normalize_assignee(params["primary_assignee_id"])
     }
@@ -1039,6 +1073,7 @@ defmodule ArgusWeb.ObligationLive.Show do
       to_form(
         %{
           "title" => obligation.title,
+          "someday" => is_nil(obligation.due_by),
           "due_by" => iso_date(obligation.due_by),
           "primary_assignee_id" => obligation.primary_assignee_id
         },
@@ -1046,6 +1081,8 @@ defmodule ArgusWeb.ObligationLive.Show do
       )
     )
   end
+
+  defp someday?(form), do: form[:someday].value in [true, "true"]
 
   defp collaborator_selected?(ids, id) do
     Enum.any?(ids, &(to_string(&1) == to_string(id)))

@@ -1082,4 +1082,42 @@ defmodule ArgusWeb.ObligationLiveTest do
     {:ok, replacement_view, _} = live(conn, path)
     assert has_element?(replacement_view, "#replaces-banner")
   end
+
+  test "show page renders a Someday duty and can promote it to a due date", %{conn: conn} do
+    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    conn = log_in_user(conn, manager.user)
+    type = type_fixture(manager.entity)
+
+    {:ok, ob} =
+      Obligations.create_obligation(manager, %{
+        title: "Refresh brand assets",
+        obligation_type_id: type.id,
+        someday: true,
+        open_note: "n"
+      })
+
+    {:ok, view, html} = live(conn, ~p"/entities/#{manager.entity.slug}/obligations/#{ob.id}")
+    assert html =~ "Refresh brand assets"
+
+    # promote: open edit modal, uncheck someday, set a due date, submit
+    view |> element("#edit-obligation-btn") |> render_click()
+    assert has_element?(view, "#edit-obligation-form")
+
+    # toggle someday off so the due_by field appears
+    view
+    |> form("#edit-obligation-form", obligation: %{someday: "false"})
+    |> render_change()
+
+    view
+    |> form("#edit-obligation-form",
+      obligation: %{
+        title: ob.title,
+        due_by: "2026-09-01",
+        someday: "false"
+      }
+    )
+    |> render_submit()
+
+    assert Argus.Repo.reload(ob).due_by == ~D[2026-09-01]
+  end
 end
