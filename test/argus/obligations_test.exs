@@ -633,6 +633,33 @@ defmodule Argus.ObligationsTest do
       assert page.end?
       assert page.cursor == nil
     end
+
+    test "my_* status scopes to the user's work and still applies the SQL search", %{manager: m} do
+      member = member_scope_on_entity(m.entity)
+      type = type_fixture(m.entity)
+
+      mk = fn title, assignee_id ->
+        {:ok, o} =
+          Obligations.create_obligation(m, %{
+            title: title,
+            obligation_type_id: type.id,
+            primary_assignee_id: assignee_id,
+            due_by: ~D[2026-04-01],
+            open_note: "n"
+          })
+
+        o
+      end
+
+      mine = mk.("Quarterly VAT return", member.user.id)
+      _other_mine = mk.("Annual audit", member.user.id)
+      _unassigned = mk.("VAT something unassigned", nil)
+
+      # my_live excludes the unassigned "VAT" row (not the member's work) and the
+      # search drops "Annual audit", leaving only the member's VAT obligation.
+      page = Obligations.list_obligations_page(member, status: :my_live, query: "vat")
+      assert Enum.map(page.rows, & &1.id) == [mine.id]
+    end
   end
 
   describe "mark_completed_in_error/3" do
