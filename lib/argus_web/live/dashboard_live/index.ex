@@ -57,10 +57,21 @@ defmodule ArgusWeb.DashboardLive.Index do
                 </option>
               </select>
             </form>
+            <form id="obligation-date-filter" phx-change="set_date_filter">
+              <select name="date_filter" class="select">
+                <option
+                  :for={{value, label} <- Index.date_filters()}
+                  value={value}
+                  selected={@date_filter == Index.parse_date_filter(value)}
+                >
+                  {label}
+                </option>
+              </select>
+            </form>
             <form id="obligation-sort-filter" phx-change="set_sort">
               <select id="obligation-sort" name="sort" class="select">
                 <option
-                  :for={{value, label} <- Index.sorts(@lifecycle)}
+                  :for={{value, label} <- Index.sorts(@lifecycle, @date_filter)}
                   value={value}
                   selected={@sort == Index.parse_sort(value)}
                 >
@@ -102,7 +113,7 @@ defmodule ArgusWeb.DashboardLive.Index do
             id="obligations-empty"
             class="py-8 text-center text-base-content/60"
           >
-            {Index.empty_message(@mine?, @lifecycle)}
+            {Index.empty_message(@mine?, @lifecycle, @date_filter)}
           </div>
         </div>
       </div>
@@ -191,6 +202,14 @@ defmodule ArgusWeb.DashboardLive.Index do
      |> DashboardFilter.persist()}
   end
 
+  def handle_event("set_date_filter", %{"date_filter" => df}, socket) do
+    {:noreply,
+     socket
+     |> assign(:date_filter, Index.parse_date_filter(df))
+     |> load_first_page()
+     |> DashboardFilter.persist()}
+  end
+
   def handle_event("set_sort", %{"sort" => sort}, socket) do
     {:noreply,
      socket
@@ -213,13 +232,14 @@ defmodule ArgusWeb.DashboardLive.Index do
       today: today,
       mine?: mine?,
       lifecycle: lifecycle,
+      date_filter: date_filter,
       query: query,
       sort: sort,
       cursor: cursor
     } = socket.assigns
 
     %{rows: rows, cursor: cursor, end?: end?} =
-      Index.load_page(scope, today, mine?, lifecycle, query, sort, cursor)
+      Index.load_page(scope, today, mine?, lifecycle, date_filter, query, sort, cursor)
 
     {:noreply,
      socket
@@ -235,12 +255,13 @@ defmodule ArgusWeb.DashboardLive.Index do
       today: today,
       mine?: mine?,
       lifecycle: lifecycle,
+      date_filter: date_filter,
       query: query,
       sort: sort
     } = socket.assigns
 
     %{rows: rows, cursor: cursor, end?: end?} =
-      Index.load_page(scope, today, mine?, lifecycle, query, sort, nil)
+      Index.load_page(scope, today, mine?, lifecycle, date_filter, query, sort, nil)
 
     socket
     |> stream(:rows, rows, dom_id: &row_dom_id/1, reset: true)

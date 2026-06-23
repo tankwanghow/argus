@@ -210,6 +210,44 @@ defmodule ArgusWeb.DashboardLiveTest do
     refute has_element?(view, "#obligation-sort option[value='urgency']")
   end
 
+  test "Due date filter shows Someday duties within a lifecycle", %{conn: conn} do
+    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    conn = log_in_user(conn, manager.user)
+    type = type_fixture(manager.entity)
+
+    {:ok, _dated} =
+      Obligations.create_obligation(manager, %{
+        title: "Has a deadline",
+        obligation_type_id: type.id,
+        due_by: ~D[2026-07-01],
+        open_note: "n"
+      })
+
+    {:ok, _sd} =
+      Obligations.create_obligation(manager, %{
+        title: "Tidy the archive",
+        obligation_type_id: type.id,
+        someday: true,
+        open_note: "n"
+      })
+
+    {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}")
+
+    # Default (Has due date): dated shows, someday hidden.
+    html = view |> element("#obligations-list") |> render()
+    assert html =~ "Has a deadline"
+    refute html =~ "Tidy the archive"
+
+    # Switch Due date → Someday: someday shows, dated hidden, no "due " chrome.
+    view |> form("#obligation-date-filter", %{date_filter: "someday"}) |> render_change()
+    html = view |> element("#obligations-list") |> render()
+    assert html =~ "Tidy the archive"
+    refute html =~ "Has a deadline"
+    refute html =~ "due "
+    refute has_element?(view, "#obligation-sort option[value='urgency']")
+    assert has_element?(view, "#obligation-sort option[value='recent']")
+  end
+
   test "team (Live) list includes unassigned obligations", %{conn: conn} do
     manager = Argus.EntitiesFixtures.manager_scope_fixture()
     conn = log_in_user(conn, manager.user)
