@@ -790,6 +790,34 @@ defmodule Argus.ObligationsTest do
       ids = Enum.map(page.rows, & &1.id)
       assert List.last(ids) == sx.id
     end
+
+    test ":my_someday scopes to primary-assignee only", %{manager: manager} do
+      member = member_scope_on_entity(manager.entity)
+      type = type_fixture(manager.entity)
+
+      {:ok, member_duty} =
+        Obligations.create_obligation(manager, %{
+          title: "Member Someday",
+          obligation_type_id: type.id,
+          primary_assignee_id: member.user.id,
+          someday: true,
+          open_note: "n"
+        })
+
+      # duty assigned to nobody — should NOT appear in member's :my_someday
+      {:ok, _other_duty} =
+        Obligations.create_obligation(manager, %{
+          title: "Other Someday",
+          obligation_type_id: type.id,
+          someday: true,
+          open_note: "n"
+        })
+
+      result =
+        Obligations.list_obligations_page(member, status: :my_someday, sort: :recent, limit: :all)
+
+      assert Enum.map(result.rows, & &1.id) == [member_duty.id]
+    end
   end
 
   describe "mark_completed_in_error/3" do

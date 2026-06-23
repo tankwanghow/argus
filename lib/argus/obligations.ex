@@ -161,7 +161,7 @@ defmodule Argus.Obligations do
   end
 
   defp scope_to_assignee(query, status, user)
-       when status in [:my_live, :my_completed, :my_skipped, :my_all] do
+       when status in [:my_live, :my_completed, :my_skipped, :my_all, :my_someday] do
     collaborator_ids = collaborator_obligation_ids(user.id)
 
     where(
