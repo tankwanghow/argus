@@ -210,28 +210,6 @@ defmodule ArgusWeb.DashboardLiveTest do
     refute has_element?(view, "#obligation-sort option[value='urgency']")
   end
 
-  test "Someday tab lists dateless duties without urgency/due chrome", %{conn: conn} do
-    manager = Argus.EntitiesFixtures.manager_scope_fixture()
-    conn = log_in_user(conn, manager.user)
-    type = type_fixture(manager.entity)
-
-    {:ok, _} =
-      Obligations.create_obligation(manager, %{
-        title: "Tidy the archive",
-        obligation_type_id: type.id,
-        someday: true,
-        open_note: "n"
-      })
-
-    {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}")
-    view |> form("#obligation-status-filter", %{lifecycle: "someday"}) |> render_change()
-
-    html = view |> element("#obligations-list") |> render()
-    assert html =~ "Tidy the archive"
-    refute html =~ "overdue"
-    refute html =~ "due "
-  end
-
   test "team (Live) list includes unassigned obligations", %{conn: conn} do
     manager = Argus.EntitiesFixtures.manager_scope_fixture()
     conn = log_in_user(conn, manager.user)

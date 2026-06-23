@@ -132,7 +132,7 @@ defmodule Argus.Obligations do
     |> Repo.all()
   end
 
-  @status_filters ~w(my_live my_completed my_skipped my_all my_someday live completed skipped all someday)a
+  @status_filters ~w(my_live my_completed my_skipped my_all live completed skipped all)a
 
   @doc """
   Lists obligations for the entity scope.
@@ -161,7 +161,7 @@ defmodule Argus.Obligations do
   end
 
   defp scope_to_assignee(query, status, user)
-       when status in [:my_live, :my_completed, :my_skipped, :my_all, :my_someday] do
+       when status in [:my_live, :my_completed, :my_skipped, :my_all] do
     collaborator_ids = collaborator_obligation_ids(user.id)
 
     where(
@@ -174,10 +174,6 @@ defmodule Argus.Obligations do
   defp scope_to_assignee(query, _status, _user), do: query
 
   defp apply_status_filter(query, status) when status in [:live, :my_live], do: live(query)
-
-  defp apply_status_filter(query, status) when status in [:someday, :my_someday] do
-    from o in live(query), where: is_nil(o.due_by)
-  end
 
   defp apply_status_filter(query, status) when status in [:completed, :my_completed] do
     from o in query, where: not is_nil(o.completed_at)
@@ -240,7 +236,8 @@ defmodule Argus.Obligations do
       |> join(:left, [o], a in assoc(o, :primary_assignee), as: :assignee)
       |> where([o], o.entity_id == ^entity.id)
       |> scope_to_assignee(status, user)
-      |> apply_page_status(status)
+      |> apply_status_filter(status)
+      |> apply_date_scope(Keyword.get(opts, :date_scope, :all_dates))
       |> apply_due_bound(:before, Keyword.get(opts, :due_before))
       |> apply_due_bound(:after, Keyword.get(opts, :due_after))
       |> apply_page_search(Keyword.get(opts, :query))
@@ -254,11 +251,9 @@ defmodule Argus.Obligations do
     |> paginate(sort, limit)
   end
 
-  defp apply_page_status(query, status) when status in [:live, :my_live] do
-    query |> apply_status_filter(status) |> where([o], not is_nil(o.due_by))
-  end
-
-  defp apply_page_status(query, status), do: apply_status_filter(query, status)
+  defp apply_date_scope(query, :dated), do: where(query, [o], not is_nil(o.due_by))
+  defp apply_date_scope(query, :someday), do: where(query, [o], is_nil(o.due_by))
+  defp apply_date_scope(query, _all_dates), do: query
 
   defp normalize_page_sort(sort) when sort in [:due_asc, :due_desc, :title, :recent], do: sort
   defp normalize_page_sort(_), do: :due_asc

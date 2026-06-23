@@ -6,20 +6,29 @@ defmodule ArgusWeb.ObligationLive.IndexHelpersTest do
   alias ArgusWeb.ObligationLive.IndexHelpers, as: Index
   alias Argus.Obligations.Urgency
 
-  test "sorts/1 includes urgency only for live" do
-    assert {"urgency", _} = List.keyfind(Index.sorts(:live), "urgency", 0)
-    refute List.keyfind(Index.sorts(:completed), "urgency", 0)
-  end
-
-  test "effective_sort keeps urgency on live, downgrades elsewhere" do
-    assert Index.effective_sort(:urgency, :live) == :urgency
-    assert Index.effective_sort(:urgency, :completed) == :due_asc
-    assert Index.effective_sort(:title, :completed) == :title
-  end
-
   test "parse_sort whitelists with due_asc default" do
     assert Index.parse_sort("title") == :title
     assert Index.parse_sort("bogus") == :due_asc
+  end
+
+  test "date_filter vocabulary + lifecycle-aware sorts" do
+    assert {"someday", "Someday"} = List.keyfind(Index.date_filters(), "someday", 0)
+    assert Index.parse_date_filter("all_dates") == :all_dates
+    assert Index.parse_date_filter("bogus") == :dated
+
+    # urgency only on live × dated; recent only on someday; due on dated/all; title always
+    assert {"urgency", _} = List.keyfind(Index.sorts(:live, :dated), "urgency", 0)
+    refute List.keyfind(Index.sorts(:live, :all_dates), "urgency", 0)
+    refute List.keyfind(Index.sorts(:completed, :dated), "urgency", 0)
+    assert {"recent", _} = List.keyfind(Index.sorts(:completed, :someday), "recent", 0)
+    refute List.keyfind(Index.sorts(:live, :dated), "recent", 0)
+    assert {"due_asc", _} = List.keyfind(Index.sorts(:completed, :all_dates), "due_asc", 0)
+    refute List.keyfind(Index.sorts(:live, :someday), "due_asc", 0)
+
+    assert Index.effective_sort(:urgency, :live, :dated) == :urgency
+    assert Index.effective_sort(:urgency, :live, :all_dates) == :due_asc
+    assert Index.effective_sort(:due_asc, :live, :someday) == :recent
+    assert Index.effective_sort(:recent, :completed, :dated) == :due_asc
   end
 
   test "load_page returns paged rows for a non-urgency sort" do
@@ -37,27 +46,11 @@ defmodule ArgusWeb.ObligationLive.IndexHelpersTest do
     end
 
     today = Urgency.today_for(manager.entity.timezone)
-    page = Index.load_page(manager, today, false, :live, "", :due_asc, nil)
+    page = Index.load_page(manager, today, false, :live, :dated, "", :due_asc, nil)
 
     assert Enum.map(page.rows, & &1.obligation.title) == ["a", "b", "c"]
     assert page.end?
     assert Enum.all?(page.rows, &Map.has_key?(&1, :tier))
-  end
-
-  test "someday lifecycle: status atom, label, sorts, effective_sort" do
-    assert Index.status_atom(false, :someday) == :someday
-    assert Index.status_atom(true, :someday) == :my_someday
-    assert Index.parse_lifecycle("someday") == :someday
-    assert Index.lifecycle_label(:someday) == "Someday"
-
-    assert {"recent", "Recently added"} = List.keyfind(Index.sorts(:someday), "recent", 0)
-    refute List.keyfind(Index.sorts(:someday), "urgency", 0)
-    refute List.keyfind(Index.sorts(:live), "recent", 0)
-
-    assert Index.effective_sort(:recent, :someday) == :recent
-    assert Index.effective_sort(:recent, :live) == :due_asc
-    assert Index.effective_sort(:due_asc, :someday) == :recent
-    assert Index.parse_sort("recent") == :recent
   end
 
   describe "load_page urgency on live" do
@@ -89,7 +82,16 @@ defmodule ArgusWeb.ObligationLive.IndexHelpersTest do
     test "ranks overdue, then due_soon, then ok by due date; far tail loads last",
          %{manager: m, today: today, overdue: o, soon: s, ok: k, far: f} do
       p1 =
-        ArgusWeb.ObligationLive.IndexHelpers.load_page(m, today, false, :live, "", :urgency, nil)
+        ArgusWeb.ObligationLive.IndexHelpers.load_page(
+          m,
+          today,
+          false,
+          :live,
+          :dated,
+          "",
+          :urgency,
+          nil
+        )
 
       assert Enum.map(p1.rows, & &1.obligation.id) == [o.id, s.id, k.id]
       refute p1.end?
@@ -100,6 +102,7 @@ defmodule ArgusWeb.ObligationLive.IndexHelpersTest do
           today,
           false,
           :live,
+          :dated,
           "",
           :urgency,
           p1.cursor

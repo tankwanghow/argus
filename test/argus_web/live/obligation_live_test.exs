@@ -1033,7 +1033,11 @@ defmodule ArgusWeb.ObligationLiveTest do
     |> render_submit()
 
     ob =
-      Argus.Obligations.list_obligations_page(manager, status: :someday, limit: :all).rows
+      Argus.Obligations.list_obligations_page(manager,
+        status: :live,
+        date_scope: :someday,
+        limit: :all
+      ).rows
       |> List.first()
 
     assert ob.title == "Improve onboarding docs"
