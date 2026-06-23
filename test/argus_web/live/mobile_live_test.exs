@@ -15,6 +15,30 @@ defmodule ArgusWeb.MobileLiveTest do
     conn |> log_in_user(scope.user) |> put_req_header("user-agent", @mobile_ua)
   end
 
+  test "mobile dashboard restores filters saved in the session", %{conn: conn} do
+    {scope, _} = manager_obligation_scope_fixture()
+
+    conn =
+      conn
+      |> mobile_conn(scope)
+      |> init_test_session(%{})
+      |> Plug.Conn.put_session(:dashboard_filters, %{
+        scope.entity.slug => %{
+          "mine" => "true",
+          "lifecycle" => "skipped",
+          "query" => "audit"
+        }
+      })
+
+    {:ok, view, _html} = live(conn, ~p"/m/#{scope.entity.slug}")
+
+    assert has_element?(view, "#m-scope-mine.tab-active")
+    assert has_element?(view, "#m-obligation-search[value='audit']")
+
+    html = render(view)
+    assert html =~ ~s(value="skipped" selected)
+  end
+
   test "mobile dashboard renders live cycles", %{conn: conn} do
     {scope, obligation} = assigned_member_scope_fixture()
     conn = mobile_conn(conn, scope)

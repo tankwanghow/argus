@@ -44,6 +44,49 @@ defmodule ArgusWeb.DashboardLiveTest do
     refute has_element?(view, "nav a", "Members")
   end
 
+  test "changing filters persists for the session across remounts", %{conn: conn} do
+    {scope, _} = manager_obligation_scope_fixture()
+    conn = log_in_user(conn, scope.user)
+
+    {:ok, view, _html} = live(conn, ~p"/entities/#{scope.entity.slug}")
+
+    view |> element("#scope-mine") |> render_click()
+    view |> form("#obligation-status-filter", %{lifecycle: "completed"}) |> render_change()
+    view |> element("#obligation-search") |> render_keyup(%{"value" => "tax"})
+
+    {:ok, view, _html} = live(conn, ~p"/entities/#{scope.entity.slug}")
+
+    assert has_element?(view, "#scope-mine.tab-active")
+    assert has_element?(view, "#obligation-search[value='tax']")
+
+    html = render(view)
+    assert html =~ ~s(value="completed" selected)
+  end
+
+  test "restores dashboard filters from the session", %{conn: conn} do
+    {scope, _} = manager_obligation_scope_fixture()
+
+    conn =
+      conn
+      |> log_in_user(scope.user)
+      |> init_test_session(%{})
+      |> Plug.Conn.put_session(:dashboard_filters, %{
+        scope.entity.slug => %{
+          "mine" => "true",
+          "lifecycle" => "completed",
+          "query" => "tax"
+        }
+      })
+
+    {:ok, view, _html} = live(conn, ~p"/entities/#{scope.entity.slug}")
+
+    assert has_element?(view, "#scope-mine.tab-active")
+    assert has_element?(view, "#obligation-search[value='tax']")
+
+    html = render(view)
+    assert html =~ ~s(value="completed" selected)
+  end
+
   test "switches scope between Mine and Team", %{conn: conn} do
     {scope, _obligation} = manager_obligation_scope_fixture()
     conn = log_in_user(conn, scope.user)

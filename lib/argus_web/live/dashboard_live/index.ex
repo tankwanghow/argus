@@ -3,6 +3,7 @@ defmodule ArgusWeb.DashboardLive.Index do
 
   alias Argus.Authorization
   alias Argus.Obligations.Urgency
+  alias ArgusWeb.DashboardFilter
   alias ArgusWeb.ObligationLive.IndexHelpers, as: Index
 
   @impl true
@@ -143,30 +144,40 @@ defmodule ArgusWeb.DashboardLive.Index do
   end
 
   @impl true
-  def mount(_params, _session, socket) do
+  def mount(_params, session, socket) do
     scope = socket.assigns.current_scope
     today = Urgency.today_for(scope.entity.timezone)
 
     {:ok,
      socket
      |> assign(:today, today)
-     |> assign(:mine?, Index.default_mine?(scope))
-     |> assign(:lifecycle, :live)
-     |> assign(:query, "")
+     |> DashboardFilter.assign_filters(session)
      |> load_rows()}
   end
 
   @impl true
   def handle_event("set_scope", %{"mine" => mine}, socket) do
-    {:noreply, socket |> assign(:mine?, mine == "true") |> load_rows()}
+    {:noreply,
+     socket
+     |> assign(:mine?, mine == "true")
+     |> load_rows()
+     |> DashboardFilter.persist()}
   end
 
   def handle_event("set_status", %{"lifecycle" => lifecycle}, socket) do
-    {:noreply, socket |> assign(:lifecycle, Index.parse_lifecycle(lifecycle)) |> load_rows()}
+    {:noreply,
+     socket
+     |> assign(:lifecycle, Index.parse_lifecycle(lifecycle))
+     |> load_rows()
+     |> DashboardFilter.persist()}
   end
 
   def handle_event("search", %{"value" => query}, socket) do
-    {:noreply, socket |> assign(:query, query) |> load_rows()}
+    {:noreply,
+     socket
+     |> assign(:query, query)
+     |> load_rows()
+     |> DashboardFilter.persist()}
   end
 
   def handle_event("close_modal_on_escape", _params, socket), do: {:noreply, socket}

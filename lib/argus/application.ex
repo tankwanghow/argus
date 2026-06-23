@@ -7,6 +7,8 @@ defmodule Argus.Application do
 
   @impl true
   def start(_type, _args) do
+    ArgusWeb.DashboardFilter.Store.init()
+
     children = [
       ArgusWeb.Telemetry,
       Argus.Repo,
@@ -28,6 +30,7 @@ defmodule Argus.Application do
   # whenever the application is updated.
   @impl true
   def config_change(changed, _new, removed) do
+    ArgusWeb.DashboardFilter.Store.init()
     ArgusWeb.Endpoint.config_change(changed, removed)
     :ok
   end

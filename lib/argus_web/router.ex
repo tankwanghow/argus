@@ -72,6 +72,7 @@ defmodule ArgusWeb.Router do
     end
 
     post "/users/update-password", UserSessionController, :update_password
+    post "/session/dashboard-filter", DashboardFilterController, :update
 
     get "/view-mode", ViewModeController, :set
     get "/set-view", ViewModeController, :set
