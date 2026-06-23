@@ -132,7 +132,7 @@ defmodule Argus.Obligations do
     |> Repo.all()
   end
 
-  @status_filters ~w(my_live my_completed my_skipped my_all live completed skipped all)a
+  @status_filters ~w(my_live my_completed my_skipped my_all my_someday live completed skipped all someday)a
 
   @doc """
   Lists obligations for the entity scope.
@@ -174,6 +174,10 @@ defmodule Argus.Obligations do
   defp scope_to_assignee(query, _status, _user), do: query
 
   defp apply_status_filter(query, status) when status in [:live, :my_live], do: live(query)
+
+  defp apply_status_filter(query, status) when status in [:someday, :my_someday] do
+    from o in live(query), where: is_nil(o.due_by)
+  end
 
   defp apply_status_filter(query, status) when status in [:completed, :my_completed] do
     from o in query, where: not is_nil(o.completed_at)
@@ -236,7 +240,7 @@ defmodule Argus.Obligations do
       |> join(:left, [o], a in assoc(o, :primary_assignee), as: :assignee)
       |> where([o], o.entity_id == ^entity.id)
       |> scope_to_assignee(status, user)
-      |> apply_status_filter(status)
+      |> apply_page_status(status)
       |> apply_due_bound(:before, Keyword.get(opts, :due_before))
       |> apply_due_bound(:after, Keyword.get(opts, :due_after))
       |> apply_page_search(Keyword.get(opts, :query))
@@ -250,7 +254,13 @@ defmodule Argus.Obligations do
     |> paginate(sort, limit)
   end
 
-  defp normalize_page_sort(sort) when sort in [:due_asc, :due_desc, :title], do: sort
+  defp apply_page_status(query, status) when status in [:live, :my_live] do
+    query |> apply_status_filter(status) |> where([o], not is_nil(o.due_by))
+  end
+
+  defp apply_page_status(query, status), do: apply_status_filter(query, status)
+
+  defp normalize_page_sort(sort) when sort in [:due_asc, :due_desc, :title, :recent], do: sort
   defp normalize_page_sort(_), do: :due_asc
 
   defp apply_due_bound(query, _which, nil), do: query
@@ -271,25 +281,54 @@ defmodule Argus.Obligations do
 
   defp escape_like(q), do: String.replace(q, ["\\", "%", "_"], &("\\" <> &1))
 
-  defp apply_page_order(query, :due_asc), do: order_by(query, [o], asc: o.due_by, asc: o.id)
-  defp apply_page_order(query, :due_desc), do: order_by(query, [o], desc: o.due_by, asc: o.id)
+  defp apply_page_order(query, :due_asc),
+    do: order_by(query, [o], asc_nulls_last: o.due_by, asc: o.id)
+
+  defp apply_page_order(query, :due_desc),
+    do: order_by(query, [o], desc_nulls_last: o.due_by, asc: o.id)
 
   defp apply_page_order(query, :title),
     do: order_by(query, [o], asc: fragment("lower(?)", o.title), asc: o.id)
 
+  defp apply_page_order(query, :recent), do: order_by(query, [o], desc: o.inserted_at, desc: o.id)
+
   defp apply_page_cursor(query, _sort, nil), do: query
+
+  @null_key " null"
+
+  defp apply_page_cursor(query, :due_asc, %{key: @null_key, id: id}),
+    do: where(query, [o], is_nil(o.due_by) and o.id > ^id)
 
   defp apply_page_cursor(query, :due_asc, %{key: k, id: id}) do
     case Date.from_iso8601(k) do
-      {:ok, d} -> where(query, [o], o.due_by > ^d or (o.due_by == ^d and o.id > ^id))
-      _ -> query
+      {:ok, d} ->
+        where(query, [o], o.due_by > ^d or (o.due_by == ^d and o.id > ^id) or is_nil(o.due_by))
+
+      _ ->
+        query
     end
   end
 
+  defp apply_page_cursor(query, :due_desc, %{key: @null_key, id: id}),
+    do: where(query, [o], is_nil(o.due_by) and o.id > ^id)
+
   defp apply_page_cursor(query, :due_desc, %{key: k, id: id}) do
     case Date.from_iso8601(k) do
-      {:ok, d} -> where(query, [o], o.due_by < ^d or (o.due_by == ^d and o.id > ^id))
-      _ -> query
+      {:ok, d} ->
+        where(query, [o], o.due_by < ^d or (o.due_by == ^d and o.id > ^id) or is_nil(o.due_by))
+
+      _ ->
+        query
+    end
+  end
+
+  defp apply_page_cursor(query, :recent, %{key: k, id: id}) do
+    case DateTime.from_iso8601(k) do
+      {:ok, ts, _} ->
+        where(query, [o], o.inserted_at < ^ts or (o.inserted_at == ^ts and o.id < ^id))
+
+      _ ->
+        query
     end
   end
 
@@ -321,6 +360,8 @@ defmodule Argus.Obligations do
   end
 
   defp cursor_key(:title, %Obligation{title: t}), do: String.downcase(t)
+  defp cursor_key(:recent, %Obligation{inserted_at: ts}), do: DateTime.to_iso8601(ts)
+  defp cursor_key(_sort, %Obligation{due_by: nil}), do: @null_key
   defp cursor_key(_sort, %Obligation{due_by: d}), do: Date.to_iso8601(d)
 
   @doc """

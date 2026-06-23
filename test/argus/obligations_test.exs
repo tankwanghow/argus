@@ -704,6 +704,94 @@ defmodule Argus.ObligationsTest do
     end
   end
 
+  describe "list_obligations_page/2 — someday + nullable keyset" do
+    setup do
+      manager = Argus.EntitiesFixtures.manager_scope_fixture()
+      type = type_fixture(manager.entity)
+
+      dated =
+        for {t, d} <- [{"Dated A", ~D[2026-02-01]}, {"Dated B", ~D[2026-03-01]}] do
+          {:ok, o} =
+            Obligations.create_obligation(manager, %{
+              title: t,
+              obligation_type_id: type.id,
+              due_by: d,
+              open_note: "n"
+            })
+
+          o
+        end
+
+      someday =
+        for t <- ["Someday X", "Someday Y", "Someday Z"] do
+          {:ok, o} =
+            Obligations.create_obligation(manager, %{
+              title: t,
+              obligation_type_id: type.id,
+              someday: true,
+              open_note: "n"
+            })
+
+          o
+        end
+
+      %{manager: manager, dated: dated, someday: someday}
+    end
+
+    test "live excludes dateless; someday returns only dateless", %{
+      manager: m,
+      dated: dated,
+      someday: someday
+    } do
+      live = Obligations.list_obligations_page(m, status: :live, limit: :all)
+
+      assert Enum.map(live.rows, & &1.id) |> Enum.sort() ==
+               Enum.map(dated, & &1.id) |> Enum.sort()
+
+      sd = Obligations.list_obligations_page(m, status: :someday, sort: :recent, limit: :all)
+
+      assert Enum.map(sd.rows, & &1.id) |> Enum.sort() ==
+               Enum.map(someday, & &1.id) |> Enum.sort()
+    end
+
+    test "recent sort orders newest-first with stable keyset paging", %{
+      manager: m,
+      someday: someday
+    } do
+      all_ids = Enum.map(someday, & &1.id) |> Enum.sort()
+      p1 = Obligations.list_obligations_page(m, status: :someday, sort: :recent, limit: 2)
+      assert length(p1.rows) == 2
+      assert p1.cursor != nil
+
+      p2 =
+        Obligations.list_obligations_page(m,
+          status: :someday,
+          sort: :recent,
+          limit: 2,
+          cursor: p1.cursor
+        )
+
+      assert length(p2.rows) == 1
+      assert p2.end?
+      paged_ids = (Enum.map(p1.rows, & &1.id) ++ Enum.map(p2.rows, & &1.id)) |> Enum.sort()
+      assert paged_ids == all_ids
+    end
+
+    test "completed date sort places dateless cycles last (NULLS LAST)", %{
+      manager: m,
+      dated: [da, _db],
+      someday: [sx | _]
+    } do
+      # complete one dated and one dateless cycle
+      {:ok, _, _} = Obligations.complete(m, da, %{note: "d"})
+      {:ok, _, _} = Obligations.complete(m, sx, %{note: "d"})
+
+      page = Obligations.list_obligations_page(m, status: :completed, sort: :due_asc, limit: :all)
+      ids = Enum.map(page.rows, & &1.id)
+      assert List.last(ids) == sx.id
+    end
+  end
+
   describe "mark_completed_in_error/3" do
     test "flags the done cycle and spawns a standalone one-off replacement" do
       manager = Argus.EntitiesFixtures.manager_scope_fixture()
