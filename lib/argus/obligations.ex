@@ -827,16 +827,16 @@ defmodule Argus.Obligations do
   end
 
   defp should_spawn_next?(%Obligation{} = obligation, next_due_by) do
-    Recurrence.recurring?(obligation.obligation_type) and not Series.ended?(obligation.series_id) and
-      not is_nil(next_due_by)
+    not is_nil(obligation.due_by) and Recurrence.recurring?(obligation.obligation_type) and
+      not Series.ended?(obligation.series_id) and not is_nil(next_due_by)
   end
 
   defp validate_next_due(%Obligation{} = obligation, attrs) do
     next_due_by = Map.get(attrs, :next_due_by) || Map.get(attrs, "next_due_by")
     type = obligation.obligation_type || Repo.get!(Type, obligation.obligation_type_id)
 
-    if Recurrence.recurring?(type) and not Series.ended?(obligation.series_id) and
-         next_due_by in [nil, ""] do
+    if not is_nil(obligation.due_by) and Recurrence.recurring?(type) and
+         not Series.ended?(obligation.series_id) and next_due_by in [nil, ""] do
       {:error, :next_due_required}
     else
       :ok

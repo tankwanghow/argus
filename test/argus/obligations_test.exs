@@ -268,6 +268,24 @@ defmodule Argus.ObligationsTest do
     end
   end
 
+  describe "complete/skip on a dateless cycle" do
+    test "completing a dateless recurring duty needs no next_due and spawns nothing" do
+      manager = Argus.EntitiesFixtures.manager_scope_fixture()
+      type = type_fixture(manager.entity, recurring_interval: "monthly")
+
+      {:ok, ob} =
+        Obligations.create_obligation(manager, %{
+          title: "Someday recurring",
+          obligation_type_id: type.id,
+          someday: true,
+          open_note: "n"
+        })
+
+      assert ob.due_by == nil
+      assert {:ok, _completed, nil} = Obligations.complete(manager, ob, %{note: "done"})
+    end
+  end
+
   describe "end_series/3" do
     test "requires a reason" do
       {scope, obligation} = recurring_manager_scope_fixture(interval: "monthly")
