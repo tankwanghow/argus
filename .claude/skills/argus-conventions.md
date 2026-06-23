@@ -166,6 +166,21 @@ Two UIs share the same contexts/schemas, each with its own LiveViews and layout:
   any per-row component so the stream dom_id lands on its root element. SQL-side filtering/sorting is
   the default; in-memory sorting is the exception (urgency over a bounded window — see CLAUDE.md's
   dashboard section).
+- **Someday / dateless duties (gotchas).** `Obligation.due_by` is **nullable**; a duty is "Someday"
+  when `due_by IS NULL` (created via the virtual `:someday` checkbox, which force-nils `due_by` and
+  drops the requirement in `Obligation.changeset/2`). Two traps that crash/corrupt if forgotten:
+  - **Anything reading `due_by` for a live cycle must nil-guard it.** `Urgency.classify/3` & `tier/3`
+    return `:none` for nil; `Recurrence.next_due_suggestion(_type, nil)` returns nil (the done/skip
+    show-form pre-fill calls it at mount, so a missing nil clause crashes the show page for a
+    *recurring* Someday duty). Render guards: `:if={@live? and @obligation.due_by}` on urgency
+    badges, `:if={@obligation.due_by}` on "due …" text. `format_date(nil)` is already safe ("—").
+  - **The virtual `:someday` field leaks into `changeset.changes`.** `update_obligation/3`'s
+    audit-log loop must `Map.drop(changeset.changes, [:someday])` so edits don't write a bogus
+    `"someday"` AuditLog row. Apply the same care to any new loop over `changeset.changes` that
+    touches a changeset carrying virtual fields.
+  - Dashboards split the live set in `list_obligations_page/2` only (`:live` = dated, `:someday` =
+    dateless); the `Recently added` (`inserted_at`) sort and `NULLS LAST` date paging handle the
+    dateless rows. See CLAUDE.md's dashboard section.
 - Gettext on **all** user-facing text — `gettext("...")` / `{gettext(...)}`. Locale in session
   (`set_locale`); English default, structured for more locales.
 - Rebind block results (`socket = if connected?(...) do ... end`); no `String.to_atom/1` on user
