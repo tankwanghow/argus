@@ -199,7 +199,12 @@ defmodule ArgusWeb.ObligationLive.IndexHelpers do
   end
 
   def cycle_status(%Obligation{completed_at: %DateTime{}}), do: :completed
-  def cycle_status(%Obligation{series_ended_at: %DateTime{}}), do: :series_ended
+  # End-series stamps BOTH closed_at and series_ended_at. A completed-in-error
+  # replacement carries series_ended_at (to block spawning) but is still live, so
+  # series_ended must be gated on the cycle actually being closed.
+  def cycle_status(%Obligation{closed_at: %DateTime{}, series_ended_at: %DateTime{}}),
+    do: :series_ended
+
   def cycle_status(%Obligation{closed_at: %DateTime{}}), do: :skipped
   def cycle_status(_), do: :live
 end

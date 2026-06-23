@@ -11,6 +11,19 @@ defmodule ArgusWeb.ObligationLive.IndexHelpersTest do
     assert Index.parse_sort("bogus") == :due_asc
   end
 
+  test "cycle_status: series_ended only when the cycle is closed; a live replacement stays :live" do
+    now = DateTime.utc_now(:second)
+    ob = %Argus.Obligations.Obligation{}
+
+    assert Index.cycle_status(%{ob | completed_at: now}) == :completed
+    # real end-series stamps BOTH closed_at and series_ended_at
+    assert Index.cycle_status(%{ob | closed_at: now, series_ended_at: now}) == :series_ended
+    assert Index.cycle_status(%{ob | closed_at: now}) == :skipped
+    # a completed-in-error replacement is LIVE (series_ended_at set only to block spawning)
+    assert Index.cycle_status(%{ob | series_ended_at: now}) == :live
+    assert Index.cycle_status(ob) == :live
+  end
+
   test "lifecycle-aware sorts include Someday; urgency only on live" do
     assert Index.parse_sort("someday") == :someday
 
