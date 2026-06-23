@@ -580,7 +580,14 @@ defmodule Argus.ObligationsTest do
       assert Enum.map(page1.rows, & &1.id) == [b.id, c.id]
       refute page1.end?
 
-      page2 = Obligations.list_obligations_page(m, status: :live, sort: :due_asc, limit: 2, cursor: page1.cursor)
+      page2 =
+        Obligations.list_obligations_page(m,
+          status: :live,
+          sort: :due_asc,
+          limit: 2,
+          cursor: page1.cursor
+        )
+
       assert Enum.map(page2.rows, & &1.id) == [a.id]
       assert page2.end?
     end
@@ -599,10 +606,24 @@ defmodule Argus.ObligationsTest do
     end
 
     test "due_before and due_after bound the window", %{manager: m, b: b, c: c, a: a} do
-      before = Obligations.list_obligations_page(m, status: :live, sort: :due_asc, due_before: ~D[2026-02-15], limit: 10)
+      before =
+        Obligations.list_obligations_page(m,
+          status: :live,
+          sort: :due_asc,
+          due_before: ~D[2026-02-15],
+          limit: 10
+        )
+
       assert Enum.map(before.rows, & &1.id) == [b.id, c.id]
 
-      after_ = Obligations.list_obligations_page(m, status: :live, sort: :due_asc, due_after: ~D[2026-02-15], limit: 10)
+      after_ =
+        Obligations.list_obligations_page(m,
+          status: :live,
+          sort: :due_asc,
+          due_after: ~D[2026-02-15],
+          limit: 10
+        )
+
       assert Enum.map(after_.rows, & &1.id) == [a.id]
     end
 
