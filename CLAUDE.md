@@ -252,40 +252,41 @@ dashboard is where overdue/due-soon work surfaces, computed at render time:
   Every live row map carries both `urgency` and `tier`.
 - `reminder_offsets` / `complete_documents` are validated and normalized on the `Type` changeset
   (write time), so the render path can't crash on bad input; `parse_offsets` still parses defensively.
-- Filter (single flat list, no grouping) is **three orthogonal controls** plus search, not a tab
-  strip: a **scope toggle** (`Mine` / `Team`), a **status dropdown** (`Live · Someday · Completed ·
+- Filter (single flat list, no grouping) is **two orthogonal controls** plus a sort and search, not
+  a tab strip: a **scope toggle** (`Mine` / `Team`), a **status dropdown** (`Live · Completed ·
   Skipped · All`), and a lifecycle-aware **sort dropdown** (`Due soonest` (default) · `Due latest` ·
-  `Title A–Z`, plus `Most urgent` **only on Live** and `Recently added` **only on Someday**), plus
-  title/type/assignee search. `IndexHelpers` keeps `mine?` + `lifecycle` + `sort`; `status_atom/2`
-  maps mine → `my_*`, and `effective_sort/2` coerces a sort not offered for the current lifecycle to
-  that lifecycle's default (`urgency`/`recent` only apply on Live/Someday respectively). All four
-  controls + search **persist per-entity** (`ArgusWeb.DashboardFilter`: ETS store + session snapshot +
-  `POST /session/dashboard-filter`, cleared on logout) and survive remounts. The **Skipped**
-  lifecycle selects `closed_at IS NOT NULL` (covers both skipped and series-ended cycles; their
-  badges differentiate). Defaults are role-based via `default_mine?/1` — members land on **Mine +
-  Live**, managers/admins on **Team + Live**; sort defaults to `Due soonest`.
-- **Someday = duties with no due date.** `due_by` is **nullable**; a duty created with the "No due
-  date (Someday)" toggle (a virtual `:someday` changeset field that force-nils `due_by` and drops the
-  `due_by` requirement) has `due_by IS NULL`. In `list_obligations_page/2` **only**, the live set is
-  split: **Live** = live `AND due_by IS NOT NULL`, **Someday** (`:someday`/`:my_someday`) = live
-  `AND due_by IS NULL` (the core `live/1` and the older `list_obligations/2` are unchanged). Someday
-  rows carry **no urgency** — `Urgency.classify/tier` return `:none` for nil `due_by`, and the
-  dashboards + show pages **guard every date-dependent render on `due_by`** (no countdown badge, no
-  tier border, no "due …" text). The **`Recently added`** sort (`inserted_at` desc keyset) is the
-  Someday default; date sorts use `NULLS LAST` so a completed/skipped Someday cycle pages last on
-  those tabs. A manager/admin **promotes/demotes** via the edit form's same Someday toggle (add a
-  date → Live, clear it → Someday), through the shared conditional-required changeset.
+  `Someday` · `Title A–Z`, plus `Most urgent` **only on Live**), plus title/type/assignee search.
+  `IndexHelpers` keeps `mine?` + `lifecycle` + `sort`; `status_atom/2` maps mine → `my_*`, and
+  `effective_sort/2` coerces a sort not offered for the current lifecycle to `:due_asc` (so `urgency`,
+  offered only on Live, can't leak to other lifecycles). The controls + search **persist per-entity**
+  (`ArgusWeb.DashboardFilter`: ETS store + session snapshot + `POST /session/dashboard-filter`, cleared
+  on logout) and survive remounts. The **Skipped** lifecycle selects `closed_at IS NOT NULL` (covers
+  both skipped and series-ended cycles; their badges differentiate). Defaults are role-based via
+  `default_mine?/1` — members land on **Mine + Live**, managers/admins on **Team + Live**; sort
+  defaults to `Due soonest`.
+- **Someday = duties with no due date, surfaced by a sort (not a filter).** `due_by` is **nullable**;
+  a duty created with the "No due date (Someday)" toggle (a virtual `:someday` changeset field that
+  force-nils `due_by` and drops the `due_by` requirement) has `due_by IS NULL`. Dateless duties live
+  in their **normal lifecycle list** (Live/Completed/Skipped/All all include them — there is no date
+  filtering; the core `live/1` and the older `list_obligations/2` are unchanged). The **`Someday`
+  sort** (`apply_page_order(:someday)` → `asc_nulls_first: due_by`) floats no-due-date duties to the
+  **top**, then dated ones by due date. Dateless rows carry **no urgency** — `Urgency.classify/tier`
+  return `:none` for nil `due_by`, and the dashboards + show pages **guard every date-dependent render
+  on `due_by`** (no countdown badge, no tier border, no "due …" text). Date sorts (`due_asc`/`due_desc`)
+  use `NULLS LAST` so dateless rows sort to the bottom there. A manager/admin **adds/clears a due date**
+  via the edit form's same Someday toggle, through the shared conditional-required changeset.
   **Recurrence requires a date:** `complete`/`skip` only require `next_due_by` / spawn a successor
   when the cycle had a `due_by` (`should_spawn_next?`/`validate_next_due` guard `not is_nil(due_by)`);
-  a dateless duty completes as a one-off even for a recurring type, and recurrence resumes if promoted.
+  a dateless duty completes as a one-off even for a recurring type, and recurrence resumes if dated.
 - **The list is server-paginated, never a full load.** `Obligations.list_obligations_page/2`
   filters (SQL `ILIKE` on title / joined type name / joined assignee email + the literal
   `"unassigned"`), sorts, and pages by **keyset cursor** (sort column + `id`, opaque
   `Obligations.Pagination` codec) for **every** lifecycle. The one in-memory exception is **`Most
   urgent` + `Live`**: `IndexHelpers` ranks a **1-year `due_by` window** in memory (`Urgency.classify`
   needs the entity-tz `today` + type offsets, impractical in SQL — and ranks bare obligations,
-  summarising only the sliced page) then continues into a `>1yr` SQL keyset tail via an opaque
-  two-mode cursor. Both dashboards render **streams** (`phx-update="stream"`, preserved DOM ids) and
+  summarising only the sliced page) then continues into a SQL keyset tail (`due_after_or_null`,
+  ordered `due_by` asc NULLS LAST) that holds the `>1yr` dated rows **and any dateless duties last**,
+  via an opaque two-mode cursor. Both dashboards render **streams** (`phx-update="stream"`, preserved DOM ids) and
   load more via `phx-viewport-bottom="load_more"` (page size 25); `@empty?` drives the empty state,
   `@end?` gates the sentinel. Partial keyset indexes back the Completed/Skipped scans.
 

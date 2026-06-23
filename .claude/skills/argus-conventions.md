@@ -178,9 +178,13 @@ Two UIs share the same contexts/schemas, each with its own LiveViews and layout:
     audit-log loop must `Map.drop(changeset.changes, [:someday])` so edits don't write a bogus
     `"someday"` AuditLog row. Apply the same care to any new loop over `changeset.changes` that
     touches a changeset carrying virtual fields.
-  - Dashboards split the live set in `list_obligations_page/2` only (`:live` = dated, `:someday` =
-    dateless); the `Recently added` (`inserted_at`) sort and `NULLS LAST` date paging handle the
-    dateless rows. See CLAUDE.md's dashboard section.
+  - **Someday is a sort, not a filter.** There is no date filtering — every lifecycle list
+    (Live/Completed/Skipped/All) includes dateless duties. The `Someday` sort
+    (`apply_page_order(:someday)` → `asc_nulls_first: due_by`) floats them to the **top**; `due_asc`/
+    `due_desc` keep `NULLS LAST` (dateless at the bottom). When the list can contain dateless rows,
+    any in-memory sort that loads only dated rows (e.g. the urgency window) must surface them somewhere
+    or they silently vanish — the urgency tail does this with `due_after_or_null` (dateless last).
+    See CLAUDE.md's dashboard section.
 - Gettext on **all** user-facing text — `gettext("...")` / `{gettext(...)}`. Locale in session
   (`set_locale`); English default, structured for more locales.
 - Rebind block results (`socket = if connected?(...) do ... end`); no `String.to_atom/1` on user
