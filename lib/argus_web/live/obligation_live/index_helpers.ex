@@ -7,6 +7,8 @@ defmodule ArgusWeb.ObligationLive.IndexHelpers do
 
   @lifecycles ~w(live completed skipped all)a
   @page_size 25
+  @urgency_window_days 365
+  @urgency_rank %{overdue: 0, due_soon: 1, ok: 2}
 
   @doc "Lifecycle options for the status dropdown, as `{value, label}` pairs."
   def lifecycles, do: Enum.map(@lifecycles, &{Atom.to_string(&1), lifecycle_label(&1)})
@@ -91,6 +93,77 @@ defmodule ArgusWeb.ObligationLive.IndexHelpers do
 
     %{rows: build_rows(page.rows, today), cursor: page.cursor, end?: page.end?}
   end
+
+  defp do_load_page(scope, today, status, :live, query, :urgency, cursor) do
+    window_end = Date.add(today, @urgency_window_days)
+
+    case decode_urgency_cursor(cursor) do
+      {:window, offset} -> serve_window(scope, today, status, query, window_end, offset)
+      {:tail, inner} -> serve_tail(scope, today, status, query, window_end, inner)
+    end
+  end
+
+  defp serve_window(scope, today, status, query, window_end, offset) do
+    ranked =
+      scope
+      |> Obligations.list_obligations_page(
+        status: status,
+        query: query,
+        sort: :due_asc,
+        due_before: window_end,
+        limit: :all
+      )
+      |> Map.fetch!(:rows)
+      |> build_rows(today)
+      |> Enum.sort_by(fn %{obligation: o, urgency: u} ->
+        {@urgency_rank[u], Date.to_iso8601(o.due_by)}
+      end)
+
+    page = Enum.slice(ranked, offset, @page_size)
+    next_offset = offset + @page_size
+
+    if next_offset < length(ranked) do
+      %{rows: page, cursor: encode_urgency_cursor({:window, next_offset}), end?: false}
+    else
+      # Window exhausted; hand off to the > window_end tail (may be empty).
+      %{rows: page, cursor: encode_urgency_cursor({:tail, nil}), end?: false}
+    end
+  end
+
+  defp serve_tail(scope, today, status, query, window_end, inner_cursor) do
+    page =
+      Obligations.list_obligations_page(scope,
+        status: status,
+        query: query,
+        sort: :due_asc,
+        due_after: window_end,
+        cursor: inner_cursor
+      )
+
+    cursor = if page.end?, do: nil, else: encode_urgency_cursor({:tail, page.cursor})
+    %{rows: build_rows(page.rows, today), cursor: cursor, end?: page.end?}
+  end
+
+  defp decode_urgency_cursor(nil), do: {:window, 0}
+
+  defp decode_urgency_cursor(cursor) when is_binary(cursor) do
+    with {:ok, json} <- Base.url_decode64(cursor, padding: false),
+         {:ok, decoded} <- Jason.decode(json) do
+      case decoded do
+        %{"m" => "w", "o" => offset} -> {:window, offset}
+        %{"m" => "t", "c" => inner} -> {:tail, inner}
+        _ -> {:window, 0}
+      end
+    else
+      _ -> {:window, 0}
+    end
+  end
+
+  defp encode_urgency_cursor({:window, offset}),
+    do: %{"m" => "w", "o" => offset} |> Jason.encode!() |> Base.url_encode64(padding: false)
+
+  defp encode_urgency_cursor({:tail, inner}),
+    do: %{"m" => "t", "c" => inner} |> Jason.encode!() |> Base.url_encode64(padding: false)
 
   defp build_rows(obligations, today) do
     summaries = Obligations.event_summaries_for(obligations)

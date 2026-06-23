@@ -43,4 +43,54 @@ defmodule ArgusWeb.ObligationLive.IndexHelpersTest do
     assert page.end?
     assert Enum.all?(page.rows, &Map.has_key?(&1, :tier))
   end
+
+  describe "load_page urgency on live" do
+    setup do
+      manager = Argus.EntitiesFixtures.manager_scope_fixture()
+      # reminder offset 30 days => due within 30d is due_soon, overdue is past.
+      type = type_fixture(manager.entity, reminder_offsets: "30")
+      today = ~D[2026-06-01]
+
+      mk = fn title, due ->
+        {:ok, o} =
+          Argus.Obligations.create_obligation(manager, %{
+            title: title,
+            obligation_type_id: type.id,
+            due_by: due,
+            open_note: "n"
+          })
+
+        o
+      end
+
+      overdue = mk.("overdue", ~D[2026-05-01])
+      soon = mk.("soon", ~D[2026-06-10])
+      ok = mk.("ok", ~D[2026-09-01])
+      far = mk.("far", ~D[2027-12-01])
+      %{manager: manager, today: today, overdue: overdue, soon: soon, ok: ok, far: far}
+    end
+
+    test "ranks overdue, then due_soon, then ok by due date; far tail loads last",
+         %{manager: m, today: today, overdue: o, soon: s, ok: k, far: f} do
+      p1 =
+        ArgusWeb.ObligationLive.IndexHelpers.load_page(m, today, false, :live, "", :urgency, nil)
+
+      assert Enum.map(p1.rows, & &1.obligation.id) == [o.id, s.id, k.id]
+      refute p1.end?
+
+      p2 =
+        ArgusWeb.ObligationLive.IndexHelpers.load_page(
+          m,
+          today,
+          false,
+          :live,
+          "",
+          :urgency,
+          p1.cursor
+        )
+
+      assert Enum.map(p2.rows, & &1.obligation.id) == [f.id]
+      assert p2.end?
+    end
+  end
 end
