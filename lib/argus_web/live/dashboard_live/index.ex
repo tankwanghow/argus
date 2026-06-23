@@ -120,7 +120,10 @@ defmodule ArgusWeb.DashboardLive.Index do
       navigate={~p"/entities/#{@slug}/obligations/#{@row.obligation.id}"}
       class={[
         "argus-compact-row",
-        if(@row.cycle_status == :live, do: tier_border(@row.tier), else: "border-transparent")
+        if(@row.cycle_status == :live and @row.obligation.due_by,
+          do: tier_border(@row.tier),
+          else: "border-transparent"
+        )
       ]}
     >
       <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5">
@@ -129,7 +132,7 @@ defmodule ArgusWeb.DashboardLive.Index do
           in error
         </span>
         <.urgency_badge
-          :if={@row.cycle_status == :live}
+          :if={@row.cycle_status == :live and @row.obligation.due_by}
           tier={@row.tier}
           due_by={@row.obligation.due_by}
           today={@today}
@@ -143,8 +146,8 @@ defmodule ArgusWeb.DashboardLive.Index do
       </div>
       <div class="flex text-sm gap-1">
         <div class="text-info">{@row.obligation.obligation_type.name}</div>
-        <div>·</div>
-        <div class="text-base-content/60">
+        <div :if={@row.obligation.due_by}>·</div>
+        <div :if={@row.obligation.due_by} class="text-base-content/60">
           due {format_date(@row.obligation.due_by)}
         </div>
         <div>·</div>

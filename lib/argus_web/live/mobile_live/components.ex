@@ -32,7 +32,7 @@ defmodule ArgusWeb.MobileLive.Components do
             in_error={!is_nil(@row.obligation.completed_in_error_at)}
           />
           <.urgency_badge
-            :if={@row.cycle_status == :live}
+            :if={@row.cycle_status == :live and @row.obligation.due_by}
             tier={@row.tier}
             due_by={@row.obligation.due_by}
             today={@today}
@@ -61,6 +61,7 @@ defmodule ArgusWeb.MobileLive.Components do
     do: "border-error/60"
 
   defp accent(%{cycle_status: :completed}), do: "border-success/60"
+  defp accent(%{cycle_status: :live, obligation: %{due_by: nil}}), do: "border-base-300"
   defp accent(%{tier: tier}), do: tier_border(tier)
   defp accent(_), do: "border-transparent"
 
@@ -79,6 +80,8 @@ defmodule ArgusWeb.MobileLive.Components do
        when status in [:skipped, :series_ended] do
     "#{humanize_cycle(status)} · due #{format_date(o.due_by)}"
   end
+
+  defp card_meta(%{obligation: %{due_by: nil}}), do: ""
 
   defp card_meta(%{obligation: o}) do
     "due #{format_date(o.due_by)}"
