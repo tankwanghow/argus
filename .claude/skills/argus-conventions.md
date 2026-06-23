@@ -155,9 +155,17 @@ Two UIs share the same contexts/schemas, each with its own LiveViews and layout:
   template. Never pass a changeset to `<.form>`. Override input classes fully if you override at all.
 - **Icons:** always `<.icon name="hero-..." />`; never the `Heroicons` module.
 - **Collections:** Phoenix **streams** (`stream/3` + `phx-update="stream"`); never
-  `phx-update="append"`. Index lists use `@per_page 30` + infinite scroll
-  (`phx-viewport-bottom`, an `infinite_scroll_footer`, `@end_of_timeline?`) and an
-  `IndexComponent` `live_component` per row (full_circle pattern).
+  `phx-update="append"`. The dashboard is the reference pattern (`DashboardLive.Index` /
+  `MobileLive.Dashboard`): the context exposes a **keyset-paginated** loader
+  (`Obligations.list_obligations_page/2` returning `%{rows, cursor, end?}`, opaque cursor via
+  `Obligations.Pagination`); the LiveView holds `@cursor`/`@end?`/`@empty?`, streams the first page
+  on mount/filter-change (`stream(:rows, page, dom_id: &dom_id/1, reset: true)`) and appends on a
+  `phx-viewport-bottom={!@end? && "load_more"}` sentinel (`stream(:rows, page, dom_id: &dom_id/1,
+  at: -1)` — pass the same `dom_id:` on both so ids stay stable; page size 25). The empty state is a
+  **sibling** `<div :if={@empty?}>` of the stream `<ul>` (never inside it). Pass an explicit `id` to
+  any per-row component so the stream dom_id lands on its root element. SQL-side filtering/sorting is
+  the default; in-memory sorting is the exception (urgency over a bounded window — see CLAUDE.md's
+  dashboard section).
 - Gettext on **all** user-facing text — `gettext("...")` / `{gettext(...)}`. Locale in session
   (`set_locale`); English default, structured for more locales.
 - Rebind block results (`socket = if connected?(...) do ... end`); no `String.to_atom/1` on user

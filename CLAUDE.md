@@ -41,9 +41,10 @@ applies here too. Headlines:
   logic via `ObligationLive.CreateForm` (`load_form`/`validate`/`save` with a redirect-path fn).
   **There is no separate obligation index page** — the **dashboard is the obligation list** on both
   UIs (`DashboardLive.Index` at `/entities/:slug`, `MobileLive.Dashboard` at `/m/:slug`). It's a
-  flat, filtered list (status tabs + search), not a grouped view; both render via
-  `ObligationLive.IndexHelpers.load_rows` (status/`default_status` role-based default, urgency, tier,
-  event meta). Each card shows the **current (latest) event** via the shared
+  flat, filtered, **server-paginated** list (scope/status/sort controls + search), not a grouped
+  view; both render rows as LiveView **streams** built by `ObligationLive.IndexHelpers.load_page/7`
+  (role-based default, urgency, tier, event meta), keyset-paged via a `phx-viewport-bottom` sentinel
+  (see the dashboard filter/sort section below). Each card shows the **current (latest) event** via the shared
   `ArgusWeb.EventMeta.event_meta/1` component (status badge, count, actor, note). The card's urgency
   **countdown badge** is the only relative-due indicator — there is no separate "due in N days" text.
   After create/complete/skip/end-series, forms and show redirect back to the dashboard.
@@ -251,15 +252,27 @@ dashboard is where overdue/due-soon work surfaces, computed at render time:
   Every live row map carries both `urgency` and `tier`.
 - `reminder_offsets` / `complete_documents` are validated and normalized on the `Type` changeset
   (write time), so the render path can't crash on bad input; `parse_offsets` still parses defensively.
-- Filter (single flat list, no grouping) is **two orthogonal controls**, not one tab strip: a
-  **scope toggle** (`Mine` / `Team`) and a **status dropdown** (`Live · Completed · Skipped · All`),
-  plus title/type/assignee search. `IndexHelpers` keeps a `mine?` boolean + a `lifecycle` atom and
-  maps them to the combined `list_obligations` status atom via `status_atom/2` (mine → `my_*`). The
-  **Skipped** lifecycle selects `closed_at IS NOT NULL` (covers both skipped and series-ended cycles;
-  their badges differentiate). Defaults are role-based via `default_mine?/1` — members land on
-  **Mine + Live**, managers/admins on **Team + Live**. The Live lifecycle is sorted overdue →
-  due_soon → `due_by` asc; completed by `completed_at` desc, skipped by `closed_at` desc, all by
-  `due_by` desc.
+- Filter (single flat list, no grouping) is **three orthogonal controls** plus search, not a tab
+  strip: a **scope toggle** (`Mine` / `Team`), a **status dropdown** (`Live · Completed · Skipped ·
+  All`), and a lifecycle-aware **sort dropdown** (`Due soonest` (default) · `Due latest` · `Title
+  A–Z`, plus `Most urgent` **only on Live**), plus title/type/assignee search. `IndexHelpers` keeps
+  `mine?` + `lifecycle` + `sort`; `status_atom/2` maps mine → `my_*`, and `effective_sort/2`
+  downgrades `urgency` → `due_asc` off-Live (the hidden option can't apply). All four controls +
+  search **persist per-entity** (`ArgusWeb.DashboardFilter`: ETS store + session snapshot +
+  `POST /session/dashboard-filter`, cleared on logout) and survive remounts. The **Skipped**
+  lifecycle selects `closed_at IS NOT NULL` (covers both skipped and series-ended cycles; their
+  badges differentiate). Defaults are role-based via `default_mine?/1` — members land on **Mine +
+  Live**, managers/admins on **Team + Live**; sort defaults to `Due soonest`.
+- **The list is server-paginated, never a full load.** `Obligations.list_obligations_page/2`
+  filters (SQL `ILIKE` on title / joined type name / joined assignee email + the literal
+  `"unassigned"`), sorts, and pages by **keyset cursor** (sort column + `id`, opaque
+  `Obligations.Pagination` codec) for **every** lifecycle. The one in-memory exception is **`Most
+  urgent` + `Live`**: `IndexHelpers` ranks a **1-year `due_by` window** in memory (`Urgency.classify`
+  needs the entity-tz `today` + type offsets, impractical in SQL — and ranks bare obligations,
+  summarising only the sliced page) then continues into a `>1yr` SQL keyset tail via an opaque
+  two-mode cursor. Both dashboards render **streams** (`phx-update="stream"`, preserved DOM ids) and
+  load more via `phx-viewport-bottom="load_more"` (page size 25); `@empty?` drives the empty state,
+  `@end?` gates the sentinel. Partial keyset indexes back the Completed/Skipped scans.
 
 ### Out of scope for v1
 
