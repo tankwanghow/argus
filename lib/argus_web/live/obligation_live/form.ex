@@ -17,7 +17,7 @@ defmodule ArgusWeb.ObligationLive.Form do
         >
           <div class="text-2xl font-bold mb-2">New duty</div>
           <.char_count_input field={@form[:title]} label="Title" max={60} required />
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div class="flex items-center gap-4">
             <.input
               field={@form[:obligation_type_id]}
               type="select"
@@ -26,7 +26,9 @@ defmodule ArgusWeb.ObligationLive.Form do
               prompt="Choose a type"
               required
             />
-            <.input field={@form[:someday]} type="checkbox" label="No due date (Someday)" />
+            <div class="mt-6">
+              <.input field={@form[:someday]} type="checkbox" label="No due date (Someday)" />
+            </div>
             <.input :if={!someday?(@form)} field={@form[:due_by]} type="date" label="Due by" required />
           </div>
           <.input field={@form[:open_note]} type="textarea" label="Open note" required />
