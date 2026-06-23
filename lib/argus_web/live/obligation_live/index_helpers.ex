@@ -104,6 +104,9 @@ defmodule ArgusWeb.ObligationLive.IndexHelpers do
   end
 
   defp serve_window(scope, today, status, query, window_end, offset) do
+    # Rank the bare obligations by urgency — this needs only the (preloaded) type
+    # and due_by, not event summaries — so we avoid summarising the whole window on
+    # every load_more and only build full rows (with summaries) for the sliced page.
     ranked =
       scope
       |> Obligations.list_obligations_page(
@@ -114,12 +117,12 @@ defmodule ArgusWeb.ObligationLive.IndexHelpers do
         limit: :all
       )
       |> Map.fetch!(:rows)
-      |> build_rows(today)
-      |> Enum.sort_by(fn %{obligation: o, urgency: u} ->
-        {@urgency_rank[u], Date.to_iso8601(o.due_by)}
+      |> Enum.sort_by(fn %Obligation{} = o ->
+        {@urgency_rank[Urgency.classify(o.obligation_type, o.due_by, today)],
+         Date.to_iso8601(o.due_by)}
       end)
 
-    page = Enum.slice(ranked, offset, @page_size)
+    page = ranked |> Enum.slice(offset, @page_size) |> build_rows(today)
     next_offset = offset + @page_size
 
     if next_offset < length(ranked) do
