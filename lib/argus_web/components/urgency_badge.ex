@@ -36,6 +36,8 @@ defmodule ArgusWeb.UrgencyBadge do
   @doc "Countdown text for a tier, or nil when on track."
   def badge_text(:ok, _due_by, _today), do: nil
 
+  def badge_text(_tier, nil, _today), do: nil
+
   def badge_text(:overdue, due_by, today), do: "#{Date.diff(today, due_by)}d overdue"
 
   def badge_text(_tier, due_by, today) do

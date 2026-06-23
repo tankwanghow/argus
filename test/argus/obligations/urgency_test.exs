@@ -85,4 +85,10 @@ defmodule Argus.Obligations.UrgencyTest do
       assert Urgency.tier(type, ~D[2026-06-12], @today) == :overdue
     end
   end
+
+  test "classify and tier return :none when due_by is nil" do
+    type = %Type{reminder_offsets: "30,7,1"}
+    assert Urgency.classify(type, nil, ~D[2026-06-23]) == :none
+    assert Urgency.tier(type, nil, ~D[2026-06-23]) == :none
+  end
 end

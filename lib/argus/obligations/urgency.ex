@@ -5,10 +5,12 @@ defmodule Argus.Obligations.Urgency do
 
   alias Argus.Obligations.Type
 
-  @type urgency :: :overdue | :due_soon | :ok
-  @type tier :: :overdue | :critical | :due_soon | :approaching | :ok
+  @type urgency :: :overdue | :due_soon | :ok | :none
+  @type tier :: :overdue | :critical | :due_soon | :approaching | :ok | :none
 
-  @spec classify(Type.t(), Date.t(), Date.t()) :: urgency()
+  @spec classify(Type.t(), Date.t() | nil, Date.t()) :: urgency()
+  def classify(%Type{}, nil, _today), do: :none
+
   def classify(%Type{reminder_offsets: offsets}, due_by, today) do
     cond do
       Date.compare(due_by, today) == :lt -> :overdue
@@ -25,7 +27,9 @@ defmodule Argus.Obligations.Urgency do
   widened by 7 days so it still yields three bands. `:overdue` (past due) and
   `:ok` (beyond the largest offset) are fixed endpoints.
   """
-  @spec tier(Type.t(), Date.t(), Date.t()) :: tier()
+  @spec tier(Type.t(), Date.t() | nil, Date.t()) :: tier()
+  def tier(%Type{}, nil, _today), do: :none
+
   def tier(%Type{reminder_offsets: offsets}, due_by, today) do
     days = Date.diff(due_by, today)
     {min, max} = tier_bounds(offsets)
