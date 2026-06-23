@@ -57,6 +57,17 @@ defmodule ArgusWeb.DashboardLive.Index do
                 </option>
               </select>
             </form>
+            <form id="obligation-sort-filter" phx-change="set_sort">
+              <select id="obligation-sort" name="sort" class="select select-sm">
+                <option
+                  :for={{value, label} <- Index.sorts(@lifecycle)}
+                  value={value}
+                  selected={@sort == Index.parse_sort(value)}
+                >
+                  {label}
+                </option>
+              </select>
+            </form>
             <input
               id="obligation-search"
               type="search"
@@ -71,23 +82,28 @@ defmodule ArgusWeb.DashboardLive.Index do
         </div>
 
         <div class="argus-page-body">
-          <ul id="obligations-list" class="argus-row-list">
+          <ul
+            id="obligations-list"
+            class="argus-row-list"
+            phx-update="stream"
+            phx-viewport-bottom={!@end? && "load_more"}
+          >
             <li
-              :for={row <- @rows}
-              id={"obligation-row-#{row.obligation.id}"}
+              :for={{dom_id, row} <- @streams.rows}
+              id={dom_id}
               data-event-count={row.event_count}
               data-event-status={row.latest_event && row.latest_event.status}
             >
               <.obligation_row_link row={row} slug={@current_scope.entity.slug} today={@today} />
             </li>
-            <li
-              :if={@rows == []}
-              id="obligations-empty"
-              class="py-8 text-center text-base-content/60"
-            >
-              {Index.empty_message(@mine?, @lifecycle)}
-            </li>
           </ul>
+          <div
+            :if={@empty?}
+            id="obligations-empty"
+            class="py-8 text-center text-base-content/60"
+          >
+            {Index.empty_message(@mine?, @lifecycle)}
+          </div>
         </div>
       </div>
     </Layouts.app>
@@ -152,7 +168,7 @@ defmodule ArgusWeb.DashboardLive.Index do
      socket
      |> assign(:today, today)
      |> DashboardFilter.assign_filters(session)
-     |> load_rows()}
+     |> load_first_page()}
   end
 
   @impl true
@@ -160,7 +176,7 @@ defmodule ArgusWeb.DashboardLive.Index do
     {:noreply,
      socket
      |> assign(:mine?, mine == "true")
-     |> load_rows()
+     |> load_first_page()
      |> DashboardFilter.persist()}
   end
 
@@ -168,7 +184,15 @@ defmodule ArgusWeb.DashboardLive.Index do
     {:noreply,
      socket
      |> assign(:lifecycle, Index.parse_lifecycle(lifecycle))
-     |> load_rows()
+     |> load_first_page()
+     |> DashboardFilter.persist()}
+  end
+
+  def handle_event("set_sort", %{"sort" => sort}, socket) do
+    {:noreply,
+     socket
+     |> assign(:sort, Index.parse_sort(sort))
+     |> load_first_page()
      |> DashboardFilter.persist()}
   end
 
@@ -176,18 +200,51 @@ defmodule ArgusWeb.DashboardLive.Index do
     {:noreply,
      socket
      |> assign(:query, query)
-     |> load_rows()
+     |> load_first_page()
      |> DashboardFilter.persist()}
+  end
+
+  def handle_event("load_more", _params, socket) do
+    %{
+      current_scope: scope,
+      today: today,
+      mine?: mine?,
+      lifecycle: lifecycle,
+      query: query,
+      sort: sort,
+      cursor: cursor
+    } = socket.assigns
+
+    %{rows: rows, cursor: cursor, end?: end?} =
+      Index.load_page(scope, today, mine?, lifecycle, query, sort, cursor)
+
+    {:noreply,
+     socket
+     |> stream(:rows, rows, dom_id: &row_dom_id/1, at: -1)
+     |> assign(cursor: cursor, end?: end?)}
   end
 
   def handle_event("close_modal_on_escape", _params, socket), do: {:noreply, socket}
 
-  defp load_rows(socket) do
-    %{current_scope: scope, today: today, mine?: mine?, lifecycle: lifecycle, query: query} =
-      socket.assigns
+  defp load_first_page(socket) do
+    %{
+      current_scope: scope,
+      today: today,
+      mine?: mine?,
+      lifecycle: lifecycle,
+      query: query,
+      sort: sort
+    } = socket.assigns
 
-    assign(socket, :rows, Index.load_rows(scope, today, mine?, lifecycle, query))
+    %{rows: rows, cursor: cursor, end?: end?} =
+      Index.load_page(scope, today, mine?, lifecycle, query, sort, nil)
+
+    socket
+    |> stream(:rows, rows, dom_id: &row_dom_id/1, reset: true)
+    |> assign(cursor: cursor, end?: end?, empty?: rows == [])
   end
+
+  defp row_dom_id(row), do: "obligation-row-#{row.obligation.id}"
 
   defp assignee_label(assigns) when assigns == nil do
     ~H"""

@@ -175,6 +175,41 @@ defmodule ArgusWeb.DashboardLiveTest do
     assert has_element?(view, "#obligation-row-#{obligation.id}", scope.user.email)
   end
 
+  test "sort dropdown reorders, hides urgency off-live, and infinite scroll appends", %{
+    conn: conn
+  } do
+    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    conn = log_in_user(conn, manager.user)
+    type = type_fixture(manager.entity)
+
+    for i <- 1..30 do
+      {:ok, _} =
+        Obligations.create_obligation(manager, %{
+          title: "Duty #{String.pad_leading(Integer.to_string(i), 2, "0")}",
+          obligation_type_id: type.id,
+          due_by: Date.add(~D[2026-06-01], i),
+          open_note: "n"
+        })
+    end
+
+    {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}")
+
+    # First page caps at 25.
+    assert view |> element("#obligations-list") |> render() =~ "Duty 25"
+    refute view |> element("#obligations-list") |> render() =~ "Duty 26"
+
+    # Infinite scroll reveals the rest.
+    render_hook(view, "load_more", %{})
+    assert view |> element("#obligations-list") |> render() =~ "Duty 26"
+
+    # Urgency option present on live.
+    assert has_element?(view, "#obligation-sort option[value='urgency']")
+
+    # Switching to Completed hides urgency.
+    view |> form("#obligation-status-filter", %{lifecycle: "completed"}) |> render_change()
+    refute has_element?(view, "#obligation-sort option[value='urgency']")
+  end
+
   test "team (Live) list includes unassigned obligations", %{conn: conn} do
     manager = Argus.EntitiesFixtures.manager_scope_fixture()
     conn = log_in_user(conn, manager.user)
