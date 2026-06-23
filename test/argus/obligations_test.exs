@@ -294,6 +294,30 @@ defmodule Argus.ObligationsTest do
     alias Argus.Obligations.Obligation
     alias Argus.Repo
 
+    test "requires due_by normally" do
+      cs =
+        Obligation.changeset(%Obligation{}, %{
+          title: "t",
+          obligation_type_id: Ecto.UUID.generate()
+        })
+
+      refute cs.valid?
+      assert %{due_by: ["can't be blank"]} = errors_on(cs)
+    end
+
+    test "someday=true makes due_by optional and force-nils it" do
+      cs =
+        Obligation.changeset(%Obligation{}, %{
+          title: "t",
+          obligation_type_id: Ecto.UUID.generate(),
+          due_by: ~D[2026-01-01],
+          someday: true
+        })
+
+      refute Keyword.has_key?(cs.errors, :due_by)
+      assert Ecto.Changeset.get_field(cs, :due_by) == nil
+    end
+
     test "translates one-live-cycle-per-series unique constraint" do
       {_scope, obligation} = recurring_primary_scope_fixture()
 

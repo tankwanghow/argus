@@ -15,6 +15,7 @@ defmodule Argus.Obligations.Obligation do
     field :series_ended_at, :utc_datetime
     field :complete_documents, :string, default: ""
     field :open_note, :string, virtual: true
+    field :someday, :boolean, virtual: true
 
     field :completed_in_error_at, :utc_datetime
     field :completed_in_error_reason, :string
@@ -32,16 +33,34 @@ defmodule Argus.Obligations.Obligation do
     timestamps()
   end
 
-  @cast_fields ~w(title obligation_type_id primary_assignee_id due_by open_note)a
+  @cast_fields ~w(title obligation_type_id primary_assignee_id due_by open_note someday)a
 
   @doc false
   def changeset(obligation, attrs) do
     obligation
     |> cast(attrs, @cast_fields)
-    |> validate_required([:title, :obligation_type_id, :due_by])
+    |> maybe_clear_due_by()
+    |> validate_required([:title, :obligation_type_id])
+    |> validate_due_by()
     |> validate_length(:title, max: 60)
     |> normalize_blank_assignee()
     |> unique_constraint(:series_id, name: :obligations_one_live_cycle_per_series)
+  end
+
+  defp maybe_clear_due_by(changeset) do
+    if get_field(changeset, :someday) do
+      put_change(changeset, :due_by, nil)
+    else
+      changeset
+    end
+  end
+
+  defp validate_due_by(changeset) do
+    if get_field(changeset, :someday) do
+      changeset
+    else
+      validate_required(changeset, [:due_by])
+    end
   end
 
   defp normalize_blank_assignee(changeset) do
