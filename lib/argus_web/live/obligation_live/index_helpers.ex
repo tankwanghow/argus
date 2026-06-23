@@ -5,8 +5,8 @@ defmodule ArgusWeb.ObligationLive.IndexHelpers do
   alias Argus.Obligations
   alias Argus.Obligations.{Obligation, Urgency}
 
-  @urgency_rank %{overdue: 0, due_soon: 1, ok: 2}
   @lifecycles ~w(live completed skipped all)a
+  @page_size 25
 
   @doc "Lifecycle options for the status dropdown, as `{value, label}` pairs."
   def lifecycles, do: Enum.map(@lifecycles, &{Atom.to_string(&1), lifecycle_label(&1)})
@@ -43,13 +43,59 @@ defmodule ArgusWeb.ObligationLive.IndexHelpers do
     end
   end
 
+  @doc "Sort options for the dropdown; urgency is offered only on the live lifecycle."
+  def sorts(:live),
+    do: [
+      {"due_asc", "Due soonest"},
+      {"due_desc", "Due latest"},
+      {"urgency", "Most urgent"},
+      {"title", "Title A–Z"}
+    ]
+
+  def sorts(_lifecycle),
+    do: [{"due_asc", "Due soonest"}, {"due_desc", "Due latest"}, {"title", "Title A–Z"}]
+
+  def parse_sort("due_desc"), do: :due_desc
+  def parse_sort("title"), do: :title
+  def parse_sort("urgency"), do: :urgency
+  def parse_sort(_), do: :due_asc
+
+  def effective_sort(:urgency, :live), do: :urgency
+  def effective_sort(:urgency, _lifecycle), do: :due_asc
+  def effective_sort(sort, _lifecycle), do: sort
+
   def load_rows(scope, today, mine?, lifecycle, query) do
     status = status_atom(mine?, lifecycle)
-    obligations = Obligations.list_obligations(scope, status: status, query: query)
+
+    scope
+    |> Obligations.list_obligations(status: status, query: query)
+    |> build_rows(today)
+  end
+
+  def load_page(scope, today, mine?, lifecycle, query, sort, cursor) do
+    status = status_atom(mine?, lifecycle)
+    do_load_page(scope, today, status, lifecycle, query, effective_sort(sort, lifecycle), cursor)
+  end
+
+  # Non-urgency (and non-live urgency, already downgraded): straight SQL paging.
+  defp do_load_page(scope, today, status, _lifecycle, query, sort, cursor)
+       when sort != :urgency do
+    page =
+      Obligations.list_obligations_page(scope,
+        status: status,
+        query: query,
+        sort: sort,
+        cursor: cursor,
+        limit: @page_size
+      )
+
+    %{rows: build_rows(page.rows, today), cursor: page.cursor, end?: page.end?}
+  end
+
+  defp build_rows(obligations, today) do
     summaries = Obligations.event_summaries_for(obligations)
 
-    obligations
-    |> Enum.map(fn obligation ->
+    Enum.map(obligations, fn obligation ->
       %{event_count: event_count, latest_event: latest_event} =
         Map.fetch!(summaries, obligation.id)
 
@@ -62,14 +108,7 @@ defmodule ArgusWeb.ObligationLive.IndexHelpers do
         latest_event: latest_event
       }
     end)
-    |> sort_rows(lifecycle)
   end
-
-  defp sort_rows(rows, :live) do
-    Enum.sort_by(rows, fn %{obligation: o, urgency: u} -> {@urgency_rank[u], o.due_by} end)
-  end
-
-  defp sort_rows(rows, _lifecycle), do: rows
 
   def cycle_status(%Obligation{completed_at: %DateTime{}}), do: :completed
   def cycle_status(%Obligation{series_ended_at: %DateTime{}}), do: :series_ended
