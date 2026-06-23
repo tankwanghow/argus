@@ -8,6 +8,7 @@ defmodule ArgusWeb.MobileLive.Components do
   A touch-friendly obligation card linking to the mobile show page, with a
   left accent and urgency badge sized for field use.
   """
+  attr :id, :string, required: true
   attr :row, :map, required: true, doc: "%{obligation: ..., urgency: ..., cycle_status: ...}"
   attr :today, Date, required: true
   attr :slug, :string, required: true
@@ -15,7 +16,7 @@ defmodule ArgusWeb.MobileLive.Components do
   def obligation_card(assigns) do
     ~H"""
     <li
-      id={"m-ob-#{@row.obligation.id}"}
+      id={@id}
       data-event-count={@row.event_count}
       data-event-status={@row.latest_event && @row.latest_event.status}
     >

@@ -426,6 +426,32 @@ defmodule ArgusWeb.MobileLiveTest do
            )
   end
 
+  test "mobile sort dropdown reorders and infinite scroll appends", %{conn: conn} do
+    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    conn = mobile_conn(conn, manager)
+    type = type_fixture(manager.entity)
+
+    for i <- 1..30 do
+      {:ok, _} =
+        Argus.Obligations.create_obligation(manager, %{
+          title: "Duty #{String.pad_leading(Integer.to_string(i), 2, "0")}",
+          obligation_type_id: type.id,
+          due_by: Date.add(~D[2026-06-01], i),
+          open_note: "n"
+        })
+    end
+
+    {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}")
+
+    assert view |> element("#mobile-obligations") |> render() =~ "Duty 25"
+    refute view |> element("#mobile-obligations") |> render() =~ "Duty 26"
+
+    render_hook(view, "load_more", %{})
+    assert view |> element("#mobile-obligations") |> render() =~ "Duty 26"
+
+    assert has_element?(view, "#m-obligation-sort option[value='urgency']")
+  end
+
   test "mobile: new-obligation form creates and redirects to the mobile show page", %{conn: conn} do
     manager = Argus.EntitiesFixtures.manager_scope_fixture()
     conn = mobile_conn(conn, manager)
