@@ -24,8 +24,7 @@ defmodule ArgusWeb.DashboardFilterControllerTest do
                "mine" => "true",
                "lifecycle" => "completed",
                "query" => "tax",
-               "sort" => "due_asc",
-               "date_filter" => "dated"
+               "sort" => "due_asc"
              }
            }
 
@@ -56,15 +55,13 @@ defmodule ArgusWeb.DashboardFilterControllerTest do
                "mine" => "true",
                "lifecycle" => "live",
                "query" => "one",
-               "sort" => "due_asc",
-               "date_filter" => "dated"
+               "sort" => "due_asc"
              },
              scope.entity.slug => %{
                "mine" => "false",
                "lifecycle" => "skipped",
                "query" => "two",
-               "sort" => "due_asc",
-               "date_filter" => "dated"
+               "sort" => "due_asc"
              }
            }
   end

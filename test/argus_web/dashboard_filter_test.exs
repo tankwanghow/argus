@@ -126,37 +126,19 @@ defmodule ArgusWeb.DashboardFilterTest do
       assert %{sort: :due_asc} = DashboardFilter.load(session, scope(:manager, "acme"))
     end
 
-    test "restores a saved date_filter and defaults to dated" do
+    test "restores a saved someday sort" do
       session = %{
         "dashboard_filters" => %{
           "acme" => %{
             "mine" => "false",
             "lifecycle" => "completed",
             "query" => "",
-            "sort" => "recent",
-            "date_filter" => "someday"
+            "sort" => "someday"
           }
         }
       }
 
-      assert %{date_filter: :someday} = DashboardFilter.load(session, scope(:manager, "acme"))
-      assert %{date_filter: :dated} = DashboardFilter.load(%{}, scope(:manager, "beta"))
-    end
-
-    test "rejects a bogus date_filter" do
-      session = %{
-        "dashboard_filters" => %{
-          "acme" => %{
-            "mine" => "false",
-            "lifecycle" => "live",
-            "query" => "",
-            "sort" => "due_asc",
-            "date_filter" => "nope"
-          }
-        }
-      }
-
-      assert %{date_filter: :dated} = DashboardFilter.load(session, scope(:manager, "acme"))
+      assert %{sort: :someday} = DashboardFilter.load(session, scope(:manager, "acme"))
     end
   end
 
@@ -166,15 +148,13 @@ defmodule ArgusWeb.DashboardFilterTest do
                "mine" => true,
                "lifecycle" => "completed",
                "query" => "tax",
-               "sort" => "title",
-               "date_filter" => "dated"
+               "sort" => "title"
              }) == %{
                "acme" => %{
                  "mine" => "true",
                  "lifecycle" => "completed",
                  "query" => "tax",
-                 "sort" => "title",
-                 "date_filter" => "dated"
+                 "sort" => "title"
                }
              }
     end

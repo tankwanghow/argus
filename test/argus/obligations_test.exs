@@ -726,7 +726,7 @@ defmodule Argus.ObligationsTest do
     end
   end
 
-  describe "list_obligations_page/2 — date_scope" do
+  describe "list_obligations_page/2 — someday sort" do
     setup do
       manager = Argus.EntitiesFixtures.manager_scope_fixture()
       type = type_fixture(manager.entity)
@@ -760,106 +760,69 @@ defmodule Argus.ObligationsTest do
       %{manager: manager, dated: dated, someday: someday}
     end
 
-    test "date_scope :dated and :someday split live duties", %{
+    test "live lifecycle now includes both dated and dateless duties", %{
       manager: m,
       dated: dated,
       someday: someday
     } do
-      d = Obligations.list_obligations_page(m, status: :live, date_scope: :dated, limit: :all)
-      assert Enum.map(d.rows, & &1.id) |> Enum.sort() == Enum.map(dated, & &1.id) |> Enum.sort()
-
-      s =
-        Obligations.list_obligations_page(m,
-          status: :live,
-          date_scope: :someday,
-          sort: :recent,
-          limit: :all
-        )
-
-      assert Enum.map(s.rows, & &1.id) |> Enum.sort() == Enum.map(someday, & &1.id) |> Enum.sort()
+      page = Obligations.list_obligations_page(m, status: :live, limit: :all)
+      ids = Enum.map(page.rows, & &1.id) |> Enum.sort()
+      assert ids == Enum.map(dated ++ someday, & &1.id) |> Enum.sort()
     end
 
-    test "date_scope :all_dates returns both", %{manager: m, dated: dated, someday: someday} do
-      a = Obligations.list_obligations_page(m, status: :live, date_scope: :all_dates, limit: :all)
-      assert length(a.rows) == length(dated) + length(someday)
-    end
-
-    test "date_scope composes with a non-live lifecycle (completed someday)", %{
+    test "someday sort floats no-due-date duties to the top, then dated by due date", %{
       manager: m,
-      someday: [sx | _]
+      dated: [a, b],
+      someday: someday
     } do
-      {:ok, _, _} = Obligations.complete(m, sx, %{note: "d"})
+      page = Obligations.list_obligations_page(m, status: :live, sort: :someday, limit: :all)
+      {top, bottom} = page.rows |> Enum.map(& &1.id) |> Enum.split(3)
 
-      page =
-        Obligations.list_obligations_page(m,
-          status: :completed,
-          date_scope: :someday,
-          sort: :recent,
-          limit: :all
-        )
-
-      assert Enum.map(page.rows, & &1.id) == [sx.id]
+      assert Enum.sort(top) == Enum.map(someday, & &1.id) |> Enum.sort()
+      assert bottom == [a.id, b.id]
     end
 
-    test "my_* + date_scope :someday scopes to the user", %{manager: m} do
-      member = member_scope_on_entity(m.entity)
-      type = type_fixture(m.entity)
-
-      {:ok, mine} =
-        Obligations.create_obligation(m, %{
-          title: "Mine SD",
-          obligation_type_id: type.id,
-          primary_assignee_id: member.user.id,
-          someday: true,
-          open_note: "n"
-        })
-
-      {:ok, _other} =
-        Obligations.create_obligation(m, %{
-          title: "Other SD",
-          obligation_type_id: type.id,
-          someday: true,
-          open_note: "n"
-        })
-
-      page =
-        Obligations.list_obligations_page(member,
-          status: :my_live,
-          date_scope: :someday,
-          sort: :recent,
-          limit: :all
-        )
-
-      assert Enum.map(page.rows, & &1.id) == [mine.id]
-    end
-
-    test "recent sort still keyset-pages newest-first", %{manager: m, someday: someday} do
-      all_ids = Enum.map(someday, & &1.id) |> Enum.sort()
-
-      p1 =
-        Obligations.list_obligations_page(m,
-          status: :live,
-          date_scope: :someday,
-          sort: :recent,
-          limit: 2
-        )
-
-      assert length(p1.rows) == 2
-      assert p1.cursor != nil
+    test "someday sort keyset-pages dateless-first with no dup or skip", %{
+      manager: m,
+      dated: [a, b],
+      someday: someday
+    } do
+      p1 = Obligations.list_obligations_page(m, status: :live, sort: :someday, limit: 2)
 
       p2 =
         Obligations.list_obligations_page(m,
           status: :live,
-          date_scope: :someday,
-          sort: :recent,
+          sort: :someday,
           limit: 2,
           cursor: p1.cursor
         )
 
-      assert length(p2.rows) == 1
-      assert p2.end?
-      paged_ids = (Enum.map(p1.rows, & &1.id) ++ Enum.map(p2.rows, & &1.id)) |> Enum.sort()
-      assert paged_ids == all_ids
+      p3 =
+        Obligations.list_obligations_page(m,
+          status: :live,
+          sort: :someday,
+          limit: 2,
+          cursor: p2.cursor
+        )
+
+      assert p3.end?
+
+      ids = Enum.map(p1.rows ++ p2.rows ++ p3.rows, & &1.id)
+      assert length(ids) == 5
+      assert length(Enum.uniq(ids)) == 5
+
+      {top, bottom} = Enum.split(ids, 3)
+      assert Enum.sort(top) == Enum.map(someday, & &1.id) |> Enum.sort()
+      assert bottom == [a.id, b.id]
+    end
+
+    test "completed lifecycle includes a completed dateless duty", %{
+      manager: m,
+      someday: [sx | _]
+    } do
+      {:ok, _, _} = Obligations.complete(m, sx, %{note: "d"})
+      page = Obligations.list_obligations_page(m, status: :completed, sort: :someday, limit: :all)
+      assert sx.id in Enum.map(page.rows, & &1.id)
     end
   end
 

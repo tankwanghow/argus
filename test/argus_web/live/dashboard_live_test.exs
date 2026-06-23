@@ -210,7 +210,7 @@ defmodule ArgusWeb.DashboardLiveTest do
     refute has_element?(view, "#obligation-sort option[value='urgency']")
   end
 
-  test "Due date filter shows Someday duties within a lifecycle", %{conn: conn} do
+  test "Someday sort floats no-due-date duties to the top", %{conn: conn} do
     manager = Argus.EntitiesFixtures.manager_scope_fixture()
     conn = log_in_user(conn, manager.user)
     type = type_fixture(manager.entity)
@@ -233,19 +233,19 @@ defmodule ArgusWeb.DashboardLiveTest do
 
     {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}")
 
-    # Default (Has due date): dated shows, someday hidden.
+    # Someday is a sort, not a filter: the Live list shows both dated and dateless duties.
     html = view |> element("#obligations-list") |> render()
     assert html =~ "Has a deadline"
-    refute html =~ "Tidy the archive"
-
-    # Switch Due date → Someday: someday shows, dated hidden, no "due " chrome.
-    view |> form("#obligation-date-filter", %{date_filter: "someday"}) |> render_change()
-    html = view |> element("#obligations-list") |> render()
     assert html =~ "Tidy the archive"
-    refute html =~ "Has a deadline"
-    refute html =~ "due "
-    refute has_element?(view, "#obligation-sort option[value='urgency']")
-    assert has_element?(view, "#obligation-sort option[value='recent']")
+
+    # Select the Someday sort → the no-due-date duty floats to the top.
+    assert has_element?(view, "#obligation-sort option[value='someday']")
+    view |> form("#obligation-sort-filter", %{sort: "someday"}) |> render_change()
+    html = view |> element("#obligations-list") |> render()
+
+    {sd_pos, _} = :binary.match(html, "Tidy the archive")
+    {dated_pos, _} = :binary.match(html, "Has a deadline")
+    assert sd_pos < dated_pos
   end
 
   test "team (Live) list includes unassigned obligations", %{conn: conn} do

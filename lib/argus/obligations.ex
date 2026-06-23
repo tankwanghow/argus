@@ -237,9 +237,9 @@ defmodule Argus.Obligations do
       |> where([o], o.entity_id == ^entity.id)
       |> scope_to_assignee(status, user)
       |> apply_status_filter(status)
-      |> apply_date_scope(Keyword.get(opts, :date_scope, :all_dates))
       |> apply_due_bound(:before, Keyword.get(opts, :due_before))
       |> apply_due_bound(:after, Keyword.get(opts, :due_after))
+      |> apply_due_bound(:after_or_null, Keyword.get(opts, :due_after_or_null))
       |> apply_page_search(Keyword.get(opts, :query))
       |> apply_page_order(sort)
       |> apply_page_cursor(sort, cursor)
@@ -251,16 +251,17 @@ defmodule Argus.Obligations do
     |> paginate(sort, limit)
   end
 
-  defp apply_date_scope(query, :dated), do: where(query, [o], not is_nil(o.due_by))
-  defp apply_date_scope(query, :someday), do: where(query, [o], is_nil(o.due_by))
-  defp apply_date_scope(query, _all_dates), do: query
+  defp normalize_page_sort(sort) when sort in [:due_asc, :due_desc, :title, :recent, :someday],
+    do: sort
 
-  defp normalize_page_sort(sort) when sort in [:due_asc, :due_desc, :title, :recent], do: sort
   defp normalize_page_sort(_), do: :due_asc
 
   defp apply_due_bound(query, _which, nil), do: query
   defp apply_due_bound(query, :before, %Date{} = d), do: where(query, [o], o.due_by <= ^d)
   defp apply_due_bound(query, :after, %Date{} = d), do: where(query, [o], o.due_by > ^d)
+
+  defp apply_due_bound(query, :after_or_null, %Date{} = d),
+    do: where(query, [o], o.due_by > ^d or is_nil(o.due_by))
 
   defp apply_page_search(query, q) when q in [nil, ""], do: query
 
@@ -286,6 +287,10 @@ defmodule Argus.Obligations do
     do: order_by(query, [o], asc: fragment("lower(?)", o.title), asc: o.id)
 
   defp apply_page_order(query, :recent), do: order_by(query, [o], desc: o.inserted_at, desc: o.id)
+
+  # Someday sort: no-due-date duties first (NULLS FIRST), then the dated ones by due date.
+  defp apply_page_order(query, :someday),
+    do: order_by(query, [o], asc_nulls_first: o.due_by, asc: o.id)
 
   defp apply_page_cursor(query, _sort, nil), do: query
 
@@ -321,6 +326,25 @@ defmodule Argus.Obligations do
     case DateTime.from_iso8601(k) do
       {:ok, ts, _} ->
         where(query, [o], o.inserted_at < ^ts or (o.inserted_at == ^ts and o.id < ^id))
+
+      _ ->
+        query
+    end
+  end
+
+  # Someday keyset: NULLS FIRST. After a null row, more nulls (then all dated);
+  # after a dated row, the nulls are already behind us, so only later dated rows.
+  defp apply_page_cursor(query, :someday, %{key: @null_key, id: id}),
+    do: where(query, [o], (is_nil(o.due_by) and o.id > ^id) or not is_nil(o.due_by))
+
+  defp apply_page_cursor(query, :someday, %{key: k, id: id}) do
+    case Date.from_iso8601(k) do
+      {:ok, d} ->
+        where(
+          query,
+          [o],
+          not is_nil(o.due_by) and (o.due_by > ^d or (o.due_by == ^d and o.id > ^id))
+        )
 
       _ ->
         query

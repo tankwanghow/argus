@@ -13,14 +13,6 @@ defmodule ArgusWeb.ObligationLive.IndexHelpers do
   @doc "Lifecycle options for the status dropdown, as `{value, label}` pairs."
   def lifecycles, do: Enum.map(@lifecycles, &{Atom.to_string(&1), lifecycle_label(&1)})
 
-  @doc "Due-date filter options as {value, label} pairs."
-  def date_filters,
-    do: [{"dated", "Has due date"}, {"someday", "Someday"}, {"all_dates", "All dates"}]
-
-  def parse_date_filter("someday"), do: :someday
-  def parse_date_filter("all_dates"), do: :all_dates
-  def parse_date_filter(_), do: :dated
-
   @doc "Whether the list defaults to the current user's own work."
   def default_mine?(%Scope{role: :member}), do: true
   def default_mine?(_scope), do: false
@@ -42,15 +34,7 @@ defmodule ArgusWeb.ObligationLive.IndexHelpers do
   def status_atom(true, :all), do: :my_all
   def status_atom(false, lifecycle), do: lifecycle
 
-  # Transitional shim: callers not yet passing date_filter get the :dated default.
-  def empty_message(mine?, lifecycle), do: empty_message(mine?, lifecycle, :dated)
-
-  def empty_message(mine?, _lifecycle, :someday) do
-    who = if mine?, do: " assigned to you", else: ""
-    "No someday duties#{who}."
-  end
-
-  def empty_message(mine?, lifecycle, _date_filter) do
+  def empty_message(mine?, lifecycle) do
     who = if mine?, do: " assigned to you", else: ""
 
     case lifecycle do
@@ -61,34 +45,36 @@ defmodule ArgusWeb.ObligationLive.IndexHelpers do
     end
   end
 
-  # Transitional shim: callers not yet passing date_filter get the :dated default.
-  def sorts(lifecycle), do: sorts(lifecycle, :dated)
+  @doc """
+  Sort options for the dropdown. `Someday` floats no-due-date duties to the top;
+  `Most urgent` is offered only on the live lifecycle.
+  """
+  def sorts(:live),
+    do: [
+      {"due_asc", "Due soonest"},
+      {"due_desc", "Due latest"},
+      {"urgency", "Most urgent"},
+      {"someday", "Someday"},
+      {"title", "Title A–Z"}
+    ]
 
-  def sorts(lifecycle, date_filter) do
-    base =
-      case date_filter do
-        :someday -> [{"recent", "Recently added"}]
-        _ -> [{"due_asc", "Due soonest"}, {"due_desc", "Due latest"}]
-      end
+  def sorts(_lifecycle),
+    do: [
+      {"due_asc", "Due soonest"},
+      {"due_desc", "Due latest"},
+      {"someday", "Someday"},
+      {"title", "Title A–Z"}
+    ]
 
-    urgency =
-      if lifecycle == :live and date_filter == :dated, do: [{"urgency", "Most urgent"}], else: []
-
-    base ++ urgency ++ [{"title", "Title A–Z"}]
+  def effective_sort(sort, lifecycle) do
+    allowed = Enum.map(sorts(lifecycle), fn {v, _} -> parse_sort(v) end)
+    if sort in allowed, do: sort, else: :due_asc
   end
-
-  def effective_sort(sort, lifecycle, date_filter) do
-    allowed = Enum.map(sorts(lifecycle, date_filter), fn {v, _} -> parse_sort(v) end)
-    if sort in allowed, do: sort, else: default_sort(date_filter)
-  end
-
-  defp default_sort(:someday), do: :recent
-  defp default_sort(_), do: :due_asc
 
   def parse_sort("due_desc"), do: :due_desc
   def parse_sort("title"), do: :title
   def parse_sort("urgency"), do: :urgency
-  def parse_sort("recent"), do: :recent
+  def parse_sort("someday"), do: :someday
   def parse_sort(_), do: :due_asc
 
   def load_rows(scope, today, mine?, lifecycle, query) do
@@ -99,22 +85,15 @@ defmodule ArgusWeb.ObligationLive.IndexHelpers do
     |> build_rows(today)
   end
 
-  # Transitional shim: callers not yet passing date_filter get the default (:dated).
-  def load_page(scope, today, mine?, lifecycle, query, sort, cursor),
-    do: load_page(scope, today, mine?, lifecycle, :dated, query, sort, cursor)
-
-  def load_page(scope, today, mine?, lifecycle, date_filter, query, sort, cursor) do
+  def load_page(scope, today, mine?, lifecycle, query, sort, cursor) do
     status = status_atom(mine?, lifecycle)
-    eff = effective_sort(sort, lifecycle, date_filter)
-    do_load_page(scope, today, status, date_filter, query, eff, cursor)
+    do_load_page(scope, today, status, query, effective_sort(sort, lifecycle), cursor)
   end
 
-  defp do_load_page(scope, today, status, date_filter, query, sort, cursor)
-       when sort != :urgency do
+  defp do_load_page(scope, today, status, query, sort, cursor) when sort != :urgency do
     page =
       Obligations.list_obligations_page(scope,
         status: status,
-        date_scope: date_filter,
         query: query,
         sort: sort,
         cursor: cursor,
@@ -124,8 +103,10 @@ defmodule ArgusWeb.ObligationLive.IndexHelpers do
     %{rows: build_rows(page.rows, today), cursor: page.cursor, end?: page.end?}
   end
 
-  # urgency only reaches here for live × dated (effective_sort guarantees it).
-  defp do_load_page(scope, today, status, :dated, query, :urgency, cursor) do
+  # urgency reaches here only for the live lifecycle (effective_sort guarantees it).
+  # The list may now contain dateless duties; they are appended after the dated
+  # tail (see serve_tail's due_after_or_null) so they never silently drop.
+  defp do_load_page(scope, today, status, query, :urgency, cursor) do
     window_end = Date.add(today, @urgency_window_days)
 
     case decode_urgency_cursor(cursor) do
@@ -134,12 +115,13 @@ defmodule ArgusWeb.ObligationLive.IndexHelpers do
     end
   end
 
+  # In-memory urgency ranking over the dated rows due within the window
+  # (`due_before` excludes nulls, so dateless rows never enter the window).
   defp serve_window(scope, today, status, window_end, query, offset) do
     ranked =
       scope
       |> Obligations.list_obligations_page(
         status: status,
-        date_scope: :dated,
         query: query,
         sort: :due_asc,
         due_before: window_end,
@@ -161,14 +143,15 @@ defmodule ArgusWeb.ObligationLive.IndexHelpers do
     end
   end
 
+  # The tail is the rest, SQL-keyset by `due_by` ascending NULLS LAST: dated rows
+  # beyond the window first, then dateless duties (urgency :none) at the very end.
   defp serve_tail(scope, today, status, window_end, query, inner_cursor) do
     page =
       Obligations.list_obligations_page(scope,
         status: status,
-        date_scope: :dated,
         query: query,
         sort: :due_asc,
-        due_after: window_end,
+        due_after_or_null: window_end,
         cursor: inner_cursor
       )
 
