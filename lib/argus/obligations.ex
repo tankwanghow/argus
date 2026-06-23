@@ -15,6 +15,7 @@ defmodule Argus.Obligations do
     Event,
     EventDocument,
     Obligation,
+    Pagination,
     Recurrence,
     Series,
     Type
@@ -216,6 +217,111 @@ defmodule Argus.Obligations do
   defp collaborator_obligation_ids(user_id) do
     from c in Collaborator, where: c.user_id == ^user_id, select: c.obligation_id
   end
+
+  @page_size 25
+
+  def list_obligations_page(%Scope{entity: entity, user: user}, opts \\ []) do
+    status = Keyword.get(opts, :status, :live)
+    sort = normalize_page_sort(Keyword.get(opts, :sort, :due_asc))
+    cursor = Pagination.decode(Keyword.get(opts, :cursor))
+    limit = Keyword.get(opts, :limit, @page_size)
+
+    unless status in @status_filters do
+      raise ArgumentError, "invalid status filter #{inspect(status)}"
+    end
+
+    query =
+      Obligation
+      |> join(:left, [o], t in assoc(o, :obligation_type), as: :type)
+      |> join(:left, [o], a in assoc(o, :primary_assignee), as: :assignee)
+      |> where([o], o.entity_id == ^entity.id)
+      |> scope_to_assignee(status, user)
+      |> apply_status_filter(status)
+      |> apply_due_bound(:before, Keyword.get(opts, :due_before))
+      |> apply_due_bound(:after, Keyword.get(opts, :due_after))
+      |> apply_page_search(Keyword.get(opts, :query))
+      |> apply_page_order(sort)
+      |> apply_page_cursor(sort, cursor)
+      |> preload([:obligation_type, :primary_assignee])
+
+    query
+    |> maybe_limit(limit)
+    |> Repo.all()
+    |> paginate(sort, limit)
+  end
+
+  defp normalize_page_sort(sort) when sort in [:due_asc, :due_desc, :title], do: sort
+  defp normalize_page_sort(_), do: :due_asc
+
+  defp apply_due_bound(query, _which, nil), do: query
+  defp apply_due_bound(query, :before, %Date{} = d), do: where(query, [o], o.due_by <= ^d)
+  defp apply_due_bound(query, :after, %Date{} = d), do: where(query, [o], o.due_by > ^d)
+
+  defp apply_page_search(query, q) when q in [nil, ""], do: query
+
+  defp apply_page_search(query, q) do
+    like = "%#{escape_like(q)}%"
+    unassigned? = String.contains?("unassigned", String.downcase(q))
+
+    from [o, type: t, assignee: a] in query,
+      where:
+        ilike(o.title, ^like) or ilike(t.name, ^like) or ilike(a.email, ^like) or
+          (^unassigned? and is_nil(o.primary_assignee_id))
+  end
+
+  defp escape_like(q), do: String.replace(q, ["\\", "%", "_"], &("\\" <> &1))
+
+  defp apply_page_order(query, :due_asc), do: order_by(query, [o], asc: o.due_by, asc: o.id)
+  defp apply_page_order(query, :due_desc), do: order_by(query, [o], desc: o.due_by, asc: o.id)
+
+  defp apply_page_order(query, :title),
+    do: order_by(query, [o], asc: fragment("lower(?)", o.title), asc: o.id)
+
+  defp apply_page_cursor(query, _sort, nil), do: query
+
+  defp apply_page_cursor(query, :due_asc, %{key: k, id: id}) do
+    case Date.from_iso8601(k) do
+      {:ok, d} -> where(query, [o], o.due_by > ^d or (o.due_by == ^d and o.id > ^id))
+      _ -> query
+    end
+  end
+
+  defp apply_page_cursor(query, :due_desc, %{key: k, id: id}) do
+    case Date.from_iso8601(k) do
+      {:ok, d} -> where(query, [o], o.due_by < ^d or (o.due_by == ^d and o.id > ^id))
+      _ -> query
+    end
+  end
+
+  defp apply_page_cursor(query, :title, %{key: k, id: id}) do
+    where(
+      query,
+      [o],
+      fragment("lower(?)", o.title) > ^k or
+        (fragment("lower(?)", o.title) == ^k and o.id > ^id)
+    )
+  end
+
+  defp maybe_limit(query, :all), do: query
+  defp maybe_limit(query, limit), do: limit(query, ^(limit + 1))
+
+  defp paginate(rows, _sort, :all), do: %{rows: rows, cursor: nil, end?: true}
+
+  defp paginate(rows, sort, limit) do
+    {page, rest} = Enum.split(rows, limit)
+    has_more = rest != []
+
+    cursor =
+      if has_more do
+        last = List.last(page)
+        Pagination.encode(%{key: cursor_key(sort, last), id: last.id})
+      end
+
+    %{rows: page, cursor: cursor, end?: not has_more}
+  end
+
+  defp cursor_key(:title, %Obligation{title: t}), do: String.downcase(t)
+  defp cursor_key(_sort, %Obligation{due_by: d}), do: Date.to_iso8601(d)
 
   @doc """
   All cycles sharing a `series_id`, oldest first — the recurrence history.

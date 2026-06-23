@@ -552,6 +552,68 @@ defmodule Argus.ObligationsTest do
     end
   end
 
+  describe "list_obligations_page/2" do
+    setup do
+      manager = Argus.EntitiesFixtures.manager_scope_fixture()
+      type = type_fixture(manager.entity)
+
+      mk = fn title, due ->
+        {:ok, o} =
+          Obligations.create_obligation(manager, %{
+            title: title,
+            obligation_type_id: type.id,
+            due_by: due,
+            open_note: "n"
+          })
+
+        o
+      end
+
+      a = mk.("Alpha", ~D[2026-03-01])
+      b = mk.("bravo", ~D[2026-01-01])
+      c = mk.("Charlie", ~D[2026-02-01])
+      %{manager: manager, a: a, b: b, c: c}
+    end
+
+    test "sorts due_asc with stable keyset paging", %{manager: m, a: a, b: b, c: c} do
+      page1 = Obligations.list_obligations_page(m, status: :live, sort: :due_asc, limit: 2)
+      assert Enum.map(page1.rows, & &1.id) == [b.id, c.id]
+      refute page1.end?
+
+      page2 = Obligations.list_obligations_page(m, status: :live, sort: :due_asc, limit: 2, cursor: page1.cursor)
+      assert Enum.map(page2.rows, & &1.id) == [a.id]
+      assert page2.end?
+    end
+
+    test "sorts due_desc and title", %{manager: m, a: a, b: b, c: c} do
+      desc = Obligations.list_obligations_page(m, status: :live, sort: :due_desc, limit: 10)
+      assert Enum.map(desc.rows, & &1.id) == [a.id, c.id, b.id]
+
+      title = Obligations.list_obligations_page(m, status: :live, sort: :title, limit: 10)
+      assert Enum.map(title.rows, & &1.id) == [a.id, b.id, c.id]
+    end
+
+    test "search filters by title in SQL", %{manager: m, b: b} do
+      page = Obligations.list_obligations_page(m, status: :live, query: "brav")
+      assert Enum.map(page.rows, & &1.id) == [b.id]
+    end
+
+    test "due_before and due_after bound the window", %{manager: m, b: b, c: c, a: a} do
+      before = Obligations.list_obligations_page(m, status: :live, sort: :due_asc, due_before: ~D[2026-02-15], limit: 10)
+      assert Enum.map(before.rows, & &1.id) == [b.id, c.id]
+
+      after_ = Obligations.list_obligations_page(m, status: :live, sort: :due_asc, due_after: ~D[2026-02-15], limit: 10)
+      assert Enum.map(after_.rows, & &1.id) == [a.id]
+    end
+
+    test "limit: :all returns everything with end? true", %{manager: m} do
+      page = Obligations.list_obligations_page(m, status: :live, sort: :due_asc, limit: :all)
+      assert length(page.rows) == 3
+      assert page.end?
+      assert page.cursor == nil
+    end
+  end
+
   describe "mark_completed_in_error/3" do
     test "flags the done cycle and spawns a standalone one-off replacement" do
       manager = Argus.EntitiesFixtures.manager_scope_fixture()
