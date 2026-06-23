@@ -1013,6 +1013,33 @@ defmodule ArgusWeb.ObligationLiveTest do
     assert has_element?(view, "#step-files-#{open_event.id}", "r.pdf")
   end
 
+  test "create form can make a Someday (no due date) duty", %{conn: conn} do
+    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    conn = log_in_user(conn, manager.user)
+    type = type_fixture(manager.entity)
+
+    {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}/obligations/new")
+
+    view
+    |> form("#obligation-create-form",
+      obligation: %{
+        title: "Improve onboarding docs",
+        obligation_type_id: type.id,
+        someday: "true",
+        due_by: "",
+        open_note: "idea"
+      }
+    )
+    |> render_submit()
+
+    ob =
+      Argus.Obligations.list_obligations_page(manager, status: :someday, limit: :all).rows
+      |> List.first()
+
+    assert ob.title == "Improve onboarding docs"
+    assert ob.due_by == nil
+  end
+
   test "manager marks a completed cycle in error and is taken to the replacement", %{conn: conn} do
     manager = Argus.EntitiesFixtures.manager_scope_fixture()
     conn = log_in_user(conn, manager.user)

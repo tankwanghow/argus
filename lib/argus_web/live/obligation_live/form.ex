@@ -26,7 +26,8 @@ defmodule ArgusWeb.ObligationLive.Form do
               prompt="Choose a type"
               required
             />
-            <.input field={@form[:due_by]} type="date" label="Due by" required />
+            <.input field={@form[:someday]} type="checkbox" label="No due date (Someday)" />
+            <.input :if={!someday?(@form)} field={@form[:due_by]} type="date" label="Due by" required />
           </div>
           <.input field={@form[:open_note]} type="textarea" label="Open note" required />
           <div class="fieldset">
@@ -92,4 +93,6 @@ defmodule ArgusWeb.ObligationLive.Form do
   def handle_event("close_modal_on_escape", _params, socket) do
     {:noreply, socket}
   end
+
+  defp someday?(form), do: Phoenix.HTML.Form.normalize_value("checkbox", form[:someday].value)
 end

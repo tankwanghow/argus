@@ -84,7 +84,8 @@ defmodule ArgusWeb.ObligationLive.CreateForm do
       "primary_assignee_id",
       "due_by",
       "open_note",
-      "collaborator_ids"
+      "collaborator_ids",
+      "someday"
     ])
     |> Map.new(fn {k, v} -> {String.to_existing_atom(k), v} end)
   end
