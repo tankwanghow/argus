@@ -7,6 +7,7 @@ defmodule ArgusWeb.DashboardFilter do
 
   @session_key "dashboard_filters"
   @lifecycles ~w(live completed skipped all)
+  @sorts ~w(due_asc due_desc title urgency)
 
   def assign_filters(socket, session) do
     filters = load(session, socket.assigns.current_scope)
@@ -15,6 +16,7 @@ defmodule ArgusWeb.DashboardFilter do
     |> Phoenix.Component.assign(:mine?, filters.mine?)
     |> Phoenix.Component.assign(:lifecycle, filters.lifecycle)
     |> Phoenix.Component.assign(:query, filters.query)
+    |> Phoenix.Component.assign(:sort, filters.sort)
   end
 
   def load(session, %Scope{user: %{id: user_id}, entity: %{slug: slug}} = scope) do
@@ -35,7 +37,8 @@ defmodule ArgusWeb.DashboardFilter do
       entity_slug: slug,
       mine: entry["mine"],
       lifecycle: entry["lifecycle"],
-      query: entry["query"]
+      query: entry["query"],
+      sort: entry["sort"]
     })
   end
 
@@ -79,7 +82,8 @@ defmodule ArgusWeb.DashboardFilter do
     session_entry(%{
       "mine" => if(socket.assigns.mine?, do: "true", else: "false"),
       "lifecycle" => Atom.to_string(socket.assigns.lifecycle),
-      "query" => socket.assigns.query
+      "query" => socket.assigns.query,
+      "sort" => Atom.to_string(socket.assigns.sort)
     })
   end
 
@@ -87,17 +91,19 @@ defmodule ArgusWeb.DashboardFilter do
     %{
       "mine" => param_mine(params["mine"]),
       "lifecycle" => param_lifecycle(params["lifecycle"]),
-      "query" => param_query(params["query"])
+      "query" => param_query(params["query"]),
+      "sort" => param_sort(params["sort"])
     }
   end
 
-  defp merge_saved(%{"mine" => mine, "lifecycle" => lifecycle, "query" => query}, scope) do
+  defp merge_saved(%{"mine" => mine, "lifecycle" => lifecycle, "query" => query} = saved, scope) do
     defaults = defaults(scope)
 
     %{
       mine?: parse_mine(mine, defaults.mine?),
       lifecycle: Index.parse_lifecycle(lifecycle),
-      query: query || ""
+      query: query || "",
+      sort: parse_sort(Map.get(saved, "sort"))
     }
   end
 
@@ -107,7 +113,8 @@ defmodule ArgusWeb.DashboardFilter do
     %{
       mine?: Index.default_mine?(scope),
       lifecycle: :live,
-      query: ""
+      query: "",
+      sort: :due_asc
     }
   end
 
@@ -138,4 +145,12 @@ defmodule ArgusWeb.DashboardFilter do
 
   defp param_query(query) when is_binary(query), do: query
   defp param_query(_), do: ""
+
+  defp param_sort(sort) when sort in @sorts, do: sort
+  defp param_sort(_), do: "due_asc"
+
+  defp parse_sort("due_desc"), do: :due_desc
+  defp parse_sort("title"), do: :title
+  defp parse_sort("urgency"), do: :urgency
+  defp parse_sort(_), do: :due_asc
 end

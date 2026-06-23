@@ -23,7 +23,8 @@ defmodule ArgusWeb.DashboardFilterControllerTest do
              scope.entity.slug => %{
                "mine" => "true",
                "lifecycle" => "completed",
-               "query" => "tax"
+               "query" => "tax",
+               "sort" => "due_asc"
              }
            }
 
@@ -53,12 +54,14 @@ defmodule ArgusWeb.DashboardFilterControllerTest do
              "first-entity" => %{
                "mine" => "true",
                "lifecycle" => "live",
-               "query" => "one"
+               "query" => "one",
+               "sort" => "due_asc"
              },
              scope.entity.slug => %{
                "mine" => "false",
                "lifecycle" => "skipped",
-               "query" => "two"
+               "query" => "two",
+               "sort" => "due_asc"
              }
            }
   end

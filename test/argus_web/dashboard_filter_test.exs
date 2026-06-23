@@ -104,6 +104,27 @@ defmodule ArgusWeb.DashboardFilterTest do
       assert %{mine?: true, lifecycle: :live, query: "find me"} =
                DashboardFilter.load(session, scope(:member, "acme"))
     end
+
+    test "restores a saved sort and defaults to due_asc" do
+      session = %{
+        "dashboard_filters" => %{
+          "acme" => %{"mine" => "false", "lifecycle" => "live", "query" => "", "sort" => "title"}
+        }
+      }
+
+      assert %{sort: :title} = DashboardFilter.load(session, scope(:manager, "acme"))
+      assert %{sort: :due_asc} = DashboardFilter.load(%{}, scope(:manager, "beta"))
+    end
+
+    test "rejects a bogus sort value" do
+      session = %{
+        "dashboard_filters" => %{
+          "acme" => %{"mine" => "false", "lifecycle" => "live", "query" => "", "sort" => "bogus"}
+        }
+      }
+
+      assert %{sort: :due_asc} = DashboardFilter.load(session, scope(:manager, "acme"))
+    end
   end
 
   describe "merge_session/3" do
@@ -111,12 +132,14 @@ defmodule ArgusWeb.DashboardFilterTest do
       assert DashboardFilter.merge_session(%{}, "acme", %{
                "mine" => true,
                "lifecycle" => "completed",
-               "query" => "tax"
+               "query" => "tax",
+               "sort" => "title"
              }) == %{
                "acme" => %{
                  "mine" => "true",
                  "lifecycle" => "completed",
-                 "query" => "tax"
+                 "query" => "tax",
+                 "sort" => "title"
                }
              }
     end
