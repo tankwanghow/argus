@@ -27,7 +27,7 @@ defmodule ArgusWeb.CycleBadge do
     <span
       :if={@badge}
       class={[
-        "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium whitespace-nowrap",
+        "inline-flex items-center gap-0.5 rounded border px-2 py-0.5 text-xs font-medium whitespace-nowrap",
         @badge.color
       ]}
       data-cycle={@cycle_status}
@@ -40,13 +40,13 @@ defmodule ArgusWeb.CycleBadge do
   end
 
   defp badge(%{cycle_status: :completed, in_error: true, obligation: o}),
-    do: %{color: "border-error text-error", label: "Completed", date: fmt(o.completed_at)}
+    do: %{color: "bg-error", label: "Completed with error", date: fmt(o.completed_at)}
 
   defp badge(%{cycle_status: :completed, obligation: o}),
-    do: %{color: "border-success text-success", label: "Completed", date: fmt(o.completed_at)}
+    do: %{color: "bg-success", label: "Completed", date: fmt(o.completed_at)}
 
   defp badge(%{cycle_status: :skipped, obligation: o}),
-    do: %{color: "border-warning text-warning", label: "Skipped", date: fmt(o.closed_at)}
+    do: %{color: "bg-warning", label: "Skipped", date: fmt(o.closed_at)}
 
   defp badge(%{cycle_status: :series_ended, obligation: o}),
     do: %{color: "border-warning text-warning", label: "Series ended", date: fmt(o.closed_at)}
@@ -63,6 +63,6 @@ defmodule ArgusWeb.CycleBadge do
   defp urgency_color(tier) when tier in [:overdue, :critical], do: "border-error text-error"
   defp urgency_color(_tier), do: "border-warning text-warning"
 
-  defp fmt(%DateTime{} = dt), do: dt |> DateTime.to_date() |> Calendar.strftime("%d %b %Y")
+  defp fmt(%DateTime{} = dt), do: dt |> DateTime.to_date() |> Calendar.strftime("%Y-%m-%d")
   defp fmt(_), do: nil
 end

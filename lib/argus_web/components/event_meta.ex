@@ -12,7 +12,7 @@ defmodule ArgusWeb.EventMeta do
 
   def event_meta(assigns) do
     ~H"""
-    <div class="flex flex-wrap items-center gap-x-1 gap-y-0.5 text-xs text-base-content/60 mt-1">
+    <div class="flex flex-wrap items-center gap-x-1 gap-y-0.5 text-sm text-base-content/60 mt-1">
       <span
         :if={@event.status in ["open", "in_progress"]}
         class={["badge badge-xs", status_badge_class(@event.status)]}

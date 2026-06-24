@@ -24,8 +24,8 @@ defmodule ArgusWeb.MobileLive.Components do
         navigate={~p"/m/#{@slug}/obligations/#{@row.obligation.id}"}
         class={["block rounded-box border border-base-300 p-3 border-l-4", accent(@row)]}
       >
-        <div class="flex items-center justify-between gap-1">
-          <div class="font-medium truncate max-w-[15rem]">{@row.obligation.title}</div>
+        <div class="flex items-center mb-1 justify-between gap-1">
+          <div class="text-l font-medium truncate max-w-[15rem]">{@row.obligation.title}</div>
           <.cycle_badge
             cycle_status={@row.cycle_status}
             tier={@row.tier}
@@ -34,13 +34,14 @@ defmodule ArgusWeb.MobileLive.Components do
             in_error={!is_nil(@row.obligation.completed_in_error_at)}
           />
         </div>
-        <div class="flex gap-1 text-xs">
-          <div class="text-info">
-            {@row.obligation.obligation_type.name}
+        <div class="flex flex-wrap text-xs gap-0.5 -space-y-1">
+          <div class="text-info">{@row.obligation.obligation_type.name}</div>
+          <div :if={@row.obligation.due_by}>·</div>
+          <div :if={@row.obligation.due_by} class="text-base-content/60">
+            due {format_date(@row.obligation.due_by, :short)}
           </div>
-          <div class={[text_color(@row)]}>
-            {card_meta(@row)}
-          </div>
+          <div>·</div>
+          {assignee_label(@row.obligation.primary_assignee)}
         </div>
         <.event_meta
           :if={@row.latest_event}
@@ -61,28 +62,15 @@ defmodule ArgusWeb.MobileLive.Components do
   defp accent(%{tier: tier}), do: tier_border(tier)
   defp accent(_), do: "border-transparent"
 
-  defp text_color(%{cycle_status: status}) when status in [:completed, :skipped, :series_ended],
-    do: "text-base-content/50"
-
-  defp text_color(%{tier: tier}) when tier in [:overdue, :critical], do: "text-error"
-  defp text_color(%{tier: tier}) when tier in [:due_soon, :approaching], do: "text-warning"
-  defp text_color(_), do: "text-base-content/50"
-
-  defp card_meta(%{cycle_status: :completed, obligation: o}) do
-    "completed #{format_datetime(o.completed_at)} · due #{format_date(o.due_by)}"
+    defp assignee_label(assigns) when assigns == nil do
+    ~H"""
+    <div class="text-error">Unassigned</div>
+    """
   end
 
-  defp card_meta(%{cycle_status: status, obligation: o})
-       when status in [:skipped, :series_ended] do
-    "#{humanize_cycle(status)} · due #{format_date(o.due_by)}"
+  defp assignee_label(assigns) do
+    ~H"""
+    <div class="text-primary">{assigns.email}</div>
+    """
   end
-
-  defp card_meta(%{obligation: %{due_by: nil}}), do: ""
-
-  defp card_meta(%{obligation: o}) do
-    "due #{format_date(o.due_by)}"
-  end
-
-  defp humanize_cycle(:series_ended), do: "series ended"
-  defp humanize_cycle(_), do: "skipped"
 end

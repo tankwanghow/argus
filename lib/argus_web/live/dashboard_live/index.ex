@@ -128,9 +128,6 @@ defmodule ArgusWeb.DashboardLive.Index do
     >
       <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5">
         <span class="font-medium">{@row.obligation.title}</span>
-        <span :if={@row.obligation.completed_in_error_at} class="badge badge-xs badge-error">
-          in error
-        </span>
         <.cycle_badge
           cycle_status={@row.cycle_status}
           tier={@row.tier}
@@ -139,11 +136,11 @@ defmodule ArgusWeb.DashboardLive.Index do
           in_error={!is_nil(@row.obligation.completed_in_error_at)}
         />
       </div>
-      <div class="flex text-sm gap-1">
+      <div class="flex items-center text-sm gap-1">
         <div class="text-info">{@row.obligation.obligation_type.name}</div>
         <div :if={@row.obligation.due_by}>·</div>
         <div :if={@row.obligation.due_by} class="text-base-content/60">
-          due {format_date(@row.obligation.due_by)}
+          due {format_date(@row.obligation.due_by, :short)}
         </div>
         <div>·</div>
         {assignee_label(@row.obligation.primary_assignee)}
@@ -252,7 +249,7 @@ defmodule ArgusWeb.DashboardLive.Index do
 
   defp assignee_label(assigns) do
     ~H"""
-    <div>{assigns.email}</div>
+    <div class="text-primary">{assigns.email}</div>
     """
   end
 end
