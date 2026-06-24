@@ -131,17 +131,12 @@ defmodule ArgusWeb.DashboardLive.Index do
         <span :if={@row.obligation.completed_in_error_at} class="badge badge-xs badge-error">
           in error
         </span>
-        <.urgency_badge
-          :if={@row.cycle_status == :live and @row.obligation.due_by}
-          tier={@row.tier}
-          due_by={@row.obligation.due_by}
-          today={@today}
-        />
-        <.obligation_status_badge
-          :if={@row.cycle_status != :live}
+        <.cycle_badge
           cycle_status={@row.cycle_status}
-          in_error={!is_nil(@row.obligation.completed_in_error_at)}
+          tier={@row.tier}
           obligation={@row.obligation}
+          today={@today}
+          in_error={!is_nil(@row.obligation.completed_in_error_at)}
         />
       </div>
       <div class="flex text-sm gap-1">

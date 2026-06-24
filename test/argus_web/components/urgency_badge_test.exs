@@ -34,13 +34,4 @@ defmodule ArgusWeb.UrgencyBadgeTest do
       assert UrgencyBadge.badge_text(:approaching, ~D[2026-07-08], @today) == "25d left"
     end
   end
-
-  describe "badge_class/1" do
-    test "maps each tier to a daisyUI badge class" do
-      assert UrgencyBadge.badge_class(:overdue) == "badge-error"
-      assert UrgencyBadge.badge_class(:critical) == "badge-error badge-soft"
-      assert UrgencyBadge.badge_class(:due_soon) == "badge-warning"
-      assert UrgencyBadge.badge_class(:approaching) == "badge-warning badge-soft"
-    end
-  end
 end

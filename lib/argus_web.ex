@@ -86,9 +86,9 @@ defmodule ArgusWeb do
       import Phoenix.HTML
       # Core UI components
       import ArgusWeb.CoreComponents
+      import ArgusWeb.CycleBadge
       import ArgusWeb.DoneDocumentChecklist
       import ArgusWeb.EventMeta
-      import ArgusWeb.ObligationStatusBadge
       import ArgusWeb.UrgencyBadge
 
       # Common modules used in templates

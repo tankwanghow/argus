@@ -47,17 +47,12 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
           </div>
           <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
             <h1 class="text-lg font-semibold leading-tight min-w-0 flex-1">{@obligation.title}</h1>
-            <.urgency_badge
-              :if={@live? and @obligation.due_by}
-              tier={@tier}
-              due_by={@obligation.due_by}
-              today={@today}
-            />
-            <.obligation_status_badge
-              :if={!@live?}
+            <.cycle_badge
               cycle_status={@cycle_status}
-              in_error={!is_nil(@obligation.completed_in_error_at)}
+              tier={@tier}
               obligation={@obligation}
+              today={@today}
+              in_error={!is_nil(@obligation.completed_in_error_at)}
             />
             <div :if={@correctable?} class="dropdown dropdown-end">
               <div
