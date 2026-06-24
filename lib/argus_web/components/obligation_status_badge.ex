@@ -20,7 +20,10 @@ defmodule ArgusWeb.ObligationStatusBadge do
       |> assign(:date, terminal_date(assigns.cycle_status, assigns.obligation))
 
     ~H"""
-    <div :if={@label} class={["-space-y-1 text-center border rounded-xl p-1", @color]}>
+    <div
+      :if={@label}
+      class={["-space-y-1 text-center border rounded-xl p-1 whitespace-nowrap", @color]}
+    >
       <div class="font-bold text-xs">{@label}</div>
       <div :if={@date} class="text-[12px]">{@date}</div>
     </div>
