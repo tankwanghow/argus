@@ -31,20 +31,71 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
         <section id="obligation-summary" class="argus-workbench argus-obligation-summary">
           <div
             id="obligation-meta"
-            class="text-base-content/70"
+            class="text-base-content/70 space-y-1.5"
           >
-            <div class="flex justify-between items-center">
-              <div class="font-bold text-info truncate">
+            <div class="flex justify-between items-center gap-2">
+              <div class="font-bold text-info truncate min-w-0">
                 {@obligation.obligation_type.name}
               </div>
-              <div :if={@obligation.due_by} class="font-medium text-base-content">
+              <div :if={@obligation.due_by} class="font-medium text-base-content shrink-0">
                 <span class="text-warning">Due </span>{format_date(@obligation.due_by, :short)}
               </div>
-              <div :if={is_nil(@obligation.due_by)} class="font-medium text-base-content">
+              <div :if={is_nil(@obligation.due_by)} class="font-medium text-base-content shrink-0">
                 <span class="text-success">No Due Date</span>
               </div>
-              <div :if={@cycle_status == :skipped} class="text-warning">
+              <div :if={@cycle_status == :skipped} class="text-warning shrink-0">
                 Skipped
+              </div>
+            </div>
+            <div class="flex flex-wrap items-center gap-1.5">
+              <span
+                :if={is_nil(@obligation.primary_assignee)}
+                id="m-assignees-unassigned"
+                class="badge badge-sm badge-secondary badge-soft gap-1"
+              >
+                Unassigned
+              </span>
+              <span
+                :if={@obligation.primary_assignee && other_collaborators(@obligation) == []}
+                id="m-assignees-badge"
+                class="badge badge-sm badge-primary badge-soft gap-1 max-w-full"
+              >
+                <.icon name="hero-user-mini" class="size-3 shrink-0" />
+                <span class="truncate">{@obligation.primary_assignee.email}</span>
+                <span class="text-[0.65rem] font-semibold uppercase tracking-wide opacity-70 shrink-0">
+                  Primary
+                </span>
+              </span>
+              <div
+                :if={@obligation.primary_assignee && other_collaborators(@obligation) != []}
+                id="m-assignees-dropdown"
+                class="dropdown"
+              >
+                <div
+                  tabindex="0"
+                  role="button"
+                  id="m-assignees-toggle"
+                  class="badge badge-sm badge-primary badge-soft gap-1 cursor-pointer max-w-full"
+                >
+                  <.icon name="hero-user-mini" class="size-3 shrink-0" />
+                  <span class="truncate">{@obligation.primary_assignee.email}</span>
+                  <span class="text-[0.65rem] font-semibold uppercase tracking-wide opacity-70 shrink-0">
+                    Primary
+                  </span>
+                  <.icon name="hero-chevron-down-mini" class="size-3 shrink-0" />
+                </div>
+                <ul
+                  tabindex="0"
+                  class="dropdown-content menu menu-sm bg-base-100 rounded-box z-10 w-64 p-2 shadow border border-base-300"
+                >
+                  <li class="menu-title text-xs">Also collaborating</li>
+                  <li :for={c <- other_collaborators(@obligation)}>
+                    <span class="flex items-center gap-1">
+                      <.icon name="hero-user-group-mini" class="size-3" />
+                      {c.user.email}
+                    </span>
+                  </li>
+                </ul>
               </div>
             </div>
           </div>
@@ -148,7 +199,7 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
                 <.icon name="hero-check-mini" class="size-5" />
               </button>
             </div>
-            <div id="obligation-series-actions" class="argus-inline-actions">
+            <div id="obligation-series-actions" class="argus-inline-actions gap-2">
               <button
                 :if={Authorization.can?(@current_scope, :skip)}
                 id="m-skip-btn"
@@ -158,6 +209,16 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
                 aria-label="Skip"
               >
                 <.icon name="hero-arrow-uturn-right" class="size-5" />
+              </button>
+              <button
+                :if={Authorization.can?(@current_scope, :end_series)}
+                id="m-end-series-btn"
+                type="button"
+                phx-click="open_end_series_modal"
+                class="btn btn-ghost btn-square h-11 min-h-11 w-11"
+                aria-label="End series"
+              >
+                <.icon name="hero-stop" class="size-5" />
               </button>
             </div>
           </div>
@@ -204,11 +265,14 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
               :for={event <- @obligation.events}
               id={"m-event-#{event.id}"}
               data-status={event.status}
-              class="argus-event-row border-l-4 border-base-300"
+              class={["argus-event-row border-l-4", event_accent(event.status)]}
             >
               <div class="argus-event-head">
                 <span class="font-semibold text-sm">{humanize_status(event.status)}</span>
                 <span class="text-xs text-base-content/50">{format_datetime(event.inserted_at)}</span>
+                <span :if={event.status_by} class="text-xs text-base-content/50">
+                  · {event.status_by.email}
+                </span>
                 <button
                   id={"m-step-files-btn-#{event.id}"}
                   type="button"
@@ -253,6 +317,48 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
             </li>
           </ol>
         </section>
+
+        <div :if={@audit_logs != []} class="mt-3 px-1">
+          <button
+            :if={not @show_corrections?}
+            id="m-show-corrections-btn"
+            type="button"
+            phx-click="show_corrections"
+            class="btn btn-ghost btn-sm gap-1"
+          >
+            <.icon name="hero-clipboard-document-list-mini" class="size-4" />
+            Show corrections ({length(@audit_logs)})
+          </button>
+          <section :if={@show_corrections?} id="m-audit-log" class="space-y-2">
+            <div class="flex items-center justify-between gap-3">
+              <h2 class="text-sm font-semibold uppercase tracking-wide text-base-content/60">
+                Corrections
+              </h2>
+              <button
+                id="m-hide-corrections-btn"
+                type="button"
+                phx-click="hide_corrections"
+                class="btn btn-ghost btn-xs"
+              >
+                Hide
+              </button>
+            </div>
+            <ul class="divide-y divide-base-300 rounded-box border border-base-300 text-sm">
+              <li :for={log <- @audit_logs} id={"m-audit-#{log.id}"} class="p-3 space-y-1">
+                <div class="flex items-center justify-between gap-3">
+                  <span class="font-medium">{log.field}</span>
+                  <span class="text-xs text-base-content/50">{format_datetime(log.inserted_at)}</span>
+                </div>
+                <div class="text-xs text-base-content/50">by {log.user.email}</div>
+                <div class="text-base-content/70 break-words">
+                  <span :if={log.old_value} class="line-through">{log.old_value}</span>
+                  <span :if={log.old_value != nil and log.new_value != nil}> → </span>
+                  <span :if={log.new_value}>{log.new_value}</span>
+                </div>
+              </li>
+            </ul>
+          </section>
+        </div>
       </div>
 
       <div :if={@editing_note_id} id="m-note-modal" class="modal modal-bottom modal-open">
@@ -489,6 +595,35 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
         </form>
       </div>
 
+      <div :if={@show_end_series_modal} id="m-end-series-modal" class="modal modal-bottom modal-open">
+        <div class="modal-box">
+          <h3 class="font-bold text-lg">End series</h3>
+          <p class="text-sm text-base-content/60 mt-1">
+            Closes the current cycle and stops future recurrence. A reason is recorded on the timeline.
+          </p>
+          <.form
+            for={@end_series_form}
+            id="m-end-series-form"
+            phx-submit="confirm_end_series"
+            class="mt-4 space-y-3"
+          >
+            <.input
+              field={@end_series_form[:note]}
+              type="textarea"
+              label="Reason for ending series"
+              required
+            />
+            <div class="modal-action">
+              <button type="button" class="btn" phx-click="close_end_series_modal">Back</button>
+              <.button class="btn btn-error" phx-disable-with="Ending…">End series</.button>
+            </div>
+          </.form>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+          <button type="button" phx-click="close_end_series_modal">close</button>
+        </form>
+      </div>
+
       <div :if={@show_correct_modal} id="m-correct-modal" class="modal modal-bottom modal-open">
         <div class="modal-box">
           <h3 class="font-bold text-lg">Mark completed in error</h3>
@@ -532,6 +667,7 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
      |> assign(:show_done_modal, false)
      |> assign(:show_progress_modal, false)
      |> assign(:show_skip_modal, false)
+     |> assign(:show_end_series_modal, false)
      |> assign(:show_edit_modal, false)
      |> assign(:show_completion_modal, false)
      |> assign(:active_completion_slot, nil)
@@ -540,6 +676,7 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
      |> assign(:step_files_modal_event, nil)
      |> assign(:voiding_document_id, nil)
      |> assign(:deleting_document_id, nil)
+     |> assign(:show_corrections?, false)
      |> assign(:editing_note_id, nil)
      |> assign(:note_form, nil)
      |> assign(:member_options, member_options(scope))
@@ -548,7 +685,15 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
 
   @impl true
   def handle_event("close_modal_on_escape", _params, socket) do
-    {:noreply, ModalEscape.close_obligation_modals(socket, end_series?: false)}
+    {:noreply, ModalEscape.close_obligation_modals(socket)}
+  end
+
+  def handle_event("show_corrections", _params, socket) do
+    {:noreply, assign(socket, :show_corrections?, true)}
+  end
+
+  def handle_event("hide_corrections", _params, socket) do
+    {:noreply, assign(socket, :show_corrections?, false)}
   end
 
   def handle_event("open_edit_modal", _params, socket) do
@@ -787,6 +932,35 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
     end
   end
 
+  def handle_event("open_end_series_modal", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:show_end_series_modal, true)
+     |> assign(:end_series_form, to_form(%{"note" => ""}, as: :end_series))}
+  end
+
+  def handle_event("close_end_series_modal", _params, socket) do
+    {:noreply, assign(socket, :show_end_series_modal, false)}
+  end
+
+  def handle_event("confirm_end_series", %{"end_series" => %{"note" => note}}, socket) do
+    scope = socket.assigns.current_scope
+
+    case Obligations.end_series(scope, socket.assigns.obligation, %{note: note}) do
+      {:ok, _} ->
+        {:noreply,
+         socket
+         |> put_flash(:info, "Series ended.")
+         |> push_navigate(to: ~p"/m/#{scope.entity.slug}")}
+
+      {:error, :note_required} ->
+        {:noreply, put_flash(socket, :error, "A reason is required.")}
+
+      _ ->
+        {:noreply, put_flash(socket, :error, "Could not end series.")}
+    end
+  end
+
   def handle_event("open_correct_modal", _params, socket) do
     {:noreply, assign(socket, :show_correct_modal, true)}
   end
@@ -865,6 +1039,7 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
     |> assign(:required_docs, slot_rows)
     |> assign(:docs_complete?, Enum.all?(slot_rows, fn {_slot, live} -> live end))
     |> assign(:void_reason_required?, Obligations.document_void_reason_required?(obligation))
+    |> assign(:audit_logs, Obligations.list_audit_logs(obligation))
     |> assign(:can_add_document?, can_add_document?(scope, obligation))
     |> assign(
       :correctable?,
@@ -880,6 +1055,7 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
       :skip_form,
       to_form(%{"note" => "", "next_due_by" => suggestion(obligation, recurring?)}, as: :skip)
     )
+    |> assign(:end_series_form, to_form(%{"note" => ""}, as: :end_series))
     |> assign_edit_form(obligation)
   end
 
@@ -956,6 +1132,19 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
 
   defp humanize_status("in_progress"), do: "In progress"
   defp humanize_status(status), do: String.capitalize(status)
+
+  defp event_accent("done"), do: "border-success"
+  defp event_accent("skipped"), do: "border-warning"
+  defp event_accent("series_ended"), do: "border-neutral"
+  defp event_accent("in_progress"), do: "border-warning"
+  defp event_accent(_), do: "border-base-300"
+
+  defp other_collaborators(%{primary_assignee: nil, collaborators: collaborators}),
+    do: collaborators
+
+  defp other_collaborators(%{primary_assignee: assignee, collaborators: collaborators}) do
+    Enum.reject(collaborators, &(&1.user_id == assignee.id))
+  end
 
   defp parse_date(nil), do: nil
   defp parse_date(""), do: nil

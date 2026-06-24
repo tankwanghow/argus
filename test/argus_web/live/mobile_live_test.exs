@@ -452,6 +452,84 @@ defmodule ArgusWeb.MobileLiveTest do
     assert has_element?(view, "#m-obligation-sort option[value='urgency']")
   end
 
+  test "mobile show renders assignees, event actors, corrections, and end series control", %{
+    conn: conn
+  } do
+    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    conn = mobile_conn(conn, manager)
+    assignee = member_fixture(manager.entity)
+    collaborator = member_fixture(manager.entity)
+    type = type_fixture(manager.entity, recurring_interval: "monthly")
+
+    {:ok, obligation} =
+      Obligations.create_obligation(manager, %{
+        title: "Shared work",
+        obligation_type_id: type.id,
+        primary_assignee_id: assignee.id,
+        collaborator_ids: [collaborator.id],
+        due_by: ~D[2026-06-30],
+        open_note: "open"
+      })
+
+    assert {:ok, _} = Obligations.start_progress(manager, obligation, %{note: "Working"})
+
+    assert {:ok, _} =
+             Obligations.update_obligation(manager, obligation, %{title: "Shared work (updated)"})
+
+    {:ok, view, _html} =
+      live(conn, ~p"/m/#{manager.entity.slug}/obligations/#{obligation.id}")
+
+    assert has_element?(view, "#m-assignees-toggle", assignee.email)
+    assert has_element?(view, "#m-assignees-dropdown", collaborator.email)
+    assert has_element?(view, "#m-end-series-btn")
+
+    obligation = Obligations.get_obligation!(manager, obligation.id)
+    in_progress = Enum.find(obligation.events, &(&1.status == "in_progress"))
+
+    assert has_element?(view, "#m-event-#{in_progress.id}", manager.user.email)
+    assert view |> element("#m-event-#{in_progress.id}") |> render() =~ "border-warning"
+
+    refute has_element?(view, "#m-audit-log")
+    assert has_element?(view, "#m-show-corrections-btn")
+
+    view |> element("#m-show-corrections-btn") |> render_click()
+    assert has_element?(view, "#m-audit-log", "title")
+  end
+
+  test "mobile end series flow closes recurring series and redirects", %{conn: conn} do
+    {scope, obligation} = recurring_manager_scope_fixture(interval: "monthly")
+    conn = mobile_conn(conn, scope)
+
+    {:ok, view, _html} =
+      live(conn, ~p"/m/#{scope.entity.slug}/obligations/#{obligation.id}")
+
+    view |> element("#m-end-series-btn") |> render_click()
+    assert has_element?(view, "#m-end-series-modal")
+
+    view
+    |> form("#m-end-series-form", %{"end_series" => %{"note" => "Client left"}})
+    |> render_submit()
+
+    assert_redirect(view, ~p"/m/#{scope.entity.slug}")
+
+    ended = Obligations.get_obligation!(scope, obligation.id)
+    assert ended.series_ended_at
+  end
+
+  test "mobile escape closes end series modal", %{conn: conn} do
+    {scope, obligation} = recurring_manager_scope_fixture(interval: "monthly")
+    conn = mobile_conn(conn, scope)
+
+    {:ok, view, _html} =
+      live(conn, ~p"/m/#{scope.entity.slug}/obligations/#{obligation.id}")
+
+    view |> element("#m-end-series-btn") |> render_click()
+    assert has_element?(view, "#m-end-series-modal")
+
+    view |> element("#argus-shell") |> render_keydown()
+    refute has_element?(view, "#m-end-series-modal")
+  end
+
   test "mobile: new-obligation form creates and redirects to the mobile show page", %{conn: conn} do
     manager = Argus.EntitiesFixtures.manager_scope_fixture()
     conn = mobile_conn(conn, manager)
