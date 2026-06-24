@@ -5,6 +5,7 @@ defmodule ArgusWeb.Plugs.AutoRouteByDevice do
     * `/entities/<slug>/...` (desktop) → `/m/<slug>/...` for mobile UAs
     * `/m/<slug>/...` (mobile)          → `/entities/<slug>/...` for desktop UAs
     * `/invitations/<token>`            ↔ `/m/invitations/<token>`
+    * `/m/users/...` (legacy)           → `/users/...` (unified auth UI)
 
   An `argus_view=mobile|desktop` cookie short-circuits the UA check so
   the user's explicit choice (via the Mobile / Desktop toggle links)
@@ -13,6 +14,9 @@ defmodule ArgusWeb.Plugs.AutoRouteByDevice do
   Only redirects when the destination route is known to exist on the
   other side. Pages that exist on only one UI (members, etc.)
   pass through untouched so we never 404 the user out.
+
+  Auth (register/log-in) uses a single standalone UI at `/users/...` for
+  all devices — no desktop/mobile auth swap.
   """
   @behaviour Plug
   import Plug.Conn
@@ -37,20 +41,17 @@ defmodule ArgusWeb.Plugs.AutoRouteByDevice do
       malformed_mobile_entity_path?(path) ->
         redirect_swap(conn, path, "/entities/m/", "/m/")
 
+      legacy_mobile_auth_path?(path) ->
+        redirect_swap(conn, path, "/m/users/", "/users/")
+
       cookie == "mobile" and desktop_url?(path) ->
         maybe_redirect_to_mobile(conn, path)
 
       cookie == "mobile" and invitation_landing?(path) ->
         redirect_swap(conn, path, "/invitations/", "/m/invitations/")
 
-      cookie == "mobile" and auth_landing?(path) ->
-        redirect_swap(conn, path, "/users/", "/m/users/")
-
       cookie == "desktop" and mobile_invitation_landing?(path) ->
         redirect_swap(conn, path, "/m/invitations/", "/invitations/")
-
-      cookie == "desktop" and mobile_auth_landing?(path) ->
-        redirect_swap(conn, path, "/m/users/", "/users/")
 
       cookie == "desktop" and mobile_url?(path) ->
         redirect_swap(conn, path, "/m/", "/entities/")
@@ -64,14 +65,8 @@ defmodule ArgusWeb.Plugs.AutoRouteByDevice do
       mobile_ua?(conn) and invitation_landing?(path) ->
         redirect_swap(conn, path, "/invitations/", "/m/invitations/")
 
-      mobile_ua?(conn) and auth_landing?(path) ->
-        redirect_swap(conn, path, "/users/", "/m/users/")
-
       not mobile_ua?(conn) and mobile_invitation_landing?(path) ->
         redirect_swap(conn, path, "/m/invitations/", "/invitations/")
-
-      not mobile_ua?(conn) and mobile_auth_landing?(path) ->
-        redirect_swap(conn, path, "/m/users/", "/users/")
 
       not mobile_ua?(conn) and mobile_url?(path) ->
         redirect_swap(conn, path, "/m/", "/entities/")
@@ -103,12 +98,7 @@ defmodule ArgusWeb.Plugs.AutoRouteByDevice do
     end
   end
 
-  defp auth_landing?(path) do
-    path in ["/users/register", "/users/log-in"] or
-      String.match?(path, ~r{^/users/log-in/[^/]+$})
-  end
-
-  defp mobile_auth_landing?(path) do
+  defp legacy_mobile_auth_path?(path) do
     path in ["/m/users/register", "/m/users/log-in"] or
       String.match?(path, ~r{^/m/users/log-in/[^/]+$})
   end

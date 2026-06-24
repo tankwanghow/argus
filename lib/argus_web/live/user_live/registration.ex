@@ -7,38 +7,37 @@ defmodule ArgusWeb.UserLive.Registration do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash} current_scope={@current_scope}>
-      <div class="mx-auto max-w-sm">
-        <div class="text-center">
-          <.header>
-            Register for an account
-            <:subtitle>
+    <Layouts.mobile_standalone flash={@flash}>
+      <div class="w-full max-w-sm card bg-base-100 shadow">
+        <div class="card-body gap-4">
+          <div class="text-center">
+            <h1 class="text-lg font-semibold">Register for an account</h1>
+            <p class="text-sm text-base-content/60 mt-1">
               Already registered?
-              <.link navigate={~p"/users/log-in"} class="font-semibold text-brand hover:underline">
+              <.link navigate={~p"/users/log-in"} class="font-semibold text-primary hover:underline">
                 Log in
               </.link>
-              to your account now.
-            </:subtitle>
-          </.header>
+            </p>
+          </div>
+
+          <.form for={@form} id="registration_form" phx-submit="save" phx-change="validate">
+            <.input
+              field={@form[:email]}
+              type="email"
+              label="Email"
+              autocomplete="username"
+              spellcheck="false"
+              required
+              phx-mounted={JS.focus()}
+            />
+
+            <.button phx-disable-with="Creating account..." class="btn btn-primary w-full mt-2">
+              Create an account
+            </.button>
+          </.form>
         </div>
-
-        <.form for={@form} id="registration_form" phx-submit="save" phx-change="validate">
-          <.input
-            field={@form[:email]}
-            type="email"
-            label="Email"
-            autocomplete="username"
-            spellcheck="false"
-            required
-            phx-mounted={JS.focus()}
-          />
-
-          <.button phx-disable-with="Creating account..." class="btn btn-primary w-full">
-            Create an account
-          </.button>
-        </.form>
       </div>
-    </Layouts.app>
+    </Layouts.mobile_standalone>
     """
   end
 

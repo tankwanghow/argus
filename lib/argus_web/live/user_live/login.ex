@@ -6,101 +6,94 @@ defmodule ArgusWeb.UserLive.Login do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash} current_scope={@current_scope}>
-      <div class="mx-auto max-w-sm space-y-4">
-        <div class="text-center">
-          <.header>
-            <p>Log in</p>
-            <:subtitle>
-              <%= if @current_scope do %>
-                You need to reauthenticate to perform sensitive actions on your account.
-              <% else %>
-                Don't have an account? <.link
-                  navigate={~p"/users/register"}
-                  class="font-semibold text-brand hover:underline"
-                  phx-no-format
-                >Sign up</.link> for an account now.
-              <% end %>
-            </:subtitle>
-          </.header>
-        </div>
-
-        <div :if={local_mail_adapter?()} class="alert alert-info">
-          <.icon name="hero-information-circle" class="size-6 shrink-0" />
-          <div>
-            <p>You are running the local mail adapter.</p>
-            <p>
-              To see sent emails, visit <.link href="/dev/mailbox" class="underline">the mailbox page</.link>.
+    <Layouts.mobile_standalone flash={@flash}>
+      <div class="w-full max-w-sm card bg-base-100 shadow">
+        <div class="card-body gap-4">
+          <div class="text-center">
+            <h1 class="text-lg font-semibold">Log in</h1>
+            <p :if={!@current_scope} class="text-sm text-base-content/60 mt-1">
+              Don't have an account?
+              <.link navigate={~p"/users/register"} class="font-semibold text-primary hover:underline">
+                Sign up
+              </.link>
+            </p>
+            <p :if={@current_scope} class="text-sm text-base-content/60 mt-1">
+              You need to reauthenticate to perform sensitive actions on your account.
             </p>
           </div>
+
+          <div :if={local_mail_adapter?()} class="alert alert-info text-sm">
+            <.icon name="hero-information-circle" class="size-5 shrink-0" />
+            <div>
+              <p>
+                Local mail adapter — visit <.link href="/dev/mailbox" class="underline">mailbox</.link>.
+              </p>
+            </div>
+          </div>
+
+          <.form
+            :let={f}
+            for={@form}
+            id="login_form_magic"
+            action={~p"/users/log-in"}
+            phx-submit="submit_magic"
+          >
+            <.input
+              readonly={!!@current_scope}
+              field={f[:email]}
+              type="email"
+              label="Email"
+              autocomplete="username"
+              spellcheck="false"
+              required
+              phx-mounted={JS.focus()}
+            />
+            <.button class="btn btn-primary w-full mt-2">
+              Log in with email <span aria-hidden="true">→</span>
+            </.button>
+          </.form>
+
+          <div class="divider text-xs">or</div>
+
+          <.form
+            :let={f}
+            for={@form}
+            id="login_form_password"
+            action={~p"/users/log-in"}
+            phx-submit="submit_password"
+            phx-trigger-action={@trigger_submit}
+          >
+            <.input
+              readonly={!!@current_scope}
+              field={f[:identifier]}
+              type="text"
+              label="Email or username"
+              autocomplete="username"
+              spellcheck="false"
+              required
+            />
+            <.input
+              field={@form[:password]}
+              type="password"
+              label="Password"
+              autocomplete="current-password"
+              spellcheck="false"
+            />
+            <.button class="btn btn-primary w-full mt-2" name={@form[:remember_me].name} value="true">
+              Log in and stay logged in
+            </.button>
+            <.button class="btn btn-primary btn-soft w-full mt-2">
+              Log in only this time
+            </.button>
+          </.form>
         </div>
-
-        <.form
-          :let={f}
-          for={@form}
-          id="login_form_magic"
-          action={~p"/users/log-in"}
-          phx-submit="submit_magic"
-        >
-          <.input
-            readonly={!!@current_scope}
-            field={f[:email]}
-            type="email"
-            label="Email"
-            autocomplete="username"
-            spellcheck="false"
-            required
-            phx-mounted={JS.focus()}
-          />
-          <.button class="btn btn-primary w-full">
-            Log in with email <span aria-hidden="true">→</span>
-          </.button>
-        </.form>
-
-        <div class="divider">or</div>
-
-        <.form
-          :let={f}
-          for={@form}
-          id="login_form_password"
-          action={~p"/users/log-in"}
-          phx-submit="submit_password"
-          phx-trigger-action={@trigger_submit}
-        >
-          <.input
-            readonly={!!@current_scope}
-            field={f[:identifier]}
-            type="text"
-            label="Email or username"
-            autocomplete="username"
-            spellcheck="false"
-            required
-          />
-          <.input
-            field={@form[:password]}
-            type="password"
-            label="Password"
-            autocomplete="current-password"
-            spellcheck="false"
-          />
-          <.button class="btn btn-primary w-full" name={@form[:remember_me].name} value="true">
-            Log in and stay logged in <span aria-hidden="true">→</span>
-          </.button>
-          <.button class="btn btn-primary btn-soft w-full mt-2">
-            Log in only this time
-          </.button>
-        </.form>
       </div>
-    </Layouts.app>
+    </Layouts.mobile_standalone>
     """
   end
 
   @impl true
   def mount(_params, _session, socket) do
-    # The page hosts two subforms that prefill independently: the magic-link
-    # form reads the "email" key (flash :email), the password form reads
-    # "identifier" (flash :identifier). Both fall back to the current user's
-    # email when reauthenticating.
     current_email =
       get_in(socket.assigns, [:current_scope, Access.key(:user), Access.key(:email)])
 

@@ -74,7 +74,7 @@ defmodule ArgusWeb.Plugs.AutoRouteByDeviceTest do
       assert conn.halted
     end
 
-    test "redirects mobile UA from desktop register to mobile", %{conn: conn} do
+    test "does not redirect mobile UA on unified auth paths", %{conn: conn} do
       conn =
         conn
         |> put_req_header("user-agent", @mobile_ua)
@@ -83,33 +83,32 @@ defmodule ArgusWeb.Plugs.AutoRouteByDeviceTest do
         |> Map.put(:query_string, "")
         |> AutoRouteByDevice.call([])
 
-      assert redirected_to(conn) == "/m/users/register"
-      assert conn.halted
+      refute conn.halted
     end
 
-    test "redirects mobile UA from desktop log-in token to mobile", %{conn: conn} do
+    test "redirects legacy /m/users paths to /users", %{conn: conn} do
       conn =
         conn
         |> put_req_header("user-agent", @mobile_ua)
-        |> Map.put(:request_path, "/users/log-in/sometoken")
-        |> Map.put(:path_info, ["users", "log-in", "sometoken"])
-        |> Map.put(:query_string, "")
-        |> AutoRouteByDevice.call([])
-
-      assert redirected_to(conn) == "/m/users/log-in/sometoken"
-      assert conn.halted
-    end
-
-    test "redirects desktop UA from mobile register to desktop", %{conn: conn} do
-      conn =
-        conn
-        |> put_req_header("user-agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X)")
         |> Map.put(:request_path, "/m/users/register")
         |> Map.put(:path_info, ["m", "users", "register"])
         |> Map.put(:query_string, "")
         |> AutoRouteByDevice.call([])
 
       assert redirected_to(conn) == "/users/register"
+      assert conn.halted
+    end
+
+    test "redirects legacy /m/users log-in token to /users", %{conn: conn} do
+      conn =
+        conn
+        |> put_req_header("user-agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X)")
+        |> Map.put(:request_path, "/m/users/log-in/sometoken")
+        |> Map.put(:path_info, ["m", "users", "log-in", "sometoken"])
+        |> Map.put(:query_string, "")
+        |> AutoRouteByDevice.call([])
+
+      assert redirected_to(conn) == "/users/log-in/sometoken"
       assert conn.halted
     end
 

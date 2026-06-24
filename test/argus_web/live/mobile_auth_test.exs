@@ -8,60 +8,60 @@ defmodule ArgusWeb.MobileAuthTest do
 
   @mobile_ua "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)"
 
-  describe "mobile registration" do
-    test "renders under mobile_standalone shell", %{conn: conn} do
-      conn = put_req_header(conn, "user-agent", @mobile_ua)
-      {:ok, _lv, html} = live(conn, ~p"/m/users/register")
+  describe "unified auth UI" do
+    test "register and log-in use mobile_standalone on desktop UA", %{conn: conn} do
+      {:ok, _lv, register_html} = live(conn, ~p"/users/register")
+      assert register_html =~ "Register"
+      assert register_html =~ "Argus"
 
-      assert html =~ "Register"
-      assert html =~ "mobile_standalone" or html =~ "Argus"
-      refute html =~ ~s|id="entity-nav"|
+      {:ok, view, login_html} = live(conn, ~p"/users/log-in")
+      assert login_html =~ "Log in with email"
+      assert has_element?(view, "#login_form_password")
     end
 
-    test "creates account and navigates to mobile log-in", %{conn: conn} do
+    test "register and log-in use mobile_standalone on mobile UA", %{conn: conn} do
       conn = put_req_header(conn, "user-agent", @mobile_ua)
-      {:ok, lv, _html} = live(conn, ~p"/m/users/register")
+
+      {:ok, _lv, html} = live(conn, ~p"/users/register")
+      assert html =~ "Register"
+      refute html =~ ~s|id="entity-nav"|
+
+      {:ok, view, html} = live(conn, ~p"/users/log-in")
+      assert html =~ "Log in with email"
+      assert has_element?(view, "#login_form_password")
+    end
+
+    test "registration creates account and navigates to log-in", %{conn: conn} do
+      {:ok, lv, _html} = live(conn, ~p"/users/register")
 
       email = unique_user_email()
 
       {:ok, _lv, html} =
         lv
-        |> form("#m-registration-form", user: valid_user_attributes(email: email))
+        |> form("#registration_form", user: valid_user_attributes(email: email))
         |> render_submit()
-        |> follow_redirect(conn, ~p"/m/users/log-in")
+        |> follow_redirect(conn, ~p"/users/log-in")
 
       assert html =~ "An email was sent"
     end
-  end
 
-  describe "mobile login" do
-    test "renders magic and password forms", %{conn: conn} do
-      conn = put_req_header(conn, "user-agent", @mobile_ua)
-      {:ok, view, html} = live(conn, ~p"/m/users/log-in")
-
-      assert html =~ "Log in with email"
-      assert has_element?(view, "#m-login-form-password")
-    end
-
-    test "password login redirects mobile user to mobile dashboard", %{conn: conn} do
+    test "mobile UA password login redirects to mobile dashboard", %{conn: conn} do
       scope = Argus.EntitiesFixtures.entity_scope_fixture()
       user = set_password(scope.user)
       conn = put_req_header(conn, "user-agent", @mobile_ua)
 
-      {:ok, lv, _html} = live(conn, ~p"/m/users/log-in")
+      {:ok, lv, _html} = live(conn, ~p"/users/log-in")
 
       form =
-        form(lv, "#m-login-form-password",
+        form(lv, "#login_form_password",
           user: %{identifier: user.email, password: valid_user_password(), remember_me: true}
         )
 
       conn = submit_form(form, conn)
       assert redirected_to(conn) == ~p"/m/#{scope.entity.slug}"
     end
-  end
 
-  describe "mobile confirmation" do
-    test "renders confirmation for unconfirmed user", %{conn: conn} do
+    test "confirmation uses standalone shell", %{conn: conn} do
       user = unconfirmed_user_fixture()
 
       token =
@@ -69,11 +69,9 @@ defmodule ArgusWeb.MobileAuthTest do
           Accounts.deliver_login_instructions(user, url)
         end)
 
-      conn = put_req_header(conn, "user-agent", @mobile_ua)
-      {:ok, _lv, html} = live(conn, ~p"/m/users/log-in/#{token}")
-
+      {:ok, _lv, html} = live(conn, ~p"/users/log-in/#{token}")
       assert html =~ "Confirm and stay logged in"
-      assert html =~ "m-confirmation-form"
+      assert html =~ "confirmation_form"
     end
   end
 end
