@@ -62,7 +62,7 @@ defmodule ArgusWeb.MobileLive.Components do
   defp accent(%{tier: tier}), do: tier_border(tier)
   defp accent(_), do: "border-transparent"
 
-    defp assignee_label(assigns) when assigns == nil do
+  defp assignee_label(assigns) when assigns == nil do
     ~H"""
     <div class="text-error">Unassigned</div>
     """

@@ -25,16 +25,21 @@ defmodule ArgusWeb.CycleBadgeTest do
     assert html =~ "text-error"
   end
 
-  test "live on-track (or undated) cycle renders nothing" do
+  test "live on-track dated cycle renders nothing" do
     assert badge_html(%{
              cycle_status: :live,
              tier: :ok,
              obligation: %Obligation{due_by: ~D[2027-01-01]}
            }) ==
              ""
+  end
 
-    assert badge_html(%{cycle_status: :live, tier: :none, obligation: %Obligation{due_by: nil}}) ==
-             ""
+  test "live undated (Someday) cycle shows a green Anytime badge" do
+    html =
+      badge_html(%{cycle_status: :live, tier: :none, obligation: %Obligation{due_by: nil}})
+
+    assert html =~ "Anytime"
+    assert html =~ "text-success"
   end
 
   test "completed cycle shows Completed + date in success colour" do
@@ -46,8 +51,8 @@ defmodule ArgusWeb.CycleBadgeTest do
       })
 
     assert html =~ "Completed"
-    assert html =~ "22 Mar 2026"
-    assert html =~ "text-success"
+    assert html =~ "2026-03-22"
+    assert html =~ "bg-success"
   end
 
   test "completed-in-error cycle uses the error colour" do
@@ -59,7 +64,8 @@ defmodule ArgusWeb.CycleBadgeTest do
         obligation: %Obligation{completed_at: @at}
       })
 
-    assert html =~ "text-error"
+    assert html =~ "Completed with error"
+    assert html =~ "bg-error"
   end
 
   test "skipped cycle shows Skipped + closed date in warning colour" do
@@ -67,7 +73,7 @@ defmodule ArgusWeb.CycleBadgeTest do
       badge_html(%{cycle_status: :skipped, tier: :ok, obligation: %Obligation{closed_at: @at}})
 
     assert html =~ "Skipped"
-    assert html =~ "22 Mar 2026"
-    assert html =~ "text-warning"
+    assert html =~ "2026-03-22"
+    assert html =~ "bg-warning"
   end
 end

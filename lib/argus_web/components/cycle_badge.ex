@@ -51,6 +51,11 @@ defmodule ArgusWeb.CycleBadge do
   defp badge(%{cycle_status: :series_ended, obligation: o}),
     do: %{color: "border-warning text-warning", label: "Series ended", date: fmt(o.closed_at)}
 
+  # A live duty with no due date is workable "anytime" — show a green badge
+  # rather than the (date-driven) urgency countdown.
+  defp badge(%{cycle_status: :live, obligation: %{due_by: nil}}),
+    do: %{color: "border-success text-success", label: "Anytime", date: nil}
+
   defp badge(%{cycle_status: :live, tier: tier, obligation: o, today: today}) do
     case UrgencyBadge.badge_text(tier, o.due_by, today) do
       nil -> nil
