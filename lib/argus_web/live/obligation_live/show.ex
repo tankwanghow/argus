@@ -39,7 +39,7 @@ defmodule ArgusWeb.ObligationLive.Show do
             <div class="flex flex-wrap items-center gap-1.5 min-w-0">
               <span class="font-medium text-info">{@obligation.obligation_type.name}</span>
             </div>
-            <div class="mt-2 flex flex-wrap items-center gap-1.5">
+            <div class="flex flex-wrap items-center gap-1.5">
               <span
                 :if={is_nil(@obligation.primary_assignee)}
                 class="badge badge-sm badge-secondary badge-soft gap-1"
@@ -92,6 +92,9 @@ defmodule ArgusWeb.ObligationLive.Show do
               <span class="argus-meta-label">Due</span>
               <span class="font-medium text-base-content">{format_date(@obligation.due_by)}</span>
               <span :if={@cycle_status == :skipped} class="text-base-content/60">· skipped</span>
+            </div>
+            <div :if={is_nil(@obligation.due_by)} class="font-medium text-base-content">
+              <span class="text-success">No Due Date</span>
             </div>
           </div>
           <div class="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 mt-2">

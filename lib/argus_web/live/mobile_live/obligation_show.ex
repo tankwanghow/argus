@@ -40,6 +40,9 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
               <div :if={@obligation.due_by} class="font-medium text-base-content">
                 <span class="text-warning">Due </span>{format_date(@obligation.due_by, :short)}
               </div>
+              <div :if={is_nil(@obligation.due_by)} class="font-medium text-base-content">
+                <span class="text-success">No Due Date</span>
+              </div>
               <div :if={@cycle_status == :skipped} class="text-warning">
                 Skipped
               </div>
