@@ -22,10 +22,10 @@ defmodule ArgusWeb.ObligationStatusBadge do
     ~H"""
     <div
       :if={@label}
-      class={["-space-y-1 text-center border rounded-xl p-1 whitespace-nowrap", @color]}
+      class={["inline-flex items-center gap-1 border rounded-xl px-2 py-0.5 whitespace-nowrap", @color]}
     >
-      <div class="font-bold text-xs">{@label}</div>
-      <div :if={@date} class="text-[12px]">{@date}</div>
+      <span class="font-bold text-xs">{@label}</span>
+      <span :if={@date} class="text-[12px]">{@date}</span>
     </div>
     """
   end
