@@ -99,6 +99,19 @@ defmodule ArgusWeb.Plugs.AutoRouteByDeviceTest do
       assert conn.halted
     end
 
+    test "redirects legacy /m/users log-in to /users", %{conn: conn} do
+      conn =
+        conn
+        |> put_req_header("user-agent", @mobile_ua)
+        |> Map.put(:request_path, "/m/users/log-in")
+        |> Map.put(:path_info, ["m", "users", "log-in"])
+        |> Map.put(:query_string, "")
+        |> AutoRouteByDevice.call([])
+
+      assert redirected_to(conn) == "/users/log-in"
+      assert conn.halted
+    end
+
     test "redirects legacy /m/users log-in token to /users", %{conn: conn} do
       conn =
         conn

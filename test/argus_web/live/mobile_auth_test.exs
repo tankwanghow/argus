@@ -13,9 +13,11 @@ defmodule ArgusWeb.MobileAuthTest do
       {:ok, _lv, register_html} = live(conn, ~p"/users/register")
       assert register_html =~ "Register"
       assert register_html =~ "Argus"
+      refute register_html =~ ~s|id="entity-nav"|
 
       {:ok, view, login_html} = live(conn, ~p"/users/log-in")
       assert login_html =~ "Log in with email"
+      refute login_html =~ ~s|id="entity-nav"|
       assert has_element?(view, "#login_form_password")
     end
 
@@ -43,6 +45,21 @@ defmodule ArgusWeb.MobileAuthTest do
         |> follow_redirect(conn, ~p"/users/log-in")
 
       assert html =~ "An email was sent"
+    end
+
+    test "desktop UA password login redirects to desktop dashboard", %{conn: conn} do
+      scope = Argus.EntitiesFixtures.entity_scope_fixture()
+      user = set_password(scope.user)
+
+      {:ok, lv, _html} = live(conn, ~p"/users/log-in")
+
+      form =
+        form(lv, "#login_form_password",
+          user: %{identifier: user.email, password: valid_user_password(), remember_me: true}
+        )
+
+      conn = submit_form(form, conn)
+      assert redirected_to(conn) == ~p"/entities/#{scope.entity.slug}"
     end
 
     test "mobile UA password login redirects to mobile dashboard", %{conn: conn} do
