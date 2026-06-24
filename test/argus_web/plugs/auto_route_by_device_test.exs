@@ -74,6 +74,45 @@ defmodule ArgusWeb.Plugs.AutoRouteByDeviceTest do
       assert conn.halted
     end
 
+    test "redirects mobile UA from desktop register to mobile", %{conn: conn} do
+      conn =
+        conn
+        |> put_req_header("user-agent", @mobile_ua)
+        |> Map.put(:request_path, "/users/register")
+        |> Map.put(:path_info, ["users", "register"])
+        |> Map.put(:query_string, "")
+        |> AutoRouteByDevice.call([])
+
+      assert redirected_to(conn) == "/m/users/register"
+      assert conn.halted
+    end
+
+    test "redirects mobile UA from desktop log-in token to mobile", %{conn: conn} do
+      conn =
+        conn
+        |> put_req_header("user-agent", @mobile_ua)
+        |> Map.put(:request_path, "/users/log-in/sometoken")
+        |> Map.put(:path_info, ["users", "log-in", "sometoken"])
+        |> Map.put(:query_string, "")
+        |> AutoRouteByDevice.call([])
+
+      assert redirected_to(conn) == "/m/users/log-in/sometoken"
+      assert conn.halted
+    end
+
+    test "redirects desktop UA from mobile register to desktop", %{conn: conn} do
+      conn =
+        conn
+        |> put_req_header("user-agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X)")
+        |> Map.put(:request_path, "/m/users/register")
+        |> Map.put(:path_info, ["m", "users", "register"])
+        |> Map.put(:query_string, "")
+        |> AutoRouteByDevice.call([])
+
+      assert redirected_to(conn) == "/users/register"
+      assert conn.halted
+    end
+
     test "redirects mobile UA from desktop obligation types to mobile", %{conn: conn} do
       conn =
         conn

@@ -36,10 +36,11 @@ defmodule ArgusWeb.UserAuth do
   """
   def log_in_user(conn, user, params \\ %{}) do
     user_return_to = get_session(conn, :user_return_to)
+    mobile? = ArgusWeb.Device.mobile?(conn)
 
     conn
     |> create_or_extend_session(user, params)
-    |> redirect(to: user_return_to || signed_in_path(conn))
+    |> redirect(to: user_return_to || default_entity_path(user, mobile: mobile?))
   end
 
   @doc """
@@ -291,8 +292,15 @@ defmodule ArgusWeb.UserAuth do
   end
 
   @doc "Returns the path to redirect to after log in."
-  def signed_in_path(%Plug.Conn{assigns: %{current_scope: %Scope{user: %Accounts.User{} = user}}}) do
-    default_entity_path(user)
+  def signed_in_path(
+        %Plug.Conn{assigns: %{current_scope: %Scope{user: %Accounts.User{} = user}}} = conn
+      ) do
+    default_entity_path(user, mobile: ArgusWeb.Device.mobile?(conn))
+  end
+
+  def signed_in_path(%Phoenix.LiveView.Socket{} = socket) do
+    user = socket.assigns.current_scope.user
+    default_entity_path(user, mobile: mobile_from_socket?(socket))
   end
 
   def signed_in_path(_), do: ~p"/"
@@ -301,20 +309,31 @@ defmodule ArgusWeb.UserAuth do
   If the user belongs to exactly one entity, returns that entity's dashboard path;
   otherwise returns the entities picker.
   """
-  def default_entity_path(%Accounts.User{} = user) do
+  def default_entity_path(%Accounts.User{} = user, opts \\ []) do
+    mobile? = Keyword.get(opts, :mobile, false)
     memberships = Entities.list_entity_memberships(user)
 
     cond do
       default = Enum.find(memberships, fn {_, m} -> m.is_default end) ->
         {entity, _} = default
-        ~p"/entities/#{entity.slug}"
+        entity_dashboard_path(entity, mobile?)
 
       match?([{_entity, _}], memberships) ->
         [{entity, _}] = memberships
-        ~p"/entities/#{entity.slug}"
+        entity_dashboard_path(entity, mobile?)
 
       true ->
         ~p"/entities"
+    end
+  end
+
+  defp entity_dashboard_path(entity, true), do: ~p"/m/#{entity.slug}"
+  defp entity_dashboard_path(entity, false), do: ~p"/entities/#{entity.slug}"
+
+  defp mobile_from_socket?(socket) do
+    case Phoenix.LiveView.get_connect_info(socket, :user_agent) do
+      ua when is_binary(ua) -> ArgusWeb.Device.mobile_user_agent?(ua)
+      _ -> false
     end
   end
 

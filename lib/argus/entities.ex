@@ -18,6 +18,19 @@ defmodule Argus.Entities do
     Entity.changeset(entity, attrs)
   end
 
+  def update_entity(%Scope{user: %User{} = user}, %Entity{} = entity, attrs) do
+    membership = get_membership!(user, entity)
+    scope = Scope.put_entity(Scope.for_user(user), entity, membership)
+
+    if Authorization.can?(scope, :manage_entity) do
+      entity
+      |> change_entity(attrs)
+      |> Repo.update()
+    else
+      :not_authorise
+    end
+  end
+
   def create_entity(%Scope{user: %User{} = user}, attrs) do
     now = DateTime.utc_now(:second)
 

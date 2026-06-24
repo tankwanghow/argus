@@ -11,7 +11,7 @@ defmodule ArgusWeb.Plugs.AutoRouteByDevice do
   is respected on every subsequent request.
 
   Only redirects when the destination route is known to exist on the
-  other side. Pages that exist on only one UI (types, members, etc.)
+  other side. Pages that exist on only one UI (members, etc.)
   pass through untouched so we never 404 the user out.
   """
   @behaviour Plug
@@ -43,8 +43,14 @@ defmodule ArgusWeb.Plugs.AutoRouteByDevice do
       cookie == "mobile" and invitation_landing?(path) ->
         redirect_swap(conn, path, "/invitations/", "/m/invitations/")
 
+      cookie == "mobile" and auth_landing?(path) ->
+        redirect_swap(conn, path, "/users/", "/m/users/")
+
       cookie == "desktop" and mobile_invitation_landing?(path) ->
         redirect_swap(conn, path, "/m/invitations/", "/invitations/")
+
+      cookie == "desktop" and mobile_auth_landing?(path) ->
+        redirect_swap(conn, path, "/m/users/", "/users/")
 
       cookie == "desktop" and mobile_url?(path) ->
         redirect_swap(conn, path, "/m/", "/entities/")
@@ -58,8 +64,14 @@ defmodule ArgusWeb.Plugs.AutoRouteByDevice do
       mobile_ua?(conn) and invitation_landing?(path) ->
         redirect_swap(conn, path, "/invitations/", "/m/invitations/")
 
+      mobile_ua?(conn) and auth_landing?(path) ->
+        redirect_swap(conn, path, "/users/", "/m/users/")
+
       not mobile_ua?(conn) and mobile_invitation_landing?(path) ->
         redirect_swap(conn, path, "/m/invitations/", "/invitations/")
+
+      not mobile_ua?(conn) and mobile_auth_landing?(path) ->
+        redirect_swap(conn, path, "/m/users/", "/users/")
 
       not mobile_ua?(conn) and mobile_url?(path) ->
         redirect_swap(conn, path, "/m/", "/entities/")
@@ -89,6 +101,16 @@ defmodule ArgusWeb.Plugs.AutoRouteByDevice do
       ["", token] -> token != "" and not String.contains?(token, "/")
       _ -> false
     end
+  end
+
+  defp auth_landing?(path) do
+    path in ["/users/register", "/users/log-in"] or
+      String.match?(path, ~r{^/users/log-in/[^/]+$})
+  end
+
+  defp mobile_auth_landing?(path) do
+    path in ["/m/users/register", "/m/users/log-in"] or
+      String.match?(path, ~r{^/m/users/log-in/[^/]+$})
   end
 
   defp mobile_ua?(conn), do: ArgusWeb.Device.mobile_ua?(conn)

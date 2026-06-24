@@ -95,6 +95,9 @@ defmodule ArgusWeb.Router do
       live "/users/register", UserLive.Registration, :new
       live "/users/log-in", UserLive.Login, :new
       live "/users/log-in/:token", UserLive.Confirmation, :new
+      live "/m/users/register", MobileLive.Registration, :new
+      live "/m/users/log-in", MobileLive.Login, :new
+      live "/m/users/log-in/:token", MobileLive.Confirmation, :new
       live "/invitations/:token", InvitationLive.Show, :show
       live "/m/invitations/:token", MobileLive.InvitationShow, :show
     end
