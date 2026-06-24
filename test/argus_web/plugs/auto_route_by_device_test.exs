@@ -86,45 +86,6 @@ defmodule ArgusWeb.Plugs.AutoRouteByDeviceTest do
       refute conn.halted
     end
 
-    test "redirects legacy /m/users paths to /users", %{conn: conn} do
-      conn =
-        conn
-        |> put_req_header("user-agent", @mobile_ua)
-        |> Map.put(:request_path, "/m/users/register")
-        |> Map.put(:path_info, ["m", "users", "register"])
-        |> Map.put(:query_string, "")
-        |> AutoRouteByDevice.call([])
-
-      assert redirected_to(conn) == "/users/register"
-      assert conn.halted
-    end
-
-    test "redirects legacy /m/users log-in to /users", %{conn: conn} do
-      conn =
-        conn
-        |> put_req_header("user-agent", @mobile_ua)
-        |> Map.put(:request_path, "/m/users/log-in")
-        |> Map.put(:path_info, ["m", "users", "log-in"])
-        |> Map.put(:query_string, "")
-        |> AutoRouteByDevice.call([])
-
-      assert redirected_to(conn) == "/users/log-in"
-      assert conn.halted
-    end
-
-    test "redirects legacy /m/users log-in token to /users", %{conn: conn} do
-      conn =
-        conn
-        |> put_req_header("user-agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X)")
-        |> Map.put(:request_path, "/m/users/log-in/sometoken")
-        |> Map.put(:path_info, ["m", "users", "log-in", "sometoken"])
-        |> Map.put(:query_string, "")
-        |> AutoRouteByDevice.call([])
-
-      assert redirected_to(conn) == "/users/log-in/sometoken"
-      assert conn.halted
-    end
-
     test "redirects mobile UA from desktop obligation types to mobile", %{conn: conn} do
       conn =
         conn
@@ -279,6 +240,32 @@ defmodule ArgusWeb.Plugs.AutoRouteByDeviceTest do
         |> AutoRouteByDevice.call([])
 
       refute conn.halted
+    end
+  end
+
+  describe "legacy /m/users auth paths via router" do
+    test "GET /m/users/register redirects to unified register", %{conn: conn} do
+      conn = get(conn, ~p"/m/users/register")
+      assert redirected_to(conn) == ~p"/users/register"
+    end
+
+    test "GET /m/users/log-in redirects to unified log-in", %{conn: conn} do
+      conn = get(conn, ~p"/m/users/log-in")
+      assert redirected_to(conn) == ~p"/users/log-in"
+    end
+
+    test "GET /m/users/log-in/:token redirects to unified confirmation", %{conn: conn} do
+      conn = get(conn, ~p"/m/users/log-in/some-token")
+      assert redirected_to(conn) == ~p"/users/log-in/some-token"
+    end
+
+    test "legacy register redirect works with mobile UA through full router", %{conn: conn} do
+      conn =
+        conn
+        |> put_req_header("user-agent", @mobile_ua)
+        |> get(~p"/m/users/register")
+
+      assert redirected_to(conn) == ~p"/users/register"
     end
   end
 end

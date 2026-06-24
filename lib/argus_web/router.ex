@@ -99,9 +99,11 @@ defmodule ArgusWeb.Router do
       live "/m/invitations/:token", MobileLive.InvitationShow, :show
     end
 
-    get "/m/users/register", LegacyAuthRedirectController, :show
-    get "/m/users/log-in/:token", LegacyAuthRedirectController, :show
-    get "/m/users/log-in", LegacyAuthRedirectController, :show
+    # Legacy /m/users/* bookmarks — AutoRouteByDevice redirects to /users/* before
+    # PageController runs; routes exist only so the plug pipeline is entered.
+    get "/m/users/register", PageController, :home
+    get "/m/users/log-in/:token", PageController, :home
+    get "/m/users/log-in", PageController, :home
 
     post "/invitations/:token/accept", InvitationController, :accept
     post "/m/invitations/:token/accept", InvitationController, :mobile_accept

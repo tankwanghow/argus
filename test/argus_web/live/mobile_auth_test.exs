@@ -5,8 +5,7 @@ defmodule ArgusWeb.MobileAuthTest do
   import Argus.AccountsFixtures
 
   alias Argus.Accounts
-  alias Argus.Entities.Membership
-  alias Argus.Repo
+  alias Argus.Entities
 
   @mobile_ua "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)"
   @standalone_shell_class "min-h-screen bg-base-200 flex flex-col items-center justify-center"
@@ -93,22 +92,15 @@ defmodule ArgusWeb.MobileAuthTest do
       admin_scope = Argus.EntitiesFixtures.entity_scope_fixture()
       conn = put_req_header(conn, "user-agent", @mobile_ua)
 
-      {:ok, lv, _html} = live(conn, ~p"/users/register")
-
       email = unique_user_email()
+      {:ok, invitation} = Entities.invite_member(admin_scope, email, "member")
+
+      {:ok, lv, _html} = live(conn, ~p"/users/register")
 
       render_submit(form(lv, "#registration_form", user: valid_user_attributes(email: email)))
 
       user = Accounts.get_user_by_email(email)
-
-      %Membership{
-        user_id: user.id,
-        entity_id: admin_scope.entity.id,
-        role: "member",
-        accepted_at: DateTime.utc_now(:second)
-      }
-      |> Membership.changeset(%{})
-      |> Repo.insert!()
+      assert {:ok, _membership} = Entities.accept_invitation(user, invitation.token)
 
       token =
         extract_user_token(fn url ->
