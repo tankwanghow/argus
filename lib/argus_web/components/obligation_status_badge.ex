@@ -38,7 +38,7 @@ defmodule ArgusWeb.ObligationStatusBadge do
   defp color(:completed, true), do: "bg-error"
   defp color(:completed, _), do: "bg-success"
   defp color(:skipped, _), do: "bg-warning"
-  defp color(:series_ended, _), do: "bg-neutral text-neutral-content"
+  defp color(:series_ended, _), do: "text-warning border-warning"
   defp color(_, _), do: ""
 
   defp terminal_date(:completed, %{completed_at: at}), do: fmt(at)
