@@ -15,6 +15,7 @@ defmodule ArgusWeb.EntityLive.Select do
         form={@form}
         editing_entity_id={@editing_entity_id}
         edit_form={@edit_form}
+        mobile?={true}
       />
     </Layouts.mobile_simple>
 
@@ -24,6 +25,7 @@ defmodule ArgusWeb.EntityLive.Select do
         form={@form}
         editing_entity_id={@editing_entity_id}
         edit_form={@edit_form}
+        mobile?={false}
       />
     </Layouts.app>
     """
@@ -31,7 +33,7 @@ defmodule ArgusWeb.EntityLive.Select do
 
   @impl true
   def mount(params, _session, socket) do
-    mobile? = mobile_ui?(socket)
+    mobile? = ArgusWeb.Device.mobile_from_socket?(socket)
     memberships = Entities.list_entity_memberships(socket.assigns.current_scope.user)
     socket = assign(socket, :mobile?, mobile?)
 
@@ -162,11 +164,4 @@ defmodule ArgusWeb.EntityLive.Select do
 
   defp entity_dashboard_path(%Entity{} = entity, true), do: ~p"/m/#{entity.slug}"
   defp entity_dashboard_path(%Entity{} = entity, false), do: ~p"/entities/#{entity.slug}"
-
-  defp mobile_ui?(socket) do
-    case Phoenix.LiveView.get_connect_info(socket, :user_agent) do
-      ua when is_binary(ua) -> ArgusWeb.Device.mobile_user_agent?(ua)
-      _ -> false
-    end
-  end
 end

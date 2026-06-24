@@ -5,6 +5,8 @@ defmodule ArgusWeb.UserLive.SettingsTest do
   import Phoenix.LiveViewTest
   import Argus.AccountsFixtures
 
+  @mobile_ua "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)"
+
   describe "Settings page" do
     test "renders settings page", %{conn: conn} do
       {:ok, _lv, html} =
@@ -14,6 +16,19 @@ defmodule ArgusWeb.UserLive.SettingsTest do
 
       assert html =~ "Change Email"
       assert html =~ "Save Password"
+    end
+
+    test "mobile UA uses mobile layout without desktop shell", %{conn: conn} do
+      {:ok, _lv, html} =
+        conn
+        |> log_in_user(user_fixture())
+        |> put_req_header("user-agent", @mobile_ua)
+        |> live(~p"/users/settings")
+
+      assert html =~ "Account Settings"
+      assert html =~ "Change Email"
+      refute html =~ ~s|id="argus-shell"|
+      refute html =~ "Get started"
     end
 
     test "redirects if user is not logged in", %{conn: conn} do

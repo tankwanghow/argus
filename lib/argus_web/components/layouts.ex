@@ -44,8 +44,7 @@ defmodule ArgusWeb.Layouts do
       <.doc_preview_modal />
       <header class="navbar px-4 sm:px-6 lg:px-8 border-b border-base-300">
         <div class="flex-1">
-          <.link navigate={~p"/"} class="flex items-center gap-2 font-bold text-lg">
-            <img src={~p"/images/logo.svg"} width="32" height="32" alt="" class="shrink-0" />
+          <.link navigate={entity_dashboard_nav(@current_scope)} class="flex items-center gap-2 font-bold text-lg">
             <span>Argus</span>
             <span
               :if={entity_scope?(@current_scope)}
@@ -380,7 +379,7 @@ defmodule ArgusWeb.Layouts do
             ]}
           >
             <.icon name="hero-plus-circle" class="size-6" />
-            <span class="text-[11px]">New</span>
+            <span class="text-[11px]">New Duty</span>
           </.link>
         </li>
         <li>
@@ -511,6 +510,9 @@ defmodule ArgusWeb.Layouts do
     </div>
     """
   end
+
+  defp entity_dashboard_nav(%{entity: %{slug: slug}}), do: ~p"/entities/#{slug}"
+  defp entity_dashboard_nav(_), do: ~p"/"
 
   defp entity_scope?(%{entity: %{} = _entity}), do: true
   defp entity_scope?(_), do: false

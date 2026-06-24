@@ -182,7 +182,7 @@ defmodule ArgusWeb.ObligationLive.Show do
                 phx-click="open_progress_modal"
                 class="btn btn-success btn-sm"
               >
-                Update progress
+                <.icon name="hero-arrow-right" class="size-5" />Update progress
               </button>
             </div>
             <div
@@ -196,7 +196,7 @@ defmodule ArgusWeb.ObligationLive.Show do
                 phx-click="open_done_modal"
                 class="btn btn-primary btn-sm"
               >
-                Mark done
+                <.icon name="hero-check-mini" class="size-5" />Mark done
               </button>
             </div>
             <div id="obligation-series-actions" class="argus-inline-actions ml-auto">
@@ -207,16 +207,16 @@ defmodule ArgusWeb.ObligationLive.Show do
                 phx-click="open_skip_modal"
                 class="btn btn-outline btn-warning btn-sm"
               >
-                Skip
+                <.icon name="hero-arrow-uturn-right" class="size-5" />Skip
               </button>
               <button
                 :if={Authorization.can?(@current_scope, :end_series)}
                 id="end-series-btn"
                 type="button"
                 phx-click="open_end_series_modal"
-                class="btn btn-ghost btn-sm"
+                class="btn btn-outline btn-sm"
               >
-                End series
+                <.icon name="hero-no-symbol" class="size-5" />End series
               </button>
             </div>
           </div>

@@ -6,6 +6,7 @@ defmodule ArgusWeb.EntityPicker do
   attr :form, :any, required: true
   attr :editing_entity_id, :any, default: nil
   attr :edit_form, :any, default: nil
+  attr :mobile?, :boolean, default: false
 
   def picker(assigns) do
     ~H"""
@@ -23,7 +24,7 @@ defmodule ArgusWeb.EntityPicker do
         >
           <div class="flex items-center justify-between gap-3">
             <div class="flex items-center gap-2 min-w-0">
-              <span class="font-medium truncate">{entity.name}</span>
+              <span class="font-medium wrap">{entity.name}</span>
               <span
                 :if={membership.is_default}
                 class="badge badge-sm badge-primary shrink-0"
@@ -43,7 +44,7 @@ defmodule ArgusWeb.EntityPicker do
               >
                 Edit
               </button>
-              <.link href={~p"/entities/#{entity.slug}"} class="btn btn-primary btn-sm">
+              <.link href={enter_entity_path(entity.slug, @mobile?)} class="btn btn-primary btn-sm">
                 Enter
               </.link>
             </div>
@@ -122,6 +123,9 @@ defmodule ArgusWeb.EntityPicker do
     </div>
     """
   end
+
+  defp enter_entity_path(slug, true), do: ~p"/m/#{slug}"
+  defp enter_entity_path(slug, false), do: ~p"/entities/#{slug}"
 
   defp timezone_options do
     [

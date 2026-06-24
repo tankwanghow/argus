@@ -330,12 +330,7 @@ defmodule ArgusWeb.UserAuth do
   defp entity_dashboard_path(entity, true), do: ~p"/m/#{entity.slug}"
   defp entity_dashboard_path(entity, false), do: ~p"/entities/#{entity.slug}"
 
-  defp mobile_from_socket?(socket) do
-    case Phoenix.LiveView.get_connect_info(socket, :user_agent) do
-      ua when is_binary(ua) -> ArgusWeb.Device.mobile_user_agent?(ua)
-      _ -> false
-    end
-  end
+  defp mobile_from_socket?(socket), do: ArgusWeb.Device.mobile_from_socket?(socket)
 
   @doc """
   Plug for routes that require the user to be authenticated.

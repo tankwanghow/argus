@@ -58,7 +58,7 @@ defmodule ArgusWeb.EntityLiveSelectTest do
 
     assert html =~ "Your entities"
     assert html =~ "Beta Corp"
-    assert has_element?(view, "a[href='/entities/#{other.slug}']", "Enter")
+    assert has_element?(view, "a[href='/m/#{other.slug}']", "Enter")
   end
 
   test "admin can edit entity name and timezone from picker", %{conn: conn} do
@@ -128,9 +128,19 @@ defmodule ArgusWeb.EntityLiveSelectTest do
              Entities.update_entity(member, entity, %{name: "Nope"})
   end
 
-  test "enter links use desktop paths so AutoRoute can redirect mobile UAs", %{conn: conn} do
+  test "mobile picker enter links go directly to mobile dashboard", %{conn: conn} do
     scope = Argus.EntitiesFixtures.manager_scope_fixture()
     conn = mobile_conn(conn, scope)
+
+    {:ok, view, _html} = live(conn, ~p"/entities?pick=1")
+
+    assert has_element?(view, "a[href='/m/#{scope.entity.slug}']", "Enter")
+    refute render(view) =~ ~s|href="/entities/#{scope.entity.slug}"|
+  end
+
+  test "desktop picker enter links use desktop dashboard paths", %{conn: conn} do
+    scope = Argus.EntitiesFixtures.manager_scope_fixture()
+    conn = log_in_user(conn, scope.user)
 
     {:ok, view, _html} = live(conn, ~p"/entities?pick=1")
 

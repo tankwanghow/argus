@@ -27,4 +27,12 @@ defmodule ArgusWeb.Device do
   @doc "True when a raw user-agent string looks like a mobile device."
   def mobile_user_agent?(ua) when is_binary(ua), do: String.match?(ua, @mobile_ua)
   def mobile_user_agent?(_), do: false
+
+  @doc "True when a LiveView socket should render the mobile UI."
+  def mobile_from_socket?(socket) do
+    case Phoenix.LiveView.get_connect_info(socket, :user_agent) do
+      ua when is_binary(ua) -> mobile_user_agent?(ua)
+      _ -> false
+    end
+  end
 end

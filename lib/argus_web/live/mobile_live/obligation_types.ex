@@ -10,12 +10,9 @@ defmodule ArgusWeb.MobileLive.ObligationTypes do
   def render(assigns) do
     ~H"""
     <Layouts.mobile_app flash={@flash} current_scope={@current_scope} active={:more}>
-      <div id="m-obligation-types" class="px-2 py-2">
+      <div id="m-obligation-types" class="p-4">
         <div class="flex items-center justify-between gap-2 mb-3">
-          <.link navigate={~p"/m/#{@current_scope.entity.slug}"} class="btn btn-ghost btn-sm">
-            <.icon name="hero-arrow-left-micro" class="size-4" /> Back
-          </.link>
-          <h1 class="font-semibold text-sm">Duty types</h1>
+          <div class="font-semibold text-xl">Duty types</div>
           <button
             :if={@can_manage?}
             id="m-new-type-btn"
@@ -23,7 +20,7 @@ defmodule ArgusWeb.MobileLive.ObligationTypes do
             phx-click="new"
             class="btn btn-primary btn-sm gap-1"
           >
-            <.icon name="hero-plus-mini" class="size-4" /> New
+            <.icon name="hero-plus-mini" class="size-4" /> New Type
           </button>
           <div :if={not @can_manage?} class="w-14"></div>
         </div>

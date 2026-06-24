@@ -215,10 +215,10 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
                 id="m-end-series-btn"
                 type="button"
                 phx-click="open_end_series_modal"
-                class="btn btn-ghost btn-square h-11 min-h-11 w-11"
+                class="btn btn-outline btn-square h-11 min-h-11 w-11"
                 aria-label="End series"
               >
-                <.icon name="hero-stop" class="size-5" />
+                <.icon name="hero-no-symbol" class="size-5" />
               </button>
             </div>
           </div>
