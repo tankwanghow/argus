@@ -14,7 +14,7 @@ defmodule ArgusWeb.Plugs.AutoRouteByDeviceTest do
       tails = AutoRouteByDevice.mobile_capable_tails()
 
       assert "/obligations/new" in tails
-      refute "/obligation-types" in tails
+      assert "/obligation-types" in tails
       refute "/members" in tails
     end
   end
@@ -71,6 +71,32 @@ defmodule ArgusWeb.Plugs.AutoRouteByDeviceTest do
         |> AutoRouteByDevice.call([])
 
       assert redirected_to(conn) == "/m/acme/obligations/new"
+      assert conn.halted
+    end
+
+    test "redirects mobile UA from desktop obligation types to mobile", %{conn: conn} do
+      conn =
+        conn
+        |> put_req_header("user-agent", @mobile_ua)
+        |> Map.put(:request_path, "/entities/acme/obligation-types")
+        |> Map.put(:path_info, ["entities", "acme", "obligation-types"])
+        |> Map.put(:query_string, "")
+        |> AutoRouteByDevice.call([])
+
+      assert redirected_to(conn) == "/m/acme/obligation-types"
+      assert conn.halted
+    end
+
+    test "redirects desktop UA from mobile obligation types to desktop", %{conn: conn} do
+      conn =
+        conn
+        |> put_req_header("user-agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X)")
+        |> Map.put(:request_path, "/m/acme/obligation-types")
+        |> Map.put(:path_info, ["m", "acme", "obligation-types"])
+        |> Map.put(:query_string, "")
+        |> AutoRouteByDevice.call([])
+
+      assert redirected_to(conn) == "/entities/acme/obligation-types"
       assert conn.halted
     end
 

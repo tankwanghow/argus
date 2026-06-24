@@ -246,6 +246,101 @@ defmodule ArgusWeb.MobileLiveTest do
     assert render(view) =~ "skipped"
   end
 
+  test "mobile more sheet shows Types link for managers", %{conn: conn} do
+    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    conn = mobile_conn(conn, manager)
+
+    {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}")
+
+    assert has_element?(view, "#m-more-types-link", "Types")
+  end
+
+  test "mobile more sheet hides Types link for members", %{conn: conn} do
+    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    member = member_scope_on_entity(manager.entity)
+    conn = mobile_conn(conn, member)
+
+    {:ok, view, _html} = live(conn, ~p"/m/#{member.entity.slug}")
+
+    refute has_element?(view, "#m-more-types-link")
+  end
+
+  test "mobile types page lists types and supports create", %{conn: conn} do
+    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    conn = mobile_conn(conn, manager)
+
+    {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}/obligation-types")
+
+    assert has_element?(view, "#m-obligation-types")
+    assert has_element?(view, "#m-types")
+    assert has_element?(view, "#m-new-type-btn")
+
+    view |> element("#m-new-type-btn") |> render_click()
+    assert has_element?(view, "#m-type-modal")
+
+    view
+    |> form("#m-type-form", %{
+      "type" => %{
+        "name" => "GST Return",
+        "recurring_interval" => "quarterly",
+        "reminder_offsets" => "30,7"
+      }
+    })
+    |> render_submit()
+
+    assert has_element?(view, "#m-types", "GST Return")
+  end
+
+  test "mobile types page supports clone and edit", %{conn: conn} do
+    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    conn = mobile_conn(conn, manager)
+
+    [epf | _] =
+      Obligations.list_types(manager)
+      |> Enum.filter(&(&1.name == "EPF Monthly"))
+
+    {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}/obligation-types")
+
+    view |> element("#m-clone-type-#{epf.id}") |> render_click()
+    assert has_element?(view, "#m-type-form")
+
+    view |> form("#m-type-form", %{"type" => %{}}) |> render_submit()
+    assert has_element?(view, "#m-types", "EPF Monthly (copy)")
+
+    view |> element("#m-edit-type-#{epf.id}") |> render_click()
+
+    view
+    |> form("#m-type-form", %{"type" => %{"name" => "EPF Monthly (edited)"}})
+    |> render_submit()
+
+    assert has_element?(view, "#m-types", "EPF Monthly (edited)")
+  end
+
+  test "mobile types page is read-only for members", %{conn: conn} do
+    member = member_scope_on_entity(Argus.EntitiesFixtures.manager_scope_fixture().entity)
+    conn = mobile_conn(conn, member)
+
+    {:ok, view, _html} = live(conn, ~p"/m/#{member.entity.slug}/obligation-types")
+
+    assert has_element?(view, "#m-types")
+    refute has_element?(view, "#m-new-type-btn")
+    refute has_element?(view, "[id^='m-clone-type-']")
+    refute has_element?(view, "[id^='m-edit-type-']")
+  end
+
+  test "mobile escape closes the type editor modal", %{conn: conn} do
+    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    conn = mobile_conn(conn, manager)
+
+    {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}/obligation-types")
+
+    view |> element("#m-new-type-btn") |> render_click()
+    assert has_element?(view, "#m-type-modal")
+
+    view |> element("#argus-shell") |> render_keydown()
+    refute has_element?(view, "#m-type-modal")
+  end
+
   test "mobile more sheet links to all entities picker", %{conn: conn} do
     {scope, _} = assigned_member_scope_fixture()
     conn = mobile_conn(conn, scope)

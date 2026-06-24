@@ -449,6 +449,19 @@ defmodule ArgusWeb.Layouts do
               <span>Invite members</span>
             </.link>
           </li>
+          <li :if={
+            @current_scope && @current_scope.entity &&
+              Argus.Authorization.can?(@current_scope, :manage_types)
+          }>
+            <.link
+              id="m-more-types-link"
+              navigate={~p"/m/#{@current_scope.entity.slug}/obligation-types"}
+              class="flex items-center gap-3 px-4 py-4 active:bg-base-200"
+            >
+              <.icon name="hero-tag" class="size-5 text-base-content/60" />
+              <span>Types</span>
+            </.link>
+          </li>
           <li :if={@current_scope && @current_scope.entity}>
             <a
               href={ArgusWeb.Paths.view_mode("desktop", "/entities/#{@current_scope.entity.slug}")}
