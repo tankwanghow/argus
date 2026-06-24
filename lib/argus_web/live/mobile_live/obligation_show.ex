@@ -48,8 +48,8 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
               </div>
             </div>
           </div>
-          <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <h1 class="text-lg font-semibold leading-tight min-w-0 flex-1">{@obligation.title}</h1>
+          <div class="flex flex-wrap items-center gap-2">
+            <h1 class="font-semibold leading-tight min-w-0 flex-1">{@obligation.title}</h1>
             <.cycle_badge
               cycle_status={@cycle_status}
               tier={@tier}

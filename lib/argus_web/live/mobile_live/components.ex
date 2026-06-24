@@ -25,7 +25,7 @@ defmodule ArgusWeb.MobileLive.Components do
         class={["block rounded-box border border-base-300 p-3 border-l-4", accent(@row)]}
       >
         <div class="flex items-center mb-1 justify-between gap-1">
-          <div class="text-l font-medium truncate max-w-[15rem]">{@row.obligation.title}</div>
+          <div class="font-medium truncate max-w-[15rem]">{@row.obligation.title}</div>
           <.cycle_badge
             cycle_status={@row.cycle_status}
             tier={@row.tier}
