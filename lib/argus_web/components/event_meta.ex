@@ -13,7 +13,10 @@ defmodule ArgusWeb.EventMeta do
   def event_meta(assigns) do
     ~H"""
     <div class="flex flex-wrap items-center gap-x-1 gap-y-0.5 text-xs text-base-content/60 mt-1">
-      <span class={["badge badge-xs", status_badge_class(@event.status)]}>
+      <span
+        :if={@event.status in ["open", "in_progress"]}
+        class={["badge badge-xs", status_badge_class(@event.status)]}
+      >
         {humanize_status(@event.status)}
       </span>
       <span :if={@show_actor and @event.status_by}>by {@event.status_by.email}</span>
@@ -24,14 +27,12 @@ defmodule ArgusWeb.EventMeta do
     """
   end
 
+  # Only open / in_progress reach here — terminal states are shown by the
+  # cycle's status badge, so their event badge is suppressed (see event_meta/1).
   defp humanize_status("in_progress"), do: "In progress"
-  defp humanize_status("series_ended"), do: "Series ended"
   defp humanize_status(status), do: String.capitalize(status)
 
   defp status_badge_class("in_progress"), do: "badge-warning badge-soft"
-  defp status_badge_class("done"), do: "badge-success badge-soft"
-  defp status_badge_class("skipped"), do: "badge-warning badge-soft"
-  defp status_badge_class("series_ended"), do: "badge-neutral badge-soft"
   defp status_badge_class(_), do: "badge-ghost"
 
   defp truncate_note(note) when is_binary(note) do

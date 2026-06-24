@@ -73,21 +73,11 @@ defmodule ArgusWeb.MobileLive.Components do
   defp text_color(%{tier: tier}) when tier in [:due_soon, :approaching], do: "text-warning"
   defp text_color(_), do: "text-base-content/50"
 
-  defp card_meta(%{cycle_status: :completed, obligation: o}) do
-    "completed #{format_datetime(o.completed_at)} · due #{format_date(o.due_by)}"
-  end
-
-  defp card_meta(%{cycle_status: status, obligation: o})
-       when status in [:skipped, :series_ended] do
-    "#{humanize_cycle(status)} · due #{format_date(o.due_by)}"
-  end
-
+  # Terminal status + date live in the top-right status badge; the card meta line
+  # only carries the due date (the badge owns "completed/skipped …").
   defp card_meta(%{obligation: %{due_by: nil}}), do: ""
 
   defp card_meta(%{obligation: o}) do
     "due #{format_date(o.due_by)}"
   end
-
-  defp humanize_cycle(:series_ended), do: "series ended"
-  defp humanize_cycle(_), do: "skipped"
 end
