@@ -113,7 +113,7 @@ defmodule ArgusWeb.Layouts do
         <.entity_nav_link
           href={~p"/entities/#{@current_scope.entity.slug}"}
           icon="hero-home-micro"
-          label="Dashboard"
+          label="Duties"
         />
         <.entity_nav_link
           href={~p"/entities/#{@current_scope.entity.slug}/obligation-types"}

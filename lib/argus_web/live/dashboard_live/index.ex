@@ -13,7 +13,7 @@ defmodule ArgusWeb.DashboardLive.Index do
       <div id="dashboard" class="argus-page">
         <div class="argus-page-toolbar space-y-3">
           <.header>
-            Dashboard
+            Duties
             <:actions>
               <.link
                 :if={Authorization.can?(@current_scope, :create_obligation)}
