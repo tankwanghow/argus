@@ -375,7 +375,7 @@ defmodule ArgusWeb.Layouts do
 
     ~H"""
     <nav class="fixed bottom-0 inset-x-0 z-30 bg-base-100 border-t border-base-300 pb-[env(safe-area-inset-bottom)]">
-      <ul class={["grid", if(@can_create, do: "grid-cols-3", else: "grid-cols-2")]}>
+      <ul class={["grid", if(@can_create, do: "grid-cols-4", else: "grid-cols-3")]}>
         <li :if={@can_create}>
           <.link
             id="m-new-obligation-btn"
@@ -401,6 +401,20 @@ defmodule ArgusWeb.Layouts do
           >
             <.icon name="hero-home" class="size-6" />
             <span class="text-[11px]">Dashboard</span>
+          </.link>
+        </li>
+        <li>
+          <.link
+            id="m-todos-nav-link"
+            navigate={~p"/m/#{@current_scope.entity.slug}/todos"}
+            class={[
+              "flex flex-col items-center gap-1 py-3 active:bg-base-200",
+              @active == :todos && "text-primary",
+              @active != :todos && "text-base-content/60"
+            ]}
+          >
+            <.icon name="hero-clipboard-document-check" class="size-6" />
+            <span class="text-[11px]">Todos</span>
           </.link>
         </li>
         <li>
@@ -467,16 +481,6 @@ defmodule ArgusWeb.Layouts do
             >
               <.icon name="hero-tag" class="size-5 text-base-content/60" />
               <span>Types</span>
-            </.link>
-          </li>
-          <li :if={@current_scope && @current_scope.entity}>
-            <.link
-              id="m-more-todos-link"
-              navigate={~p"/m/#{@current_scope.entity.slug}/todos"}
-              class="flex items-center gap-3 px-4 py-4 active:bg-base-200"
-            >
-              <.icon name="hero-clipboard-document-check" class="size-5 text-base-content/60" />
-              <span>Todos</span>
             </.link>
           </li>
           <li :if={@current_scope && @current_scope.entity}>

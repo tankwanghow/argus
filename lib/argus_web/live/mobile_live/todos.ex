@@ -8,7 +8,7 @@ defmodule ArgusWeb.MobileLive.Todos do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.mobile_app flash={@flash} current_scope={@current_scope} active={:more}>
+    <Layouts.mobile_app flash={@flash} current_scope={@current_scope} active={:todos}>
       <div id="m-todos-page" class="p-4">
         <div class="flex items-center justify-between gap-2 mb-3">
           <div class="font-semibold text-xl">Todos</div>

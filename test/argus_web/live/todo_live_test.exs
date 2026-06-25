@@ -81,8 +81,10 @@ defmodule ArgusWeb.TodoLiveTest do
     {:ok, view, html} = live(conn, ~p"/m/#{scope.entity.slug}/todos")
 
     assert html =~ "Todos"
+    assert has_element?(view, "#m-todos-nav-link")
     assert has_element?(view, "#m-new-todo-btn")
     assert has_element?(view, "#m-todos-empty")
+    refute has_element?(view, "#m-more-todos-link")
   end
 
   test "toggle on stale id does not crash and shows not found", %{conn: conn} do
