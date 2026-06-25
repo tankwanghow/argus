@@ -17,16 +17,25 @@ defmodule ArgusWeb.TodoLive.IndexHelpers do
 
   def load_todos(socket) do
     scope = socket.assigns.current_scope
-    todos = Todos.list_todos(scope)
 
-    audit_by_id =
-      Map.new(todos, fn todo ->
-        {todo.id, Todos.list_audit_logs(todo)}
-      end)
+    case {Todos.list_todos(scope), Todos.list_entity_audit_logs(scope)} do
+      {:not_authorise, _} ->
+        assign(socket, todos: [], audit_by_id: %{}, entity_activity: [])
 
-    socket
-    |> assign(:todos, todos)
-    |> assign(:audit_by_id, audit_by_id)
+      {_, :not_authorise} ->
+        assign(socket, todos: [], audit_by_id: %{}, entity_activity: [])
+
+      {{:ok, todos}, {:ok, entity_activity}} ->
+        audit_by_id =
+          Map.new(todos, fn todo ->
+            {todo.id, Todos.list_audit_logs(todo)}
+          end)
+
+        socket
+        |> assign(:todos, todos)
+        |> assign(:audit_by_id, audit_by_id)
+        |> assign(:entity_activity, entity_activity)
+    end
   end
 
   def open_modal(socket, template, editing, title, submit_label) do
@@ -75,41 +84,104 @@ defmodule ArgusWeb.TodoLive.IndexHelpers do
          socket
          |> put_flash(:error, "Not authorized.")
          |> close_modal()}
+
+      :not_found ->
+        {:not_found,
+         socket
+         |> put_flash(:error, "Todo not found.")
+         |> close_modal()
+         |> load_todos()}
+    end
+  end
+
+  def handle_edit(socket, id) do
+    scope = socket.assigns.current_scope
+
+    case Todos.get_todo(scope, id) do
+      {:ok, todo} ->
+        {:ok, open_modal(socket, todo, todo, "Edit todo", "Save")}
+
+      :not_found ->
+        {:not_found,
+         socket
+         |> put_flash(:error, "Todo not found.")
+         |> load_todos()}
+
+      :not_authorise ->
+        {:not_authorise, socket |> put_flash(:error, "Not authorized.")}
     end
   end
 
   def handle_toggle(socket, %{"id" => id}) do
     scope = socket.assigns.current_scope
-    todo = Todos.get_todo!(scope, id)
 
-    case Todos.toggle_complete(scope, todo) do
-      {:ok, _todo} ->
-        {:ok, load_todos(socket)}
+    case Todos.get_todo(scope, id) do
+      {:ok, todo} ->
+        case Todos.toggle_complete(scope, todo) do
+          {:ok, _todo} ->
+            {:ok, load_todos(socket)}
+
+          :not_authorise ->
+            {:not_authorise, socket |> put_flash(:error, "Not authorized.")}
+
+          :not_found ->
+            {:not_found,
+             socket
+             |> put_flash(:error, "Todo not found.")
+             |> load_todos()}
+
+          {:error, _} ->
+            {:error, put_flash(socket, :error, "Could not update todo.")}
+        end
+
+      :not_found ->
+        {:not_found,
+         socket
+         |> put_flash(:error, "Todo not found.")
+         |> load_todos()}
 
       :not_authorise ->
         {:not_authorise, socket |> put_flash(:error, "Not authorized.")}
-
-      {:error, _} ->
-        {:error, put_flash(socket, :error, "Could not update todo.")}
     end
   end
 
   def handle_delete(socket, %{"id" => id}) do
     scope = socket.assigns.current_scope
-    todo = Todos.get_todo!(scope, id)
 
-    case Todos.delete_todo(scope, todo) do
-      {:ok, _} ->
-        {:ok,
+    case Todos.get_todo(scope, id) do
+      {:ok, todo} ->
+        case Todos.delete_todo(scope, todo) do
+          {:ok, _} ->
+            {:ok,
+             socket
+             |> put_flash(:info, "Todo deleted.")
+             |> load_todos()}
+
+          :not_authorise ->
+            {:not_authorise, socket |> put_flash(:error, "Not authorized.")}
+
+          :not_found ->
+            {:not_found,
+             socket
+             |> put_flash(:error, "Todo not found.")
+             |> load_todos()}
+
+          {:error, _} ->
+            {:error, put_flash(socket, :error, "Could not delete todo.")}
+        end
+
+      :not_found ->
+        {:not_found,
          socket
-         |> put_flash(:info, "Todo deleted.")
+         |> put_flash(:error, "Todo not found.")
          |> load_todos()}
 
       :not_authorise ->
         {:not_authorise, socket |> put_flash(:error, "Not authorized.")}
-
-      {:error, _} ->
-        {:error, put_flash(socket, :error, "Could not delete todo.")}
     end
+  end
+
+  def handle_result({_status, socket}) do
+    {:noreply, socket}
   end
 end

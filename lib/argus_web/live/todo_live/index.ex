@@ -91,6 +91,8 @@ defmodule ArgusWeb.TodoLive.Index do
         <p :if={@todos == []} id="todos-empty" class="mt-6 text-sm text-base-content/60">
           No todos yet. Add one to get started.
         </p>
+
+        <.team_activity :if={@entity_activity != []} logs={@entity_activity} />
       </div>
 
       <div :if={@todo_form} id="todo-modal" class="modal modal-open">
@@ -115,6 +117,23 @@ defmodule ArgusWeb.TodoLive.Index do
         </div>
       </div>
     </Layouts.app>
+    """
+  end
+
+  attr :logs, :list, required: true
+
+  defp team_activity(assigns) do
+    ~H"""
+    <div id="team-activity" class="mt-8">
+      <h3 class="text-sm font-semibold text-base-content/70">Team activity</h3>
+      <ul class="mt-2 space-y-1 text-xs text-base-content/60">
+        <li :for={log <- @logs}>
+          <span class="font-medium">{audit_action_label(log.action)}</span>
+          {activity_subject(log)} by {display_name(log.user)}
+          <span class="text-base-content/40"> · {format_time(log.inserted_at)}</span>
+        </li>
+      </ul>
+    </div>
     """
   end
 
@@ -162,9 +181,7 @@ defmodule ArgusWeb.TodoLive.Index do
   end
 
   def handle_event("edit", %{"id" => id}, socket) do
-    scope = socket.assigns.current_scope
-    todo = Argus.Todos.get_todo!(scope, id)
-    {:noreply, IndexHelpers.open_modal(socket, todo, todo, "Edit todo", "Save")}
+    IndexHelpers.handle_edit(socket, id) |> IndexHelpers.handle_result()
   end
 
   def handle_event("close_modal_on_escape", _params, socket) do
@@ -180,27 +197,15 @@ defmodule ArgusWeb.TodoLive.Index do
   end
 
   def handle_event("save", params, socket) do
-    case IndexHelpers.handle_save(socket, params) do
-      {:ok, socket} -> {:noreply, socket}
-      {:error, socket} -> {:noreply, socket}
-      {:not_authorise, socket} -> {:noreply, socket}
-    end
+    IndexHelpers.handle_save(socket, params) |> IndexHelpers.handle_result()
   end
 
   def handle_event("toggle_complete", params, socket) do
-    case IndexHelpers.handle_toggle(socket, params) do
-      {:ok, socket} -> {:noreply, socket}
-      {:not_authorise, socket} -> {:noreply, socket}
-      {:error, socket} -> {:noreply, socket}
-    end
+    IndexHelpers.handle_toggle(socket, params) |> IndexHelpers.handle_result()
   end
 
   def handle_event("delete", params, socket) do
-    case IndexHelpers.handle_delete(socket, params) do
-      {:ok, socket} -> {:noreply, socket}
-      {:not_authorise, socket} -> {:noreply, socket}
-      {:error, socket} -> {:noreply, socket}
-    end
+    IndexHelpers.handle_delete(socket, params) |> IndexHelpers.handle_result()
   end
 
   def handle_event("toggle_audit", %{"id" => id}, socket) do
@@ -220,6 +225,12 @@ defmodule ArgusWeb.TodoLive.Index do
   defp audit_action_label("reopened"), do: "Reopened"
   defp audit_action_label("deleted"), do: "Deleted"
   defp audit_action_label(other), do: other
+
+  defp activity_subject(%{action: "deleted", old_value: title}) when is_binary(title),
+    do: " \"#{title}\""
+
+  defp activity_subject(%{todo: %{title: title}}) when is_binary(title), do: " \"#{title}\""
+  defp activity_subject(_), do: ""
 
   defp format_time(%DateTime{} = dt) do
     Calendar.strftime(dt, "%Y-%m-%d %H:%M")

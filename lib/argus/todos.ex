@@ -11,31 +11,50 @@ defmodule Argus.Todos do
   alias Argus.Repo
   alias Argus.Todos.{AuditLog, Todo}
 
-  def list_todos(%Scope{entity: entity}) do
-    Todo
-    |> where([t], t.entity_id == ^entity.id)
-    |> order_by([t], asc: is_nil(t.completed_at), desc: t.inserted_at)
-    |> preload([:created_by, :completed_by])
-    |> Repo.all()
+  def list_todos(%Scope{} = scope) do
+    with {:ok, entity} <- require_entity(scope),
+         true <- Authorization.can?(scope, :view_todos) do
+      todos =
+        Todo
+        |> where([t], t.entity_id == ^entity.id and is_nil(t.deleted_at))
+        |> order_by([t], desc: is_nil(t.completed_at), desc: t.inserted_at)
+        |> preload([:created_by, :completed_by])
+        |> Repo.all()
+
+      {:ok, todos}
+    else
+      :no_entity -> :not_authorise
+      false -> :not_authorise
+    end
   end
 
-  def get_todo!(%Scope{entity: entity}, id) do
-    Todo
-    |> where([t], t.id == ^id and t.entity_id == ^entity.id)
-    |> preload([:created_by, :completed_by])
-    |> Repo.one!()
+  def list_todos(_), do: :not_authorise
+
+  def get_todo(%Scope{} = scope, id) do
+    with {:ok, entity} <- require_entity(scope),
+         true <- Authorization.can?(scope, :view_todos),
+         %Todo{} = todo <- fetch_live_todo(entity.id, id) do
+      {:ok, todo}
+    else
+      :no_entity -> :not_authorise
+      false -> :not_authorise
+      nil -> :not_found
+    end
   end
+
+  def get_todo(_, _), do: :not_authorise
 
   def change_todo(%Todo{} = todo, attrs \\ %{}) do
     Todo.changeset(todo, attrs)
   end
 
-  def create_todo(%Scope{entity: entity, user: user} = scope, attrs) do
-    if Authorization.can?(scope, :create_todo) do
+  def create_todo(%Scope{} = scope, attrs) do
+    with {:ok, entity} <- require_entity(scope),
+         true <- Authorization.can?(scope, :create_todo) do
       Multi.new()
       |> Multi.insert(
         :todo,
-        %Todo{entity_id: entity.id, created_by_id: user.id}
+        %Todo{entity_id: entity.id, created_by_id: scope.user.id}
         |> Todo.changeset(attrs)
       )
       |> Multi.run(:audit, fn repo, %{todo: todo} ->
@@ -49,62 +68,81 @@ defmodule Argus.Todos do
         {:error, _op, reason, _} -> {:error, reason}
       end
     else
-      :not_authorise
+      :no_entity -> :not_authorise
+      false -> :not_authorise
     end
   end
 
-  def update_todo(%Scope{} = scope, %Todo{} = todo, attrs) do
-    if Authorization.can?(scope, :edit_todo) do
-      changeset = Todo.changeset(todo, attrs)
+  def create_todo(_, _), do: :not_authorise
 
-      if changeset.valid? && changeset.changes == %{} do
-        {:ok, todo}
-      else
-        Multi.new()
-        |> Multi.update(:todo, changeset)
-        |> Multi.run(:audit, fn repo, %{todo: updated} ->
-          audit_title_change(repo, scope, todo, updated)
-          {:ok, :audited}
-        end)
-        |> Repo.transaction()
-        |> case do
-          {:ok, %{todo: updated}} -> {:ok, updated}
-          {:error, :todo, changeset, _} -> {:error, changeset}
-          {:error, _op, reason, _} -> {:error, reason}
+  def update_todo(%Scope{} = scope, %Todo{} = todo, attrs) do
+    cond do
+      not Authorization.can?(scope, :edit_todo) ->
+        :not_authorise
+
+      not live_todo?(todo) ->
+        :not_found
+
+      true ->
+        changeset = Todo.changeset(todo, attrs)
+
+        if changeset.valid? && changeset.changes == %{} do
+          {:ok, todo}
+        else
+          Multi.new()
+          |> Multi.update(:todo, changeset)
+          |> Multi.run(:audit, fn repo, %{todo: updated} ->
+            audit_title_change(repo, scope, todo, updated)
+            {:ok, :audited}
+          end)
+          |> Repo.transaction()
+          |> case do
+            {:ok, %{todo: updated}} -> {:ok, updated}
+            {:error, :todo, changeset, _} -> {:error, changeset}
+            {:error, _op, reason, _} -> {:error, reason}
+          end
         end
-      end
-    else
-      :not_authorise
     end
   end
 
   def toggle_complete(%Scope{user: user} = scope, %Todo{} = todo) do
-    if Authorization.can?(scope, :complete_todo) do
-      if Todo.completed?(todo) do
+    cond do
+      not Authorization.can?(scope, :complete_todo) ->
+        :not_authorise
+
+      not live_todo?(todo) ->
+        :not_found
+
+      Todo.completed?(todo) ->
         reopen_todo(scope, todo)
-      else
+
+      true ->
         complete_todo(scope, todo, user.id)
-      end
-    else
-      :not_authorise
     end
   end
 
   def delete_todo(%Scope{} = scope, %Todo{} = todo) do
-    if Authorization.can?(scope, :delete_todo) do
-      Multi.new()
-      |> Multi.run(:audit, fn repo, _ ->
-        insert_audit!(repo, scope, todo, "deleted", "title", todo.title, nil)
-        {:ok, :audited}
-      end)
-      |> Multi.delete(:todo, todo)
-      |> Repo.transaction()
-      |> case do
-        {:ok, %{todo: deleted}} -> {:ok, deleted}
-        {:error, _op, reason, _} -> {:error, reason}
-      end
-    else
-      :not_authorise
+    cond do
+      not Authorization.can?(scope, :delete_todo) ->
+        :not_authorise
+
+      not live_todo?(todo) ->
+        :not_found
+
+      true ->
+        now = DateTime.utc_now(:second)
+
+        Multi.new()
+        |> Multi.update(:todo, Todo.delete_changeset(todo, scope.user.id, now))
+        |> Multi.run(:audit, fn repo, %{todo: updated} ->
+          insert_audit!(repo, scope, updated, "deleted", "title", updated.title, nil)
+          {:ok, :audited}
+        end)
+        |> Repo.transaction()
+        |> case do
+          {:ok, %{todo: deleted}} -> {:ok, deleted}
+          {:error, _op, reason, _} -> {:error, reason}
+        end
     end
   end
 
@@ -115,6 +153,29 @@ defmodule Argus.Todos do
     |> preload(:user)
     |> Repo.all()
   end
+
+  def list_entity_audit_logs(scope, limit \\ 50)
+
+  def list_entity_audit_logs(%Scope{} = scope, limit) do
+    with {:ok, entity} <- require_entity(scope),
+         true <- Authorization.can?(scope, :view_todos) do
+      logs =
+        AuditLog
+        |> join(:inner, [a], t in Todo, on: a.todo_id == t.id)
+        |> where([a, t], t.entity_id == ^entity.id)
+        |> order_by([a], desc: a.inserted_at)
+        |> limit(^limit)
+        |> preload([:user, todo: []])
+        |> Repo.all()
+
+      {:ok, logs}
+    else
+      :no_entity -> :not_authorise
+      false -> :not_authorise
+    end
+  end
+
+  def list_entity_audit_logs(_, _), do: :not_authorise
 
   defp complete_todo(scope, todo, user_id) do
     Multi.new()
@@ -161,5 +222,18 @@ defmodule Argus.Todos do
       new_value: new_value
     })
     |> repo.insert!()
+  end
+
+  defp require_entity(%Scope{entity: %_{} = entity}), do: {:ok, entity}
+  defp require_entity(_), do: :no_entity
+
+  defp live_todo?(%Todo{deleted_at: nil}), do: true
+  defp live_todo?(_), do: false
+
+  defp fetch_live_todo(entity_id, id) do
+    Todo
+    |> where([t], t.id == ^id and t.entity_id == ^entity_id and is_nil(t.deleted_at))
+    |> preload([:created_by, :completed_by])
+    |> Repo.one()
   end
 end

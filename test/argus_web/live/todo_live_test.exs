@@ -40,7 +40,7 @@ defmodule ArgusWeb.TodoLiveTest do
 
     assert has_element?(view, "#todos-list", "Restock pantry")
 
-    todo = hd(Argus.Todos.list_todos(scope))
+    {:ok, [todo]} = Argus.Todos.list_todos(scope)
 
     view |> element("#todo-complete-#{todo.id}") |> render_click()
     assert has_element?(view, "#todo-#{todo.id}.opacity-60")
@@ -83,6 +83,17 @@ defmodule ArgusWeb.TodoLiveTest do
     assert html =~ "Todos"
     assert has_element?(view, "#m-new-todo-btn")
     assert has_element?(view, "#m-todos-empty")
+  end
+
+  test "toggle on stale id does not crash and shows not found", %{conn: conn} do
+    scope = entity_scope_fixture()
+    conn = log_in_user(conn, scope.user)
+
+    {:ok, view, _html} = live(conn, ~p"/entities/#{scope.entity.slug}/todos")
+
+    fake_id = Ecto.UUID.generate()
+    html = render_click(view, "toggle_complete", %{"id" => fake_id})
+    assert html =~ "Todo not found"
   end
 
   test "mobile member creates a todo", %{conn: conn} do

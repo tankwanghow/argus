@@ -3,11 +3,29 @@ defmodule Argus.TodosTest do
 
   @moduletag :todos
 
+  alias Argus.Accounts.Scope
   alias Argus.Todos
   alias Argus.Todos.Todo
 
+  import Argus.AccountsFixtures, only: [user_fixture: 0]
   import Argus.EntitiesFixtures, only: [entity_scope_fixture: 0]
   import Argus.ObligationsFixtures, only: [member_scope_on_entity: 1]
+
+  describe "authorization" do
+    test "list_todos/1 and get_todo/2 return :not_authorise without entity scope" do
+      scope = Scope.for_user(user_fixture())
+      fake_id = Ecto.UUID.generate()
+
+      assert :not_authorise = Todos.list_todos(scope)
+      assert :not_authorise = Todos.get_todo(scope, fake_id)
+      assert :not_authorise = Todos.create_todo(scope, %{title: "Nope"})
+    end
+
+    test "get_todo/2 returns :not_found for unknown id" do
+      scope = entity_scope_fixture()
+      assert :not_found = Todos.get_todo(scope, Ecto.UUID.generate())
+    end
+  end
 
   describe "create_todo/2 and list_todos/1" do
     test "creates a todo visible to all team members" do
@@ -20,9 +38,21 @@ defmodule Argus.TodosTest do
       assert todo.created_by_id == creator.user.id
       assert is_nil(todo.completed_at)
 
-      listed = Todos.list_todos(teammate)
+      assert {:ok, listed} = Todos.list_todos(teammate)
       assert length(listed) == 1
       assert hd(listed).id == todo.id
+    end
+
+    test "lists pending todos before completed ones" do
+      scope = entity_scope_fixture()
+      {:ok, pending} = Todos.create_todo(scope, %{title: "Pending"})
+      {:ok, todo} = Todos.create_todo(scope, %{title: "Complete"})
+      assert {:ok, done} = Todos.toggle_complete(scope, todo)
+
+      assert {:ok, listed} = Todos.list_todos(scope)
+      assert Enum.map(listed, & &1.title) == ["Pending", "Complete"]
+      refute Todo.completed?(pending)
+      assert Todo.completed?(done)
     end
 
     test "rejects blank title" do
@@ -70,20 +100,21 @@ defmodule Argus.TodosTest do
   end
 
   describe "delete_todo/2" do
-    test "deletes todo and leaves audit entry" do
+    test "soft-deletes todo, keeps audit linked, and shows delete in entity activity" do
       scope = entity_scope_fixture()
       {:ok, todo} = Todos.create_todo(scope, %{title: "Scratch item"})
-      assert {:ok, _} = Todos.delete_todo(scope, todo)
-      assert [] = Todos.list_todos(scope)
+      assert {:ok, deleted} = Todos.delete_todo(scope, todo)
+      assert %DateTime{} = deleted.deleted_at
+      assert {:ok, []} = Todos.list_todos(scope)
 
-      audit =
-        Argus.Repo.all(Argus.Todos.AuditLog)
-        |> Enum.find(&(&1.action == "deleted" && &1.old_value == "Scratch item"))
-
+      audit = Enum.find(Todos.list_audit_logs(deleted), &(&1.action == "deleted"))
       assert audit
-      assert audit.action == "deleted"
+      assert audit.todo_id == deleted.id
       assert audit.old_value == "Scratch item"
       assert audit.user_id == scope.user.id
+
+      assert {:ok, activity} = Todos.list_entity_audit_logs(scope)
+      assert Enum.any?(activity, &(&1.action == "deleted" && &1.todo_id == deleted.id))
     end
   end
 
@@ -94,7 +125,8 @@ defmodule Argus.TodosTest do
         teammate = member_scope_on_entity(creator.entity)
 
         {:ok, todo} = Todos.create_todo(creator, %{title: "Team task #{System.unique_integer()}"})
-        assert hd(Todos.list_todos(teammate)).id == todo.id
+        assert {:ok, [listed]} = Todos.list_todos(teammate)
+        assert listed.id == todo.id
 
         assert {:ok, todo} = Todos.update_todo(teammate, todo, %{title: "Updated team task"})
         assert {:ok, todo} = Todos.toggle_complete(teammate, todo)
@@ -107,7 +139,7 @@ defmodule Argus.TodosTest do
         assert "completed" in actions
 
         assert {:ok, _} = Todos.delete_todo(creator, todo)
-        assert [] = Todos.list_todos(teammate)
+        assert {:ok, []} = Todos.list_todos(teammate)
       end
     end
   end

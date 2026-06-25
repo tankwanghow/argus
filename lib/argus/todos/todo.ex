@@ -9,10 +9,12 @@ defmodule Argus.Todos.Todo do
   schema "todos" do
     field :title, :string
     field :completed_at, :utc_datetime
+    field :deleted_at, :utc_datetime
 
     belongs_to :entity, Entity
     belongs_to :created_by, User, foreign_key: :created_by_id
     belongs_to :completed_by, User, foreign_key: :completed_by_id
+    belongs_to :deleted_by, User, foreign_key: :deleted_by_id
 
     has_many :audit_logs, AuditLog
 
@@ -36,6 +38,11 @@ defmodule Argus.Todos.Todo do
   def reopen_changeset(todo) do
     todo
     |> change(%{completed_at: nil, completed_by_id: nil})
+  end
+
+  def delete_changeset(todo, user_id, at \\ DateTime.utc_now(:second)) do
+    todo
+    |> change(%{deleted_at: at, deleted_by_id: user_id})
   end
 
   def completed?(%__MODULE__{completed_at: %DateTime{}}), do: true
