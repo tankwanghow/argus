@@ -13,29 +13,29 @@ defmodule ArgusWeb.MobileLive.Dashboard do
         <h1 class="text-lg font-semibold truncate">{@current_scope.entity.name}</h1>
         <div class="flex">
           <div class="w-[65%]">
-          <input
-            id="m-obligation-search"
-            type="search"
-            name="q"
-            placeholder="Search title, type, assignee…"
-            phx-keyup="search"
-            phx-debounce="150"
-            value={@query}
-            class="input w-full"
-          />
+            <input
+              id="m-obligation-search"
+              type="search"
+              name="q"
+              placeholder="Search title, type, assignee…"
+              phx-keyup="search"
+              phx-debounce="150"
+              value={@query}
+              class="input w-full"
+            />
           </div>
           <div class="w-[35%]">
-          <form id="m-obligation-status-filter" phx-change="set_status">
-            <select name="lifecycle" class="select">
-              <option
-                :for={{value, label} <- Index.lifecycles()}
-                value={value}
-                selected={@lifecycle == Index.parse_lifecycle(value)}
-              >
-                {label}
-              </option>
-            </select>
-          </form>
+            <form id="m-obligation-status-filter" phx-change="set_status">
+              <select name="lifecycle" class="select">
+                <option
+                  :for={{value, label} <- Index.lifecycles()}
+                  value={value}
+                  selected={@lifecycle == Index.parse_lifecycle(value)}
+                >
+                  {label}
+                </option>
+              </select>
+            </form>
           </div>
         </div>
         <div class="flex items-center gap-2">

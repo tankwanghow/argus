@@ -44,7 +44,10 @@ defmodule ArgusWeb.Layouts do
       <.doc_preview_modal />
       <header class="navbar px-4 sm:px-6 lg:px-8 border-b border-base-300">
         <div class="flex-1">
-          <.link navigate={entity_dashboard_nav(@current_scope)} class="flex items-center gap-2 font-bold text-lg">
+          <.link
+            navigate={entity_dashboard_nav(@current_scope)}
+            class="flex items-center gap-2 font-bold text-lg"
+          >
             <span>Argus</span>
             <span
               :if={entity_scope?(@current_scope)}
@@ -116,6 +119,11 @@ defmodule ArgusWeb.Layouts do
           href={~p"/entities/#{@current_scope.entity.slug}/obligation-types"}
           icon="hero-tag-micro"
           label="Types"
+        />
+        <.entity_nav_link
+          href={~p"/entities/#{@current_scope.entity.slug}/todos"}
+          icon="hero-clipboard-document-check-micro"
+          label="Todos"
         />
       </div>
     </nav>
@@ -459,6 +467,16 @@ defmodule ArgusWeb.Layouts do
             >
               <.icon name="hero-tag" class="size-5 text-base-content/60" />
               <span>Types</span>
+            </.link>
+          </li>
+          <li :if={@current_scope && @current_scope.entity}>
+            <.link
+              id="m-more-todos-link"
+              navigate={~p"/m/#{@current_scope.entity.slug}/todos"}
+              class="flex items-center gap-3 px-4 py-4 active:bg-base-200"
+            >
+              <.icon name="hero-clipboard-document-check" class="size-5 text-base-content/60" />
+              <span>Todos</span>
             </.link>
           </li>
           <li :if={@current_scope && @current_scope.entity}>
