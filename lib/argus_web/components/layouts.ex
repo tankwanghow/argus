@@ -389,7 +389,7 @@ defmodule ArgusWeb.Layouts do
             ]}
           >
             <span class="text-2xl">✚</span>
-            <span class="text-sm leading-tight text-center">New Todo</span>
+            <span class="text-sm leading-tight text-center">Todo</span>
           </.link>
         </li>
         <li>
@@ -417,7 +417,7 @@ defmodule ArgusWeb.Layouts do
             ]}
           >
             <span class="text-2xl">✚</span>
-            <span class="text-sm leading-tight text-center">New Duty</span>
+            <span class="text-sm leading-tight text-center">Duty</span>
           </.link>
         </li>
         <li>
