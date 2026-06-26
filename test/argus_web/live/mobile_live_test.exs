@@ -118,7 +118,8 @@ defmodule ArgusWeb.MobileLiveTest do
     conn = mobile_conn(conn, scope)
 
     {:ok, done, _} = Obligations.complete(scope, obligation, %{note: "Done"})
-    stamp = ArgusWeb.CoreComponents.format_datetime(done.completed_at)
+    # Mobile timeline renders the short datetime format.
+    stamp = ArgusWeb.CoreComponents.format_datetime(done.completed_at, :short)
 
     {:ok, view, _html} = live(conn, ~p"/m/#{scope.entity.slug}/obligations/#{done.id}")
 

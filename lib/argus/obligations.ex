@@ -520,7 +520,7 @@ defmodule Argus.Obligations do
   def list_audit_logs(%Obligation{} = obligation) do
     AuditLog
     |> where([l], l.obligation_id == ^obligation.id)
-    |> order_by([l], asc: l.inserted_at)
+    |> order_by([l], desc: l.inserted_at, desc: l.id)
     |> preload(:user)
     |> Repo.all()
   end

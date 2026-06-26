@@ -32,6 +32,25 @@ defmodule Argus.Obligations.AuditTest do
       {scope, obligation} = assigned_member_scope_fixture()
       assert :not_authorise = Obligations.update_obligation(scope, obligation, %{title: "X"})
     end
+
+    test "lists corrections newest-first" do
+      {scope, obligation} = manager_obligation_scope_fixture()
+
+      assert {:ok, _} = Obligations.update_obligation(scope, obligation, %{title: "First"})
+
+      [%{inserted_at: first_at} | _] =
+        Obligations.list_audit_logs(obligation)
+
+      # Backdate the first correction so the second is unambiguously newer.
+      Argus.Repo.update_all(Argus.Obligations.AuditLog,
+        set: [inserted_at: DateTime.add(first_at, -60, :second)]
+      )
+
+      assert {:ok, _} = Obligations.update_obligation(scope, obligation, %{title: "Second"})
+
+      logs = Obligations.list_audit_logs(obligation)
+      assert hd(logs).new_value == "Second"
+    end
   end
 
   describe "update_collaborators/3" do
