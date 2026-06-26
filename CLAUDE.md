@@ -39,7 +39,7 @@ applies here too. Headlines:
   `/todos`, `/todos/new`, plus the `/obligations/:id` show + `/invite-session/:role` regexes) + a
   `argus_view` cookie override. Separate LiveViews + layouts (`Layouts.app/1` navbar — desktop nav is
   **💼 Duties · 📑 Todos · 🏷️ Types**; `Layouts.mobile_app/1` bottom-nav shell — five-tab bottom nav is
-  **✚ New Todo · 📑 Todos · ✚ New Duty · 💼 Duties · ☰ More** (the New-Duty tab routes to obligation
+  **✚ Todo · 📑 Todos · ✚ Duty · 💼 Duties · ☰ More** (the ✚ Duty tab routes to obligation
   create; everything past the five tabs lives in the More sheet). New-obligation has both Desktop
   (`ObligationLive.Form`) and Mobile (`MobileLive.ObligationForm`) LiveViews sharing all non-render
   logic via `ObligationLive.CreateForm` (`load_form`/`validate`/`save` with a redirect-path fn).

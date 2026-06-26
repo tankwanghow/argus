@@ -137,7 +137,7 @@ Two UIs share the same contexts/schemas, each with its own LiveViews and layout:
   responsive padding (`px-4 sm:px-6 lg:px-8`).
 - **Mobile** under `/m/:entity_slug/...` — `ArgusWeb.MobileLive.*`. `Layouts.mobile_app/1` shell:
   `min-h-screen bg-base-100 pb-20`, a fixed bottom tab nav (`mobile_bottom_nav`, a `grid-cols-5`
-  of five primary tabs — New Todo · Todos · New Duty · Duties · More — with emoji glyphs and
+  of five primary tabs — Todo · Todos · Duty · Duties · More — with emoji glyphs and
   `pb-[env(safe-area-inset-bottom)]`), and a "More" sheet for theme/switch-entity/log-out plus
   secondary links (members, types, team logs). Large touch targets, sticky page header with search.
 - **Shared non-render logic across the two UIs lives in a `*.IndexHelpers` module** that both the
