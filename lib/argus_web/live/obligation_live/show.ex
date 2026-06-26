@@ -269,8 +269,8 @@ defmodule ArgusWeb.ObligationLive.Show do
               <div class="argus-event-head">
                 <span class="font-semibold text-sm">{humanize_status(event.status)}</span>
                 <span class="text-xs text-base-content/50">{format_datetime(event.inserted_at)}</span>
-                <span :if={event.status_by} class="text-xs text-base-content/50">
-                  · {event.status_by.email}
+                <span :if={event.status_by} class="text-xs text-base-content/80">
+                  {event.status_by.email}
                 </span>
                 <button
                   id={"step-files-btn-#{event.id}"}
@@ -289,9 +289,6 @@ defmodule ArgusWeb.ObligationLive.Show do
                 class="argus-event-note-block relative"
               >
                 <div :if={is_binary(event.note)} class="argus-event-note">{event.note}</div>
-                <div :if={is_nil(event.note)} class="argus-event-note argus-event-note-empty">
-                  No note added
-                </div>
                 <button
                   :if={Obligations.note_editable?(@current_scope, event, @obligation)}
                   id={"edit-note-#{event.id}"}
