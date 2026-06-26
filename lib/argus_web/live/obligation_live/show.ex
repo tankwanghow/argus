@@ -269,8 +269,8 @@ defmodule ArgusWeb.ObligationLive.Show do
               <div class="argus-event-head">
                 <span class="font-semibold text-sm">{humanize_status(event.status)}</span>
                 <span class="text-xs text-base-content/50">{format_datetime(event.inserted_at)}</span>
-                <span :if={event.status_by} class="text-xs text-base-content/50">
-                  · {event.status_by.email}
+                <span :if={event.status_by} class="text-xs text-base-content/80">
+                  {event.status_by.email}
                 </span>
                 <button
                   id={"step-files-btn-#{event.id}"}
@@ -289,9 +289,6 @@ defmodule ArgusWeb.ObligationLive.Show do
                 class="argus-event-note-block relative"
               >
                 <div :if={is_binary(event.note)} class="argus-event-note">{event.note}</div>
-                <div :if={is_nil(event.note)} class="argus-event-note argus-event-note-empty">
-                  No note added
-                </div>
                 <button
                   :if={Obligations.note_editable?(@current_scope, event, @obligation)}
                   id={"edit-note-#{event.id}"}
@@ -341,29 +338,17 @@ defmodule ArgusWeb.ObligationLive.Show do
 
         <div :if={@audit_logs != []} class="mt-3">
           <button
-            :if={not @show_corrections?}
             id="show-corrections-btn"
             type="button"
-            phx-click="show_corrections"
+            phx-click="toggle_corrections"
             class="btn btn-ghost btn-sm"
           >
             <.icon name="hero-clipboard-document-list-mini" class="size-4" />
-            Show corrections ({length(@audit_logs)})
+            {if @show_corrections?,
+              do: "Hide corrections",
+              else: "Show corrections (#{length(@audit_logs)})"}
           </button>
-          <section :if={@show_corrections?} id="audit-log" class="space-y-3">
-            <div class="flex items-center justify-between gap-3">
-              <h2 class="text-sm font-semibold uppercase tracking-wide text-base-content/60">
-                Corrections
-              </h2>
-              <button
-                id="hide-corrections-btn"
-                type="button"
-                phx-click="hide_corrections"
-                class="btn btn-ghost btn-xs"
-              >
-                Hide
-              </button>
-            </div>
+          <section :if={@show_corrections?} id="audit-log" class="mt-2 space-y-3">
             <ul class="divide-y divide-base-300 rounded-box border border-base-300 text-sm">
               <li :for={log <- @audit_logs} id={"audit-#{log.id}"} class="p-3 space-y-1">
                 <div class="flex items-center justify-between gap-3">
@@ -735,12 +720,8 @@ defmodule ArgusWeb.ObligationLive.Show do
     end
   end
 
-  def handle_event("show_corrections", _params, socket) do
-    {:noreply, assign(socket, :show_corrections?, true)}
-  end
-
-  def handle_event("hide_corrections", _params, socket) do
-    {:noreply, assign(socket, :show_corrections?, false)}
+  def handle_event("toggle_corrections", _params, socket) do
+    {:noreply, assign(socket, :show_corrections?, not socket.assigns.show_corrections?)}
   end
 
   def handle_event("open_edit_modal", _params, socket) do

@@ -660,6 +660,12 @@ defmodule ArgusWeb.ObligationLiveTest do
 
     view |> element("#show-corrections-btn") |> render_click()
     assert has_element?(view, "#audit-log", "title")
+    assert has_element?(view, "#show-corrections-btn", "Hide corrections")
+
+    # The same button toggles the corrections back closed.
+    view |> element("#show-corrections-btn") |> render_click()
+    refute has_element?(view, "#audit-log")
+    assert has_element?(view, "#show-corrections-btn", "Show corrections")
   end
 
   test "manager updates collaborators from edit modal", %{conn: conn} do

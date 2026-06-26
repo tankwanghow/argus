@@ -268,17 +268,17 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
               class={["argus-event-row border-l-4", event_accent(event.status)]}
             >
               <div class="argus-event-head">
-                <span class="font-semibold text-sm">{humanize_status(event.status)}</span>
-                <span class="text-xs text-base-content/50">{format_datetime(event.inserted_at)}</span>
-                <span :if={event.status_by} class="text-xs text-base-content/50">
-                  · {event.status_by.email}
+                <span class="font-semibold text-xs">{humanize_status(event.status)}</span>
+                <span class="text-xs text-base-content/50">{format_datetime(event.inserted_at, :short)}</span>
+                <span :if={event.status_by} class="text-xs text-base-content/80">
+                  {event.status_by.email}
                 </span>
                 <button
                   id={"m-step-files-btn-#{event.id}"}
                   type="button"
                   phx-click="open_step_files"
                   phx-value-event_id={event.id}
-                  class="btn btn-ghost btn-xs h-6 min-h-6 px-1.5 gap-1 ml-auto"
+                  class="btn btn-outline btn-xs h-6 min-h-6 px-1.5 gap-1 ml-auto"
                 >
                   <.icon name="hero-paper-clip-mini" class="size-3.5" />
                   Files ({length(other_file_count(event, @doc_slots))})
@@ -286,16 +286,13 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
               </div>
               <div id={"m-event-note-#{event.id}"} class="argus-event-note-block relative">
                 <div :if={is_binary(event.note)} class="argus-event-note">{event.note}</div>
-                <div :if={is_nil(event.note)} class="argus-event-note argus-event-note-empty">
-                  No note added
-                </div>
                 <button
                   :if={Obligations.note_editable?(@current_scope, event, @obligation)}
                   id={"m-edit-note-#{event.id}"}
                   type="button"
                   phx-click="edit_note"
                   phx-value-event_id={event.id}
-                  class="btn btn-ghost btn-xs btn-square absolute bottom-2 right-2 bg-base-100/80"
+                  class="btn btn-outline btn-square absolute bottom-0 right-0 bg-base-100/80"
                   aria-label="Edit note"
                 >
                   <.icon name="hero-pencil-square-mini" class="size-4" />
@@ -320,29 +317,17 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
 
         <div :if={@audit_logs != []} class="mt-3 px-1">
           <button
-            :if={not @show_corrections?}
             id="m-show-corrections-btn"
             type="button"
-            phx-click="show_corrections"
+            phx-click="toggle_corrections"
             class="btn btn-ghost btn-sm gap-1"
           >
             <.icon name="hero-clipboard-document-list-mini" class="size-4" />
-            Show corrections ({length(@audit_logs)})
+            {if @show_corrections?,
+              do: "Hide corrections",
+              else: "Show corrections (#{length(@audit_logs)})"}
           </button>
-          <section :if={@show_corrections?} id="m-audit-log" class="space-y-2">
-            <div class="flex items-center justify-between gap-3">
-              <h2 class="text-sm font-semibold uppercase tracking-wide text-base-content/60">
-                Corrections
-              </h2>
-              <button
-                id="m-hide-corrections-btn"
-                type="button"
-                phx-click="hide_corrections"
-                class="btn btn-ghost btn-xs"
-              >
-                Hide
-              </button>
-            </div>
+          <section :if={@show_corrections?} id="m-audit-log" class="mt-2 space-y-2">
             <ul class="divide-y divide-base-300 rounded-box border border-base-300 text-sm">
               <li :for={log <- @audit_logs} id={"m-audit-#{log.id}"} class="p-3 space-y-1">
                 <div class="flex items-center justify-between gap-3">
@@ -688,12 +673,8 @@ defmodule ArgusWeb.MobileLive.ObligationShow do
     {:noreply, ModalEscape.close_obligation_modals(socket)}
   end
 
-  def handle_event("show_corrections", _params, socket) do
-    {:noreply, assign(socket, :show_corrections?, true)}
-  end
-
-  def handle_event("hide_corrections", _params, socket) do
-    {:noreply, assign(socket, :show_corrections?, false)}
+  def handle_event("toggle_corrections", _params, socket) do
+    {:noreply, assign(socket, :show_corrections?, not socket.assigns.show_corrections?)}
   end
 
   def handle_event("open_edit_modal", _params, socket) do
