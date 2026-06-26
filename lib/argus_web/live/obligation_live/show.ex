@@ -338,29 +338,17 @@ defmodule ArgusWeb.ObligationLive.Show do
 
         <div :if={@audit_logs != []} class="mt-3">
           <button
-            :if={not @show_corrections?}
             id="show-corrections-btn"
             type="button"
-            phx-click="show_corrections"
+            phx-click="toggle_corrections"
             class="btn btn-ghost btn-sm"
           >
             <.icon name="hero-clipboard-document-list-mini" class="size-4" />
-            Show corrections ({length(@audit_logs)})
+            {if @show_corrections?,
+              do: "Hide corrections",
+              else: "Show corrections (#{length(@audit_logs)})"}
           </button>
-          <section :if={@show_corrections?} id="audit-log" class="space-y-3">
-            <div class="flex items-center justify-between gap-3">
-              <h2 class="text-sm font-semibold uppercase tracking-wide text-base-content/60">
-                Corrections
-              </h2>
-              <button
-                id="hide-corrections-btn"
-                type="button"
-                phx-click="hide_corrections"
-                class="btn btn-ghost btn-xs"
-              >
-                Hide
-              </button>
-            </div>
+          <section :if={@show_corrections?} id="audit-log" class="mt-2 space-y-3">
             <ul class="divide-y divide-base-300 rounded-box border border-base-300 text-sm">
               <li :for={log <- @audit_logs} id={"audit-#{log.id}"} class="p-3 space-y-1">
                 <div class="flex items-center justify-between gap-3">
@@ -732,12 +720,8 @@ defmodule ArgusWeb.ObligationLive.Show do
     end
   end
 
-  def handle_event("show_corrections", _params, socket) do
-    {:noreply, assign(socket, :show_corrections?, true)}
-  end
-
-  def handle_event("hide_corrections", _params, socket) do
-    {:noreply, assign(socket, :show_corrections?, false)}
+  def handle_event("toggle_corrections", _params, socket) do
+    {:noreply, assign(socket, :show_corrections?, not socket.assigns.show_corrections?)}
   end
 
   def handle_event("open_edit_modal", _params, socket) do
