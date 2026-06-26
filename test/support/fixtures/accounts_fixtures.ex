@@ -9,10 +9,21 @@ defmodule Argus.AccountsFixtures do
   alias Argus.Accounts
   alias Argus.Accounts.Scope
 
-  def unique_user_email, do: "user#{System.unique_integer()}@example.com"
+  # `System.unique_integer/1` only guarantees uniqueness within a single runtime
+  # instance — its counter resets every `mix test` run. The test DB persists across
+  # runs (it is created/migrated, never dropped), so a value generated this run can
+  # collide with a row a previous run left behind, failing `unsafe_validate_unique`
+  # intermittently. A random suffix makes these globally unique across runs too.
+  def unique_user_email, do: "user#{unique_suffix()}@example.com"
   def valid_user_password, do: "hello world!"
 
-  def unique_username, do: "user#{System.unique_integer([:positive])}"
+  def unique_username, do: "user#{unique_suffix()}"
+
+  # Underscore separator (not "-") so the suffix is valid for usernames too, which
+  # only allow letters, numbers, and underscores.
+  defp unique_suffix do
+    "#{System.unique_integer([:positive])}_#{:rand.uniform(1_000_000_000)}"
+  end
 
   def username_user_fixture(attrs \\ %{}) do
     attrs =

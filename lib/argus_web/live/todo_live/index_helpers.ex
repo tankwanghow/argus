@@ -115,7 +115,7 @@ defmodule ArgusWeb.TodoLive.IndexHelpers do
   end
 
   defp audit_for_todos(todos) do
-    Map.new(todos, fn todo -> {todo.id, Todos.list_audit_logs(todo)} end)
+    Todos.list_audit_logs_by_todo(Enum.map(todos, & &1.id))
   end
 
   def open_modal(socket, template, editing, title, submit_label) do

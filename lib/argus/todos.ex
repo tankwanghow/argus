@@ -305,6 +305,23 @@ defmodule Argus.Todos do
     |> Repo.all()
   end
 
+  @doc """
+  Batched variant of `list_audit_logs/1`: fetches every audit log for the given
+  todo ids in **one** query and groups them into `%{todo_id => [log, ...]}`
+  (each list ascending by `inserted_at`). Avoids the N+1 of calling
+  `list_audit_logs/1` per row when rendering a page of todos.
+  """
+  def list_audit_logs_by_todo([]), do: %{}
+
+  def list_audit_logs_by_todo(todo_ids) when is_list(todo_ids) do
+    AuditLog
+    |> where([l], l.todo_id in ^todo_ids)
+    |> order_by([l], asc: l.inserted_at)
+    |> preload(:user)
+    |> Repo.all()
+    |> Enum.group_by(& &1.todo_id)
+  end
+
   def list_entity_audit_logs(scope, limit \\ 50)
 
   def list_entity_audit_logs(%Scope{} = scope, limit) do

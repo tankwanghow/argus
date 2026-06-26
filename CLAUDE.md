@@ -6,9 +6,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Argus is **built**: the Phoenix app is generated and the full 21-task implementation plan has
 been executed (contexts, schemas, auth/scope, dual Desktop+Mobile LiveViews, dashboard urgency,
-obligation workflow/recurrence, types & membership management, audit, uploads). `mix precommit`
-passes. What remains is the plan's two **manual smoke tests** (Desktop and Mobile happy-paths via
-`mix phx.server`) and any future enhancements beyond v1 scope.
+obligation workflow/recurrence, types & membership management, audit, uploads). A post-v1
+**Quick Todos** feature (entity-scoped team todos with audit trail, 48h delete window, cancel,
+escalate-to-duty, and paginated Desktop+Mobile UIs) has also shipped — see the Quick Todos section
+below. `mix precommit` passes. What remains is the plan's two **manual smoke tests** (Desktop and
+Mobile happy-paths via `mix phx.server`) and any future enhancements beyond v1 scope.
 
 - **Spec:** `docs/superpowers/specs/2026-06-13-argus-design.md` — authoritative for data model, roles, and workflows.
 - **Plan:** `docs/superpowers/plans/2026-06-13-argus-implementation.md` — 21 phased, TDD, commit-per-task steps (all complete).
@@ -33,10 +35,12 @@ applies here too. Headlines:
   nullable. A `%Argus.Accounts.Scope{user, entity, membership, role}` struct flows as
   `@current_scope`; never `@current_user`/`@current_role` in templates.
 - **Dual UI:** Desktop `/entities/:entity_slug/...`, Mobile `/m/:entity_slug/...`, with an
-  `AutoRouteByDevice` plug (mobile-capable tails: `""`, `/obligations/new`) + a
-  `argus_view` cookie override. Separate LiveViews + layouts (`Layouts.app/1` navbar,
-  `Layouts.mobile_app/1` bottom-nav shell — bottom nav is **New(+) · Dashboard · More**, the New
-  tab shown only when the role `can?(:create_obligation)`). New-obligation has both Desktop
+  `AutoRouteByDevice` plug (mobile-capable tails: `""`, `/obligations/new`, `/obligation-types`,
+  `/todos`, `/todos/new`, plus the `/obligations/:id` show + `/invite-session/:role` regexes) + a
+  `argus_view` cookie override. Separate LiveViews + layouts (`Layouts.app/1` navbar — desktop nav is
+  **💼 Duties · 📑 Todos · 🏷️ Types**; `Layouts.mobile_app/1` bottom-nav shell — five-tab bottom nav is
+  **✚ New Todo · 📑 Todos · ✚ New Duty · 💼 Duties · ☰ More** (the New-Duty tab routes to obligation
+  create; everything past the five tabs lives in the More sheet). New-obligation has both Desktop
   (`ObligationLive.Form`) and Mobile (`MobileLive.ObligationForm`) LiveViews sharing all non-render
   logic via `ObligationLive.CreateForm` (`load_form`/`validate`/`save` with a redirect-path fn).
   **There is no separate obligation index page** — the **dashboard is the obligation list** on both
@@ -51,8 +55,11 @@ applies here too. Headlines:
 - **Shell-Escape contract:** both layout shells (`#argus-shell`) bind
   `phx-window-keydown="close_modal_on_escape"`, so **every** LiveView rendered in them must define a
   `handle_event("close_modal_on_escape", …)` clause (no-op if the page has no modals) or it crashes
-  on Escape. `ModalEscape.close_obligation_modals/2` is the shared closer (handles the document/
-  done/progress/skip/correct/edit modals **and** `editing_note_id` note editing).
+  on Escape. `ModalEscape.close_obligation_modals/2` is the shared closer for obligation pages
+  (handles the document/done/progress/skip/correct/edit modals **and** `editing_note_id` note
+  editing); `ModalEscape.close_type_modal/1` closes the type editor, and
+  `ModalEscape.close_todo_modal/1` closes the todo edit + cancel modals (used by the todo
+  LiveViews). Team-log pages have no modals, so their `close_modal_on_escape` is a no-op.
 - LiveView: `to_form` + `<.form>`/`<.input>`, `<.icon name="hero-...">`, streams (never append),
   colocated hooks. Unauthorized context calls return **`:not_authorise`**.
 - Run `mix precommit` before declaring work done.
@@ -96,6 +103,7 @@ assigns). Contexts take `scope`/`current_scope` as their first argument; authori
   **no timezone on users**), `Scope` struct, `register_user/1`, `deliver_login_instructions/2`.
 - `Argus.Entities` — entities (soft-deleted via `deleted_at`; all lookups filter `deleted_at IS NULL`), memberships `(user_id, entity_id, role)`, invitations. One default entity per user (partial unique index). `create_entity/2` also inserts the creator's `admin` membership. `seat_limit` is enforced via a single `seats_available?/1` gate on invite **and** accept **and** direct add.
 - `Argus.Authorization` — **scope-first**: `can?(scope, action)` / `can?(scope, action, obligation)`. Keys off the pre-resolved `scope.role` (no per-call DB lookup). Single source of truth for role rules; see the role table below. Unauthorized mutations return `:not_authorise`.
+- `Argus.Todos` — **quick todos**: lightweight, entity-scoped, team-visible tasks separate from obligations (see the Quick Todos section below). Scope-first like every other context; unauthorized calls return `:not_authorise`.
 
 ### Roles
 
@@ -107,6 +115,11 @@ assigns). Contexts take `scope`/`current_scope` as their first argument; authori
 
 Collaborators (join table) can move an obligation to `in_progress` and add notes/docs, but
 **cannot** mark Done. Only the **primary assignee** or a manager/admin marks Done.
+
+The role table above governs **obligations**. **Todos are flat:** every role (member/manager/admin)
+can view, create, edit, complete/reopen, delete, and cancel todos (`@todo_actions` in
+`Argus.Authorization`). The one gated todo action is **escalate-to-duty**, which requires
+`can?(scope, :create_obligation)` (manager/admin) since it creates an obligation.
 
 **Obligations may be unassigned.** `primary_assignee_id` is **nullable** — an obligation can be
 created without a primary assignee and assigned later (`Obligations.list_unassigned/1` surfaces
@@ -289,6 +302,54 @@ dashboard is where overdue/due-soon work surfaces, computed at render time:
   via an opaque two-mode cursor. Both dashboards render **streams** (`phx-update="stream"`, preserved DOM ids) and
   load more via `phx-viewport-bottom="load_more"` (page size 25); `@empty?` drives the empty state,
   `@end?` gates the sentinel. Partial keyset indexes back the Completed/Skipped scans.
+
+### Quick Todos — lightweight team tasks (separate from obligations)
+
+Todos are a deliberately **simpler, parallel domain** to obligations: an entity-scoped, team-visible
+checklist for quick tasks that don't warrant a full duty (no type, no assignee, no recurrence, no
+documents, no due date / urgency). They live in `Argus.Todos` (`Todo`, `AuditLog`, `Pagination`),
+mirror the obligation conventions (scope-first, `Ecto.Multi` writes, `:not_authorise`/`:not_found`
+returns, keyset pagination, LiveView streams), and **escalate into** a real obligation when needed.
+
+- **`Argus.Todos.Todo`** — one row per todo (`title` capped at **200** chars). Like obligations,
+  **no `status` column** — state is expressed via timestamps and read by predicates:
+  `display_status/1` → `:open | :completed | :escalated | :canceled` (priority: escalated → canceled
+  → completed → open). `active?/1` is `deleted_at` **and** `canceled_at` **and** `escalated_at` all
+  nil; `open?/1` is `active?` and not completed. Soft-delete is `deleted_at`; **canceled** and
+  **escalated** are their own terminal stamps (each with `_at`/`_by_id`; escalation also stores
+  `escalated_obligation_id`). Completing is **reversible** (toggle re-opens) — `completed_at`/`_by_id`
+  flip on/off.
+- **Delete vs. Cancel — the 48h window.** A todo is **deletable** (hard soft-delete, hidden
+  everywhere) only while **open and within 48h** of creation (`Todo.delete_window_hours`); after 48h
+  an open todo can no longer be deleted, only **canceled** — and cancel **requires a note**
+  (`validate_action_note`, same rule as obligation transitions). The two are mutually exclusive
+  (`deletable?` xor `cancelable?`), so the per-row action menu only ever offers one.
+- **Escalate-to-duty.** A manager/admin (`can?(:create_obligation)`) escalates an open todo into an
+  obligation: the action navigates to the obligation create form with `?from_todo=<id>`;
+  `ObligationLive.CreateForm` pre-fills the title (truncated to the 60-char obligation cap) + an
+  `open_note`, and on successful create calls `Todos.record_escalation/3` to stamp the todo
+  `escalated_*` and cross-link `escalated_obligation_id`. Escalated todos show a **"View duty"** link.
+  `Todos.get_todo_for_escalation/2` guards that the todo is still escalatable (active, not completed).
+- **Audit trail.** Every mutation writes a `Todos.AuditLog` row (`created`/`updated`/`completed`/
+  `reopened`/`deleted`/`canceled`/`escalated`, with field/old/new for title edits, the cancel note,
+  and the obligation id). Per-todo history is inline-expandable on each row; the **team log** pages
+  (`TodoLive.TeamLog` desktop, `MobileLive.TodoTeamLog`) show the entity-wide feed via
+  `Todos.list_entity_audit_logs/2` rendered by the shared `ArgusWeb.TodoTeamActivity` component.
+- **Routes & UI.** Desktop `/entities/:slug/todos` (`TodoLive.Index`) + `/todos/team-log`; mobile
+  `/m/:slug/todos` and `/m/:slug/todos/new` (both `MobileLive.Todos`, the `:new` action just patches
+  open the create modal) + `/todos/team-log`. **Desktop and mobile share all non-render logic** via
+  `ArgusWeb.TodoLive.IndexHelpers` (mount assigns, load/paginate, the modal + action + status
+  handlers) and `ActivityFormat`; each LiveView only owns its `render/1` and thin `handle_event`
+  delegation — the same Desktop+Mobile split used for obligations. Status filter dropdown is **Open ·
+  Completed · Escalated · Canceled · All** (`Todos.parse_status/1`); lists are keyset-paged
+  (`list_todos_page/2`, page size 25, `Todos.Pagination` opaque cursor, `:all` is unpaginated with a
+  composite tier+timestamp cursor) and rendered as `phx-update="stream"` with a `phx-viewport-bottom`
+  sentinel. `list_todos/2` is the non-paginated context API (used by tests).
+- **Row animations.** Create/update/delete flash a CSS animation on the row via the `TodoRowEffect`
+  colocated hook + `row_effects` assign (cleared on `animationend` → `finish_row_effect`); the
+  per-row action `<select>` is driven by the `TodoActionSelect` hook (pushes `todo_action`).
+- **Seeding.** `mix argus.seed_todos` seeds sample todos for local/demo use (dev task, not run in
+  tests or prod).
 
 ### Out of scope for v1
 

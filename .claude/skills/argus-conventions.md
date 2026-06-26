@@ -136,9 +136,15 @@ Two UIs share the same contexts/schemas, each with its own LiveViews and layout:
   `DashboardLive.*`. Top `navbar` via `Layouts.app/1`. Wider layouts (`mx-auto max-w-5xl`),
   responsive padding (`px-4 sm:px-6 lg:px-8`).
 - **Mobile** under `/m/:entity_slug/...` — `ArgusWeb.MobileLive.*`. `Layouts.mobile_app/1` shell:
-  `min-h-screen bg-base-100 pb-20`, a fixed bottom tab nav (`mobile_bottom_nav`, grid of 3–4
-  tabs with `hero-*` icons, `pb-[env(safe-area-inset-bottom)]`), and a "More" sheet for
-  theme/switch-entity/log-out. Large touch targets, sticky page header with search.
+  `min-h-screen bg-base-100 pb-20`, a fixed bottom tab nav (`mobile_bottom_nav`, a `grid-cols-5`
+  of five primary tabs — New Todo · Todos · New Duty · Duties · More — with emoji glyphs and
+  `pb-[env(safe-area-inset-bottom)]`), and a "More" sheet for theme/switch-entity/log-out plus
+  secondary links (members, types, team logs). Large touch targets, sticky page header with search.
+- **Shared non-render logic across the two UIs lives in a `*.IndexHelpers` module** that both the
+  desktop and mobile LiveView delegate to, so the only per-UI code is `render/1` + thin
+  `handle_event` wiring. Obligations use `ObligationLive.{IndexHelpers,CreateForm}`; todos use
+  `TodoLive.IndexHelpers` (+ `ActivityFormat`). When adding a feature with both UIs, follow this
+  split rather than duplicating mount/load/handler logic.
 - **`AutoRouteByDevice` plug** (mirror peggy's) in the authed pipeline: redirects `/entities/<slug>`
   → `/m/<slug>` for mobile UAs and vice-versa, honoring a `argus_view=mobile|desktop` cookie set by
   explicit Mobile/Desktop toggle links. Only redirect when the counterpart route exists (whitelist
