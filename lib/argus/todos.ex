@@ -491,40 +491,37 @@ defmodule Argus.Todos do
     end
   end
 
+  # The :all list orders by lifecycle tier ascending (open → completed → escalated →
+  # canceled), then inserted_at desc, then id desc. The keyset "seek" predicate for the
+  # next page is therefore: tier > cursor.tier OR (tier = cursor.tier AND the row is older).
+  # Only the tier CASE goes through a raw fragment (an integer comparison); inserted_at/id
+  # stay native Ecto expressions so Ecto casts the params to :utc_datetime / :binary_id —
+  # comparing them inside the fragment would pass the id as raw text and crash Postgrex.
   defp apply_page_cursor(query, :all, %{key: k, id: id}) do
-    case String.split(k, ":", parts: 2) do
-      [tier_str, ts_str] ->
-        with {tier, ""} <- Integer.parse(tier_str),
-             {:ok, ts, _} <- DateTime.from_iso8601(ts_str) do
-          where(
-            query,
-            [t],
-            fragment(
-              "(CASE WHEN ? IS NOT NULL THEN 3 WHEN ? IS NOT NULL THEN 2 WHEN ? IS NOT NULL THEN 1 ELSE 0 END) < ? OR
-               ((CASE WHEN ? IS NOT NULL THEN 3 WHEN ? IS NOT NULL THEN 2 WHEN ? IS NOT NULL THEN 1 ELSE 0 END) = ? AND
-                (? < ? OR (? = ? AND ? < ?)))",
-              t.canceled_at,
-              t.escalated_at,
-              t.completed_at,
-              ^tier,
-              t.canceled_at,
-              t.escalated_at,
-              t.completed_at,
-              ^tier,
-              t.inserted_at,
-              ^ts,
-              t.inserted_at,
-              ^ts,
-              t.id,
-              ^id
-            )
-          )
-        else
-          _ -> query
-        end
-
-      _ ->
-        query
+    with [tier_str, ts_str] <- String.split(k, ":", parts: 2),
+         {tier, ""} <- Integer.parse(tier_str),
+         {:ok, ts, _} <- DateTime.from_iso8601(ts_str) do
+      where(
+        query,
+        [t],
+        fragment(
+          "(CASE WHEN ? IS NOT NULL THEN 3 WHEN ? IS NOT NULL THEN 2 WHEN ? IS NOT NULL THEN 1 ELSE 0 END) > ?",
+          t.canceled_at,
+          t.escalated_at,
+          t.completed_at,
+          ^tier
+        ) or
+          (fragment(
+             "(CASE WHEN ? IS NOT NULL THEN 3 WHEN ? IS NOT NULL THEN 2 WHEN ? IS NOT NULL THEN 1 ELSE 0 END) = ?",
+             t.canceled_at,
+             t.escalated_at,
+             t.completed_at,
+             ^tier
+           ) and
+             (t.inserted_at < ^ts or (t.inserted_at == ^ts and t.id < ^id)))
+      )
+    else
+      _ -> query
     end
   end
 

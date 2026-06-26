@@ -342,9 +342,12 @@ returns, keyset pagination, LiveView streams), and **escalate into** a real obli
   handlers) and `ActivityFormat`; each LiveView only owns its `render/1` and thin `handle_event`
   delegation — the same Desktop+Mobile split used for obligations. Status filter dropdown is **Open ·
   Completed · Escalated · Canceled · All** (`Todos.parse_status/1`); lists are keyset-paged
-  (`list_todos_page/2`, page size 25, `Todos.Pagination` opaque cursor, `:all` is unpaginated with a
-  composite tier+timestamp cursor) and rendered as `phx-update="stream"` with a `phx-viewport-bottom`
-  sentinel. `list_todos/2` is the non-paginated context API (used by tests).
+  (`list_todos_page/2`, page size 25, `Todos.Pagination` opaque cursor) for **every** status,
+  including **All** — which orders by lifecycle tier (open → completed → escalated → canceled), then
+  `inserted_at`/`id`, and pages with a composite **tier+timestamp** keyset cursor. (`limit: :all` is a
+  separate **unbounded** mode that loads everything with no cursor — distinct from the `:all` *status*
+  filter.) Rendered as `phx-update="stream"` with a `phx-viewport-bottom` sentinel. `list_todos/2`
+  is the non-paginated context API (used by tests).
 - **Row animations.** Create/update/delete flash a CSS animation on the row via the `TodoRowEffect`
   colocated hook + `row_effects` assign (cleared on `animationend` → `finish_row_effect`); the
   per-row action `<select>` is driven by the `TodoActionSelect` hook (pushes `todo_action`).

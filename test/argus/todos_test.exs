@@ -319,6 +319,44 @@ defmodule Argus.TodosTest do
       assert page.end?
       assert page.cursor == nil
     end
+
+    test "status: :all keyset-paginates across lifecycle tiers" do
+      scope = entity_scope_fixture()
+
+      # 26 open todos (tier 0) so the first page is entirely open and a second
+      # page is needed to reach the completed/canceled rows.
+      for i <- 1..26 do
+        {:ok, t} = Todos.create_todo(scope, %{title: "open #{i}"})
+        stagger_todo!(t, 100 - i)
+      end
+
+      {:ok, completed} = Todos.create_todo(scope, %{title: "completed one"})
+      {:ok, _} = Todos.toggle_complete(scope, completed)
+
+      {:ok, to_cancel} = Todos.create_todo(scope, %{title: "canceled one"})
+      to_cancel = backdate_todo!(to_cancel, 72)
+      {:ok, _} = Todos.cancel_todo(scope, to_cancel, "nope")
+
+      pages = paginate_all(scope, :all)
+      titles = pages |> Enum.flat_map(& &1.rows) |> Enum.map(& &1.title)
+
+      # No crash, every tier is reachable, and no row is dropped or duplicated.
+      assert length(titles) == 28
+      assert length(Enum.uniq(titles)) == 28
+      assert "completed one" in titles
+      assert "canceled one" in titles
+    end
+  end
+
+  defp paginate_all(scope, status, cursor \\ nil, acc \\ []) do
+    {:ok, page} = Todos.list_todos_page(scope, status: status, cursor: cursor, limit: 25)
+    acc = acc ++ [page]
+
+    if page.end? or page.cursor == nil do
+      acc
+    else
+      paginate_all(scope, status, page.cursor, acc)
+    end
   end
 
   defp backdate_todo!(%Todo{} = todo, hours_ago) do
