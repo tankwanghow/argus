@@ -5,26 +5,26 @@ const errorKey = id => `tugas:upload-error:${id}`
 // A slot error can be raised while the socket is down (the size check runs when
 // the camera returns mid-reconnect). Stash it so restore() can re-show it once
 // the modal is rendered again — displayed purely client-side (no server event).
-export function persistUploadError(obligationId, idPrefix, slot, message) {
-  if (!obligationId) return
+export function persistUploadError(dutyId, idPrefix, slot, message) {
+  if (!dutyId) return
   try {
-    sessionStorage.setItem(errorKey(obligationId), JSON.stringify({idPrefix, slot, message}))
+    sessionStorage.setItem(errorKey(dutyId), JSON.stringify({idPrefix, slot, message}))
   } catch (_e) {
     // ignore quota/serialisation errors
   }
 }
 
-export function clearUploadError(obligationId) {
-  if (!obligationId) return
-  sessionStorage.removeItem(errorKey(obligationId))
+export function clearUploadError(dutyId) {
+  if (!dutyId) return
+  sessionStorage.removeItem(errorKey(dutyId))
 }
 
-export function clearUploadPersist(obligationId) {
-  if (!obligationId) return
+export function clearUploadPersist(dutyId) {
+  if (!dutyId) return
 
-  sessionStorage.removeItem(modalKey(obligationId))
-  sessionStorage.removeItem(stepKey(obligationId))
-  sessionStorage.removeItem(errorKey(obligationId))
+  sessionStorage.removeItem(modalKey(dutyId))
+  sessionStorage.removeItem(stepKey(dutyId))
+  sessionStorage.removeItem(errorKey(dutyId))
 }
 
 export function showClientSlotError(idPrefix, slot, message) {
@@ -55,28 +55,28 @@ export function clearClientSlotError(idPrefix, slot) {
 
 export const UploadUiPersist = {
   mounted() {
-    this.obligationId = this.el.dataset.obligationId
+    this.dutyId = this.el.dataset.dutyId
 
     this.handleEvent("persist_completion_modal", ({slot} = {}) => {
-      if (!this.obligationId) return
+      if (!this.dutyId) return
       // Store the active slot so a remount restores the scoped view; "1" is
       // the sentinel for the unscoped (all required slots) view.
-      sessionStorage.setItem(modalKey(this.obligationId), slot || "1")
-      sessionStorage.removeItem(stepKey(this.obligationId))
+      sessionStorage.setItem(modalKey(this.dutyId), slot || "1")
+      sessionStorage.removeItem(stepKey(this.dutyId))
     })
 
     this.handleEvent("clear_completion_modal_persist", () => {
-      clearUploadPersist(this.obligationId)
+      clearUploadPersist(this.dutyId)
     })
 
     this.handleEvent("persist_step_files", ({event_id}) => {
-      if (!this.obligationId || !event_id) return
-      sessionStorage.setItem(stepKey(this.obligationId), event_id)
-      sessionStorage.removeItem(modalKey(this.obligationId))
+      if (!this.dutyId || !event_id) return
+      sessionStorage.setItem(stepKey(this.dutyId), event_id)
+      sessionStorage.removeItem(modalKey(this.dutyId))
     })
 
     this.handleEvent("clear_step_files_persist", () => {
-      if (this.obligationId) sessionStorage.removeItem(stepKey(this.obligationId))
+      if (this.dutyId) sessionStorage.removeItem(stepKey(this.dutyId))
     })
 
     this.restore()
@@ -87,13 +87,13 @@ export const UploadUiPersist = {
   },
 
   restore() {
-    if (!this.obligationId) return
+    if (!this.dutyId) return
 
-    const modalFlag = sessionStorage.getItem(modalKey(this.obligationId))
-    const stepFlag = sessionStorage.getItem(stepKey(this.obligationId))
+    const modalFlag = sessionStorage.getItem(modalKey(this.dutyId))
+    const stepFlag = sessionStorage.getItem(stepKey(this.dutyId))
 
     let pendingError = null
-    const errorRaw = sessionStorage.getItem(errorKey(this.obligationId))
+    const errorRaw = sessionStorage.getItem(errorKey(this.dutyId))
     if (errorRaw) {
       try {
         pendingError = JSON.parse(errorRaw)
@@ -112,7 +112,7 @@ export const UploadUiPersist = {
         if (!controls) return
 
         showClientSlotError(pendingError.idPrefix, pendingError.slot, pendingError.message)
-        clearUploadError(this.obligationId)
+        clearUploadError(this.dutyId)
       })
     }
 

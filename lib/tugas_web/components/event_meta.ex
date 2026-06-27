@@ -1,8 +1,8 @@
 defmodule TugasWeb.EventMeta do
   @moduledoc """
-  Renders an obligation's latest (current) event as a compact line: a status
+  Renders an duty's latest (current) event as a compact line: a status
   badge, the event count, who acted, and a truncated note. Shared by the
-  desktop dashboard rows and the mobile obligation card.
+  desktop dashboard rows and the mobile duty card.
   """
   use Phoenix.Component
 

@@ -519,7 +519,7 @@ defmodule TugasWeb.CoreComponents do
 
   def doc_link(assigns) do
     assigns =
-      assign(assigns, :kind, TugasWeb.ObligationLive.DocumentHelpers.file_kind(assigns.name))
+      assign(assigns, :kind, TugasWeb.DutyLive.DocumentHelpers.file_kind(assigns.name))
 
     ~H"""
     <.icon name={doc_kind_icon(@kind)} class={@icon_class} />

@@ -8,7 +8,7 @@ defmodule TugasWeb.PageControllerTest do
     assert html =~ "Never miss a"
     assert html =~ "deadline"
     assert html =~ "Start tracking free"
-    assert html =~ "A vigilance layer over every obligation"
+    assert html =~ "A vigilance layer over every duty"
     assert html =~ ~p"/users/register"
     assert html =~ ~p"/users/log-in"
   end

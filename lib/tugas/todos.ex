@@ -1,6 +1,6 @@
 defmodule Tugas.Todos do
   @moduledoc """
-  Quick todos — entity-scoped, team-visible tasks separate from obligations.
+  Quick todos — entity-scoped, team-visible tasks separate from duties.
   """
 
   import Ecto.Query, warn: false
@@ -8,7 +8,7 @@ defmodule Tugas.Todos do
   alias Ecto.Multi
   alias Tugas.Accounts.Scope
   alias Tugas.Authorization
-  alias Tugas.Obligations.Obligation
+  alias Tugas.Duties.Duty
   alias Tugas.Repo
   alias Tugas.Todos.{AuditLog, Pagination, Todo}
 
@@ -30,7 +30,7 @@ defmodule Tugas.Todos do
         |> entity_todos(entity.id)
         |> apply_status_filter(status)
         |> apply_status_order(status)
-        |> preload([:created_by, :completed_by, :escalated_obligation])
+        |> preload([:created_by, :completed_by, :escalated_duty])
         |> Repo.all()
 
       {:ok, todos}
@@ -57,7 +57,7 @@ defmodule Tugas.Todos do
         |> apply_status_filter(status)
         |> apply_status_order(status)
         |> apply_page_cursor(status, cursor)
-        |> preload([:created_by, :completed_by, :escalated_obligation])
+        |> preload([:created_by, :completed_by, :escalated_duty])
         |> maybe_limit(limit)
         |> Repo.all()
         |> paginate(status, limit)
@@ -291,15 +291,15 @@ defmodule Tugas.Todos do
     end
   end
 
-  def record_escalation(%Scope{} = scope, %Todo{} = todo, %Obligation{} = obligation) do
+  def record_escalation(%Scope{} = scope, %Todo{} = todo, %Duty{} = duty) do
     cond do
       ensure_todo_entity(scope, todo) == :not_found ->
         :not_found
 
-      ensure_obligation_entity(scope, obligation) == :not_found ->
+      ensure_duty_entity(scope, duty) == :not_found ->
         :not_found
 
-      not Authorization.can?(scope, :create_obligation) ->
+      not Authorization.can?(scope, :create_duty) ->
         :not_authorise
 
       Todo.completed?(todo) ->
@@ -308,23 +308,23 @@ defmodule Tugas.Todos do
       not Todo.active?(todo) ->
         :not_found
 
-      todo.entity_id != obligation.entity_id ->
+      todo.entity_id != duty.entity_id ->
         {:error, :invalid_escalation}
 
       true ->
         now = DateTime.utc_now(:second)
 
         Multi.new()
-        |> Multi.update(:todo, Todo.escalate_changeset(todo, scope.user.id, obligation.id, now))
+        |> Multi.update(:todo, Todo.escalate_changeset(todo, scope.user.id, duty.id, now))
         |> Multi.run(:audit, fn repo, %{todo: updated} ->
           insert_audit!(
             repo,
             scope,
             updated,
             "escalated",
-            "obligation_id",
+            "duty_id",
             nil,
-            obligation.id
+            duty.id
           )
 
           {:ok, :audited}
@@ -544,8 +544,8 @@ defmodule Tugas.Todos do
   defp ensure_todo_entity(%Scope{entity: %{id: id}}, %Todo{entity_id: id}), do: :ok
   defp ensure_todo_entity(_, _), do: :not_found
 
-  defp ensure_obligation_entity(%Scope{entity: %{id: id}}, %Obligation{entity_id: id}), do: :ok
-  defp ensure_obligation_entity(_, _), do: :not_found
+  defp ensure_duty_entity(%Scope{entity: %{id: id}}, %Duty{entity_id: id}), do: :ok
+  defp ensure_duty_entity(_, _), do: :not_found
 
   defp apply_status_filter(query, :open) do
     query
@@ -731,7 +731,7 @@ defmodule Tugas.Todos do
     Todo
     |> entity_todos(entity_id)
     |> where([t], t.id == ^id)
-    |> preload([:created_by, :completed_by, :escalated_obligation])
+    |> preload([:created_by, :completed_by, :escalated_duty])
     |> Repo.one()
   end
 end

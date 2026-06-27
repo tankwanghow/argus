@@ -99,7 +99,7 @@ if config_env() == :prod do
   #
   # Check `Plug.SSL` for all available options in `force_ssl`.
 
-  # Uploaded obligation documents must live on a persistent volume — the
+  # Uploaded duty documents must live on a persistent volume — the
   # release's priv dir is read-only. The container mounts the host's
   # `/home/tugas/uploads` at `/uploads` (see generate_files_at_server.sh).
   config :tugas, :uploads_dir, System.get_env("UPLOADS_DIR") || "/uploads"

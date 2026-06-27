@@ -4,7 +4,7 @@ defmodule TugasWeb.DoneDocumentChecklistTest do
   import Phoenix.LiveViewTest
   import TugasWeb.DoneDocumentChecklist
 
-  alias Tugas.Obligations.EventDocument
+  alias Tugas.Duties.EventDocument
 
   test "renders a missing required slot (nil value) without crashing" do
     html = render_component(&done_document_checklist/1, required_docs: [{"PCB Form", nil}])

@@ -34,7 +34,7 @@ import {TodoHighlight} from "./todo_highlight"
 // asset; the browser only fetches it when a PDF is actually previewed.
 pdfjsLib.GlobalWorkerOptions.workerSrc = "/assets/js/pdf.worker.js"
 
-// First-page PDF thumbnail for mobile obligation show document tiles.
+// First-page PDF thumbnail for mobile duty show document tiles.
 const PdfThumb = {
   async mounted() {
     const url = this.el.dataset.src

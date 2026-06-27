@@ -2,9 +2,9 @@ defmodule TugasWeb.DashboardLive.Index do
   use TugasWeb, :live_view
 
   alias Tugas.Authorization
-  alias Tugas.Obligations.Urgency
+  alias Tugas.Duties.Urgency
   alias TugasWeb.DashboardFilter
-  alias TugasWeb.ObligationLive.IndexHelpers, as: Index
+  alias TugasWeb.DutyLive.IndexHelpers, as: Index
 
   @impl true
   def render(assigns) do
@@ -16,8 +16,8 @@ defmodule TugasWeb.DashboardLive.Index do
             Duties
             <:actions>
               <.link
-                :if={Authorization.can?(@current_scope, :create_obligation)}
-                navigate={~p"/entities/#{@current_scope.entity.slug}/obligations/new"}
+                :if={Authorization.can?(@current_scope, :create_duty)}
+                navigate={~p"/entities/#{@current_scope.entity.slug}/duties/new"}
                 class="btn btn-primary btn-sm"
               >
                 + New duty
@@ -26,7 +26,7 @@ defmodule TugasWeb.DashboardLive.Index do
           </.header>
 
           <div class="flex flex-wrap items-center gap-2">
-            <div id="obligation-scope-toggle" class="tabs tabs-box">
+            <div id="duty-scope-toggle" class="tabs tabs-box">
               <button
                 id="scope-mine"
                 type="button"
@@ -46,7 +46,7 @@ defmodule TugasWeb.DashboardLive.Index do
                 Team
               </button>
             </div>
-            <form id="obligation-status-filter" phx-change="set_status">
+            <form id="duty-status-filter" phx-change="set_status">
               <select name="lifecycle" class="select">
                 <option
                   :for={{value, label} <- Index.lifecycles()}
@@ -57,8 +57,8 @@ defmodule TugasWeb.DashboardLive.Index do
                 </option>
               </select>
             </form>
-            <form id="obligation-sort-filter" phx-change="set_sort">
-              <select id="obligation-sort" name="sort" class="select">
+            <form id="duty-sort-filter" phx-change="set_sort">
+              <select id="duty-sort" name="sort" class="select">
                 <option
                   :for={{value, label} <- Index.sorts(@lifecycle)}
                   value={value}
@@ -69,7 +69,7 @@ defmodule TugasWeb.DashboardLive.Index do
               </select>
             </form>
             <input
-              id="obligation-search"
+              id="duty-search"
               type="search"
               name="q"
               placeholder="Search…"
@@ -83,7 +83,7 @@ defmodule TugasWeb.DashboardLive.Index do
 
         <div class="tugas-page-body">
           <ul
-            id="obligations-list"
+            id="duties-list"
             class="tugas-row-list"
             phx-update="stream"
             phx-viewport-bottom={!@end? && "load_more"}
@@ -94,7 +94,7 @@ defmodule TugasWeb.DashboardLive.Index do
               data-event-count={row.event_count}
               data-event-status={row.latest_event && row.latest_event.status}
             >
-              <.obligation_row_link
+              <.duty_row_link
                 row={row}
                 slug={@current_scope.entity.slug}
                 today={@today}
@@ -104,7 +104,7 @@ defmodule TugasWeb.DashboardLive.Index do
           </ul>
           <div
             :if={@empty?}
-            id="obligations-empty"
+            id="duties-empty"
             class="py-8 text-center text-base-content/60"
           >
             {Index.empty_message(@mine?, @lifecycle)}
@@ -120,37 +120,37 @@ defmodule TugasWeb.DashboardLive.Index do
   attr :today, :any, required: true
   attr :timezone, :string, default: nil
 
-  defp obligation_row_link(assigns) do
+  defp duty_row_link(assigns) do
     ~H"""
     <.link
-      navigate={~p"/entities/#{@slug}/obligations/#{@row.obligation.id}"}
+      navigate={~p"/entities/#{@slug}/duties/#{@row.duty.id}"}
       class={[
         "tugas-compact-row",
-        if(@row.cycle_status == :live and @row.obligation.due_by,
+        if(@row.cycle_status == :live and @row.duty.due_by,
           do: tier_border(@row.tier),
           else: "border-transparent"
         )
       ]}
     >
       <div class="flex justify-between items-center gap-x-2 gap-y-0.5">
-        <div class="font-medium">{@row.obligation.title}</div>
+        <div class="font-medium">{@row.duty.title}</div>
         <.cycle_badge
           cycle_status={@row.cycle_status}
           tier={@row.tier}
-          obligation={@row.obligation}
+          duty={@row.duty}
           today={@today}
           timezone={@timezone}
-          in_error={!is_nil(@row.obligation.completed_in_error_at)}
+          in_error={!is_nil(@row.duty.completed_in_error_at)}
         />
       </div>
       <div class="flex items-center text-sm gap-1">
-        <div class="text-info">{@row.obligation.obligation_type.name}</div>
-        <div :if={@row.obligation.due_by}>·</div>
-        <div :if={@row.obligation.due_by} class="text-base-content/60">
-          due {format_date(@row.obligation.due_by, :short)}
+        <div class="text-info">{@row.duty.duty_type.name}</div>
+        <div :if={@row.duty.due_by}>·</div>
+        <div :if={@row.duty.due_by} class="text-base-content/60">
+          due {format_date(@row.duty.due_by, :short)}
         </div>
         <div>·</div>
-        {assignee_label(@row.obligation.primary_assignee)}
+        {assignee_label(@row.duty.primary_assignee)}
       </div>
       <.event_meta
         :if={@row.latest_event}
@@ -246,7 +246,7 @@ defmodule TugasWeb.DashboardLive.Index do
     |> assign(cursor: cursor, end?: end?, empty?: rows == [])
   end
 
-  defp row_dom_id(row), do: "obligation-row-#{row.obligation.id}"
+  defp row_dom_id(row), do: "duty-row-#{row.duty.id}"
 
   defp assignee_label(assigns) when assigns == nil do
     ~H"""

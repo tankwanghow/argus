@@ -114,7 +114,7 @@ export const UploadDirect = {
     if (this._dismiss) {
       this._onDismiss = () => {
         clearClientSlotError(this.el.dataset.idPrefix, this.el.dataset.slot)
-        clearUploadError(this.el.dataset.obligationId)
+        clearUploadError(this.el.dataset.dutyId)
       }
       this._dismiss.addEventListener("click", this._onDismiss)
     }
@@ -198,7 +198,7 @@ export const UploadDirect = {
       const message = tooLargeMessage(kind, limit)
       showClientSlotError(d.idPrefix, slot, message)
       // Survive a remount that happened during the pick (camera backgrounding).
-      persistUploadError(d.obligationId, d.idPrefix, slot, message)
+      persistUploadError(d.dutyId, d.idPrefix, slot, message)
       return
     }
 
@@ -238,7 +238,7 @@ export const UploadDirect = {
         // element persists across the refresh, and its static "Choose file"
         // label isn't restored by the LiveView diff after the hook changed it.
         this.clearBusy()
-        clearUploadError(this.el.dataset.obligationId)
+        clearUploadError(this.el.dataset.dutyId)
         this.refresh()
       } else {
         this.fail(slot, errorMessage(xhr))
@@ -266,7 +266,7 @@ export const UploadDirect = {
     const d = this.el.dataset
     this.clearBusy()
     showClientSlotError(d.idPrefix, slot, message)
-    persistUploadError(d.obligationId, d.idPrefix, slot, message)
+    persistUploadError(d.dutyId, d.idPrefix, slot, message)
   },
 
   setBusy(percent) {

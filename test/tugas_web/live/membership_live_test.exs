@@ -2,7 +2,7 @@ defmodule TugasWeb.MembershipLiveTest do
   use TugasWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
-  import Tugas.ObligationsFixtures
+  import Tugas.DutiesFixtures
 
   alias Tugas.Entities
 

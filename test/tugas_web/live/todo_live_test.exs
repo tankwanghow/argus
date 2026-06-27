@@ -8,7 +8,7 @@ defmodule TugasWeb.TodoLiveTest do
   alias Tugas.Todos.Todo
 
   import Tugas.EntitiesFixtures, only: [entity_scope_fixture: 0, manager_scope_fixture: 0]
-  import Tugas.ObligationsFixtures, only: [member_scope_on_entity: 1, type_fixture: 1]
+  import Tugas.DutiesFixtures, only: [member_scope_on_entity: 1, type_fixture: 1]
 
   @mobile_ua "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)"
 
@@ -295,7 +295,7 @@ defmodule TugasWeb.TodoLiveTest do
     refute has_element?(view, "#todo-delete-#{todo.id}")
   end
 
-  test "escalate pre-fills obligation form from todo", %{conn: conn} do
+  test "escalate pre-fills duty form from todo", %{conn: conn} do
     manager = manager_scope_fixture()
     type = type_fixture(manager.entity)
     conn = log_in_user(conn, manager.user)
@@ -303,16 +303,16 @@ defmodule TugasWeb.TodoLiveTest do
     {:ok, todo} = Tugas.Todos.create_todo(manager, %{title: "Formalize this work item"})
 
     {:ok, view, html} =
-      live(conn, ~p"/entities/#{manager.entity.slug}/obligations/new?from_todo=#{todo.id}")
+      live(conn, ~p"/entities/#{manager.entity.slug}/duties/new?from_todo=#{todo.id}")
 
     assert html =~ "Formalize this work item"
     assert html =~ "Escalated from todo: Formalize this work item"
 
     view
-    |> form("#obligation-create-form", %{
-      "obligation" => %{
+    |> form("#duty-create-form", %{
+      "duty" => %{
         "title" => "Formalize this work item",
-        "obligation_type_id" => type.id,
+        "duty_type_id" => type.id,
         "due_by" => "2026-07-15",
         "open_note" => "Escalated from todo: Formalize this work item"
       }

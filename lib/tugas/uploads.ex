@@ -1,13 +1,13 @@
 defmodule Tugas.Uploads do
   @moduledoc """
-  Local filesystem storage for obligation event documents.
+  Local filesystem storage for duty event documents.
   """
 
   alias Tugas.Uploads.Limits
 
-  def store(%Plug.Upload{} = upload, entity_id, obligation_id) do
+  def store(%Plug.Upload{} = upload, entity_id, duty_id) do
     with :ok <- validate_upload_size(upload) do
-      dest_dir = Path.join([base_dir(), to_string(entity_id), to_string(obligation_id)])
+      dest_dir = Path.join([base_dir(), to_string(entity_id), to_string(duty_id)])
       File.mkdir_p!(dest_dir)
       safe_name = upload.filename |> Path.basename() |> sanitize_filename()
       filename = "#{Ecto.UUID.generate()}_#{safe_name}"

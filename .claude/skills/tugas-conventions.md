@@ -72,9 +72,9 @@ Tugas must wire into it the same way (mirror peggy's `mix.exs` + `config/config.
 - `use Tugas.Schema` (binary_id PK, `@foreign_key_type :binary_id`). Mirrors `FullCircle.Schema`.
   Tugas additionally sets `@timestamps_opts [type: :utc_datetime]` (the spec uses utc_datetime
   throughout) — this is the one intentional divergence from full_circle's naive default.
-- Domain logic lives in context modules (`Tugas.Accounts`, `Tugas.Entities`, `Tugas.Obligations`).
+- Domain logic lives in context modules (`Tugas.Accounts`, `Tugas.Entities`, `Tugas.Duties`).
   LiveViews call contexts, never `Repo` directly.
-- **Bespoke context functions** (decided), all **scope-first**: `create_obligation/2`,
+- **Bespoke context functions** (decided), all **scope-first**: `create_duty/2`,
   `complete/3`, `skip/3`, `end_series/3`, `start_progress/2`, etc. (scope replaces the old
   entity+actor args) — Tugas does NOT adopt full_circle's generic `StdInterface`.
 - Multi-step writes use `Ecto.Multi`/transactions.
@@ -122,7 +122,7 @@ not remove the password path.
   resolves the `:entity_slug` to `scope.entity` + membership (replacing the old standalone
   `SetActiveEntity` plug). State which `live_session`/pipeline a route goes in and why.
 - Authorization is **scope-first**: `Tugas.Authorization.can?(%Scope{}, :action)` (entity-level)
-  and `can?(%Scope{}, :action, %Obligation{})` (obligation-scoped). Pattern-matched clauses
+  and `can?(%Scope{}, :action, %Duty{})` (duty-scoped). Pattern-matched clauses
   (mirroring `FullCircle.Authorization`'s shape) keyed off the **pre-resolved `scope.role`**, with
   an `allow_roles(scope, ~w(admin manager)a)` helper — Tugas does **not** re-query the role from
   the DB on every call the way full_circle does, because the `on_mount` already put it on the
@@ -132,7 +132,7 @@ not remove the password path.
 
 Two UIs share the same contexts/schemas, each with its own LiveViews and layout:
 
-- **Desktop** under `/entities/:entity_slug/...` — `TugasWeb.EntityLive.*` / `ObligationLive.*` /
+- **Desktop** under `/entities/:entity_slug/...` — `TugasWeb.EntityLive.*` / `DutyLive.*` /
   `DashboardLive.*`. Top `navbar` via `Layouts.app/1`. Wider layouts (`mx-auto max-w-5xl`),
   responsive padding (`px-4 sm:px-6 lg:px-8`).
 - **Mobile** under `/m/:entity_slug/...` — `TugasWeb.MobileLive.*`. `Layouts.mobile_app/1` shell:
@@ -142,7 +142,7 @@ Two UIs share the same contexts/schemas, each with its own LiveViews and layout:
   secondary links (members, types, team logs). Large touch targets, sticky page header with search.
 - **Shared non-render logic across the two UIs lives in a `*.IndexHelpers` module** that both the
   desktop and mobile LiveView delegate to, so the only per-UI code is `render/1` + thin
-  `handle_event` wiring. Obligations use `ObligationLive.{IndexHelpers,CreateForm}`; todos use
+  `handle_event` wiring. Duties use `DutyLive.{IndexHelpers,CreateForm}`; todos use
   `TodoLive.IndexHelpers` (+ `ActivityFormat`). When adding a feature with both UIs, follow this
   split rather than duplicating mount/load/handler logic.
 - **`AutoRouteByDevice` plug** (mirror peggy's) in the authed pipeline: redirects `/entities/<slug>`
@@ -163,8 +163,8 @@ Two UIs share the same contexts/schemas, each with its own LiveViews and layout:
 - **Collections:** Phoenix **streams** (`stream/3` + `phx-update="stream"`); never
   `phx-update="append"`. The dashboard is the reference pattern (`DashboardLive.Index` /
   `MobileLive.Dashboard`): the context exposes a **keyset-paginated** loader
-  (`Obligations.list_obligations_page/2` returning `%{rows, cursor, end?}`, opaque cursor via
-  `Obligations.Pagination`); the LiveView holds `@cursor`/`@end?`/`@empty?`, streams the first page
+  (`Duties.list_duties_page/2` returning `%{rows, cursor, end?}`, opaque cursor via
+  `Duties.Pagination`); the LiveView holds `@cursor`/`@end?`/`@empty?`, streams the first page
   on mount/filter-change (`stream(:rows, page, dom_id: &dom_id/1, reset: true)`) and appends on a
   `phx-viewport-bottom={!@end? && "load_more"}` sentinel (`stream(:rows, page, dom_id: &dom_id/1,
   at: -1)` — pass the same `dom_id:` on both so ids stay stable; page size 25). The empty state is a
@@ -172,15 +172,15 @@ Two UIs share the same contexts/schemas, each with its own LiveViews and layout:
   any per-row component so the stream dom_id lands on its root element. SQL-side filtering/sorting is
   the default; in-memory sorting is the exception (urgency over a bounded window — see CLAUDE.md's
   dashboard section).
-- **Someday / dateless duties (gotchas).** `Obligation.due_by` is **nullable**; a duty is "Someday"
+- **Someday / dateless duties (gotchas).** `Duty.due_by` is **nullable**; a duty is "Someday"
   when `due_by IS NULL` (created via the virtual `:someday` checkbox, which force-nils `due_by` and
-  drops the requirement in `Obligation.changeset/2`). Two traps that crash/corrupt if forgotten:
+  drops the requirement in `Duty.changeset/2`). Two traps that crash/corrupt if forgotten:
   - **Anything reading `due_by` for a live cycle must nil-guard it.** `Urgency.classify/3` & `tier/3`
     return `:none` for nil; `Recurrence.next_due_suggestion(_type, nil)` returns nil (the done/skip
     show-form pre-fill calls it at mount, so a missing nil clause crashes the show page for a
-    *recurring* Someday duty). Render guards: `:if={@live? and @obligation.due_by}` on urgency
-    badges, `:if={@obligation.due_by}` on "due …" text. `format_date(nil)` is already safe ("—").
-  - **The virtual `:someday` field leaks into `changeset.changes`.** `update_obligation/3`'s
+    *recurring* Someday duty). Render guards: `:if={@live? and @duty.due_by}` on urgency
+    badges, `:if={@duty.due_by}` on "due …" text. `format_date(nil)` is already safe ("—").
+  - **The virtual `:someday` field leaks into `changeset.changes`.** `update_duty/3`'s
     audit-log loop must `Map.drop(changeset.changes, [:someday])` so edits don't write a bogus
     `"someday"` AuditLog row. Apply the same care to any new loop over `changeset.changes` that
     touches a changeset carrying virtual fields.
@@ -197,8 +197,8 @@ Two UIs share the same contexts/schemas, each with its own LiveViews and layout:
   zone). A stored datetime shown as a *day* (invite expiry, completion date) uses
   `format_zoned_date/3` (shift **then** `to_date`). **Never `Calendar.strftime` a raw UTC
   datetime.** `format_date/2` is for bare `Date`s only (`due_by`) — no shift. Shared components that
-  print datetimes (`cycle_badge`, `todo_team_activity`, `obligation_document_row` voided rows,
-  mobile `obligation_card`, dashboard `obligation_row_link`) take a `timezone` attr threaded from
+  print datetimes (`cycle_badge`, `todo_team_activity`, `duty_document_row` voided rows,
+  mobile `duty_card`, dashboard `duty_row_link`) take a `timezone` attr threaded from
   the caller's `@current_scope`; don't reach for `@current_scope` inside a function component that
   wasn't given it. Pairs with the render-time `Urgency.today_for(entity.timezone)` rule.
 - Gettext on **all** user-facing text — `gettext("...")` / `{gettext(...)}`. Locale in session
@@ -209,30 +209,30 @@ Two UIs share the same contexts/schemas, each with its own LiveViews and layout:
 
 ## Documents (uploads UI)
 
-Obligation documents live in **two surfaces**, split by purpose; each file appears in
+Duty documents live in **two surfaces**, split by purpose; each file appears in
 exactly one place (no duplicated rows/checklists):
 
-- **Completion Documents** — `TugasWeb.ObligationCompletionDocuments`, cycle-level
-  (one modal per obligation). A row per **required** slot: the live file inline
+- **Completion Documents** — `TugasWeb.DutyCompletionDocuments`, cycle-level
+  (one modal per duty). A row per **required** slot: the live file inline
   (download + Delete/Void) or an inline uploader if the slot is unsatisfied, plus a
   voided-required section. Slot uploads attach to the cycle's current workable event
   (`DocumentHelpers.upload_event/1` → `in_progress` else `open`).
-- **Step Files** — `TugasWeb.ObligationStepFiles`, per-step (a modal per timeline
+- **Step Files** — `TugasWeb.DutyStepFiles`, per-step (a modal per timeline
   event). That event's **supporting** files (no-slot or stale-slot) + a voided-other
   section + an additional-file uploader.
 
 Rules:
 - Classification/partitioning is pure and lives in
-  `TugasWeb.ObligationLive.DocumentHelpers` (`completion_view/2`, `step_files/2`,
+  `TugasWeb.DutyLive.DocumentHelpers` (`completion_view/2`, `step_files/2`,
   `parse_slots/1`). A doc is **required** iff its `document_slot` is in the
-  obligation's **current snapshot** `complete_documents`, else **supporting**.
+  duty's **current snapshot** `complete_documents`, else **supporting**.
 - **Slots are immutable after upload; there is no Replace and no slot editing.** To
   change a slot's file, delete (within 48h) or void it, then re-upload — uploading is
   only offered for an unsatisfied slot.
 - **Voided files are kept and remain downloadable** (`DocumentController` serves them;
   do not reintroduce a voided→404 guard).
-- Admin type edits: `Obligations.propagate_complete_documents_to_live/3` updates the
-  snapshot of **live** obligations only (completed/closed frozen); a removed/renamed
+- Admin type edits: `Duties.propagate_complete_documents_to_live/3` updates the
+  snapshot of **live** duties only (completed/closed frozen); a removed/renamed
   slot reclassifies its file required → supporting **without mutating the row** (re-adding
   the slot re-links it).
 - Create-form attachments are LiveView upload entries **consumed on save** (no disk

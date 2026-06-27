@@ -4,12 +4,12 @@ defmodule Tugas.EntitiesTest do
   alias Tugas.Accounts.Scope
   alias Tugas.Entities
   alias Tugas.Entities.Membership
-  alias Tugas.Obligations
-  alias Tugas.Obligations.SampleTypes
+  alias Tugas.Duties
+  alias Tugas.Duties.SampleTypes
 
   import Tugas.AccountsFixtures
   import Tugas.EntitiesFixtures
-  import Tugas.ObligationsFixtures
+  import Tugas.DutiesFixtures
 
   describe "disable_member/2 and enable_member/2" do
     test "admin disables a member, stamping disabled_at and freeing a seat" do
@@ -27,23 +27,23 @@ defmodule Tugas.EntitiesTest do
     test "disabling auto-unassigns the member's live primary duties with an audit row" do
       admin_scope = entity_scope_fixture()
       member = member_scope_on_entity(admin_scope.entity)
-      obligation = live_obligation_assigned_to(admin_scope, member.user.id)
+      duty = live_duty_assigned_to(admin_scope, member.user.id)
 
       assert {:ok, _} = Entities.disable_member(admin_scope, member.membership)
 
-      reloaded = Tugas.Repo.get!(Tugas.Obligations.Obligation, obligation.id)
+      reloaded = Tugas.Repo.get!(Tugas.Duties.Duty, duty.id)
       assert is_nil(reloaded.primary_assignee_id)
 
-      audit = Obligations.list_audit_logs(reloaded)
+      audit = Duties.list_audit_logs(reloaded)
       assert Enum.any?(audit, &(&1.field == "primary_assignee" and is_nil(&1.new_value)))
     end
 
-    test "disabling removes the member's collaborator rows on live obligations" do
+    test "disabling removes the member's collaborator rows on live duties" do
       admin_scope = entity_scope_fixture()
       member = member_scope_on_entity(admin_scope.entity)
-      other = live_obligation_assigned_to(admin_scope, nil)
+      other = live_duty_assigned_to(admin_scope, nil)
 
-      {:ok, _} = Obligations.update_collaborators(admin_scope, other, [member.user.id])
+      {:ok, _} = Duties.update_collaborators(admin_scope, other, [member.user.id])
       assert member.user.id in collaborator_ids(other)
 
       assert {:ok, _} = Entities.disable_member(admin_scope, member.membership)
@@ -120,7 +120,7 @@ defmodule Tugas.EntitiesTest do
     test "list_member_administration includes disabled members with assignment counts" do
       admin_scope = entity_scope_fixture()
       member = member_scope_on_entity(admin_scope.entity)
-      _obligation = live_obligation_assigned_to(admin_scope, member.user.id)
+      _duty = live_duty_assigned_to(admin_scope, member.user.id)
 
       {:ok, _} = Entities.disable_member(admin_scope, member.membership)
 
@@ -146,7 +146,7 @@ defmodule Tugas.EntitiesTest do
       assert membership.is_default
 
       scope = Scope.put_entity(scope, entity, membership)
-      types = Obligations.list_types(scope)
+      types = Duties.list_types(scope)
       assert length(types) == length(SampleTypes.samples())
       assert Enum.any?(types, &(&1.name == "EPF Monthly"))
     end
@@ -464,26 +464,26 @@ defmodule Tugas.EntitiesTest do
     Entities.get_membership!(user, entity)
   end
 
-  defp live_obligation_assigned_to(scope, assignee_id) do
+  defp live_duty_assigned_to(scope, assignee_id) do
     type = type_fixture(scope.entity)
 
-    {:ok, obligation} =
-      Obligations.create_obligation(scope, %{
+    {:ok, duty} =
+      Duties.create_duty(scope, %{
         title: "Duty #{System.unique_integer([:positive])}",
-        obligation_type_id: type.id,
+        duty_type_id: type.id,
         primary_assignee_id: assignee_id,
         due_by: ~D[2026-06-15],
         open_note: "opened"
       })
 
-    obligation
+    duty
   end
 
-  defp collaborator_ids(obligation) do
+  defp collaborator_ids(duty) do
     import Ecto.Query
 
-    Tugas.Obligations.Collaborator
-    |> where([c], c.obligation_id == ^obligation.id)
+    Tugas.Duties.Collaborator
+    |> where([c], c.duty_id == ^duty.id)
     |> Tugas.Repo.all()
     |> Enum.map(& &1.user_id)
   end

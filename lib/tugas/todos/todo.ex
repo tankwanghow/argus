@@ -4,7 +4,7 @@ defmodule Tugas.Todos.Todo do
 
   alias Tugas.Accounts.User
   alias Tugas.Entities.Entity
-  alias Tugas.Obligations.Obligation
+  alias Tugas.Duties.Duty
   alias Tugas.Todos.AuditLog
 
   @delete_window_hours 48
@@ -23,7 +23,7 @@ defmodule Tugas.Todos.Todo do
     belongs_to :deleted_by, User, foreign_key: :deleted_by_id
     belongs_to :canceled_by, User, foreign_key: :canceled_by_id
     belongs_to :escalated_by, User, foreign_key: :escalated_by_id
-    belongs_to :escalated_obligation, Obligation, foreign_key: :escalated_obligation_id
+    belongs_to :escalated_duty, Duty, foreign_key: :escalated_duty_id
 
     has_many :audit_logs, AuditLog
 
@@ -59,12 +59,12 @@ defmodule Tugas.Todos.Todo do
     |> change(%{canceled_at: at, canceled_by_id: user_id})
   end
 
-  def escalate_changeset(todo, user_id, obligation_id, at \\ DateTime.utc_now(:second)) do
+  def escalate_changeset(todo, user_id, duty_id, at \\ DateTime.utc_now(:second)) do
     todo
     |> change(%{
       escalated_at: at,
       escalated_by_id: user_id,
-      escalated_obligation_id: obligation_id
+      escalated_duty_id: duty_id
     })
   end
 

@@ -1,7 +1,7 @@
 defmodule Tugas.UploadFixtures do
   @moduledoc false
 
-  alias Tugas.Obligations
+  alias Tugas.Duties
 
   def upload_fixture(filename \\ "test.txt", content \\ "hello", content_type \\ nil) do
     path = Path.join(System.tmp_dir!(), "#{System.unique_integer()}_#{filename}")
@@ -14,17 +14,17 @@ defmodule Tugas.UploadFixtures do
     }
   end
 
-  def seed_document(scope, obligation, slot, filename) do
-    obligation = Obligations.get_obligation!(scope, obligation.id)
+  def seed_document(scope, duty, slot, filename) do
+    duty = Duties.get_duty!(scope, duty.id)
 
     event =
-      Enum.find(obligation.events, &(&1.status == "in_progress")) ||
-        Enum.find(obligation.events, &(&1.status == "open"))
+      Enum.find(duty.events, &(&1.status == "in_progress")) ||
+        Enum.find(duty.events, &(&1.status == "open"))
 
     {:ok, doc} =
-      Obligations.add_document(
+      Duties.add_document(
         scope,
-        obligation,
+        duty,
         event,
         upload_fixture(filename, "scan"),
         slot

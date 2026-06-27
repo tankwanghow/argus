@@ -192,7 +192,7 @@ defmodule TugasWeb.TodoLive.IndexHelpers do
   end
 
   def can_escalate?(scope, %Todo{} = todo) do
-    Authorization.can?(scope, :create_obligation) and
+    Authorization.can?(scope, :create_duty) and
       not Todo.completed?(todo) and
       Todo.active?(todo)
   end
@@ -224,9 +224,9 @@ defmodule TugasWeb.TodoLive.IndexHelpers do
 
     path =
       if socket.view == TugasWeb.MobileLive.Todos do
-        ~p"/m/#{slug}/obligations/new?from_todo=#{id}"
+        ~p"/m/#{slug}/duties/new?from_todo=#{id}"
       else
-        ~p"/entities/#{slug}/obligations/new?from_todo=#{id}"
+        ~p"/entities/#{slug}/duties/new?from_todo=#{id}"
       end
 
     {:ok, push_navigate(socket, to: path)}

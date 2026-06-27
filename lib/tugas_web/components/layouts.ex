@@ -119,7 +119,7 @@ defmodule TugasWeb.Layouts do
           label="📑 Todos"
         />
         <.entity_nav_link
-          href={~p"/entities/#{@current_scope.entity.slug}/obligation-types"}
+          href={~p"/entities/#{@current_scope.entity.slug}/duty-types"}
           label="🏷️ Types"
         />
       </div>
@@ -409,7 +409,7 @@ defmodule TugasWeb.Layouts do
         <li>
           <.link
             id="m-new-duties-nav-link"
-            navigate={~p"/m/#{@current_scope.entity.slug}/obligations/new"}
+            navigate={~p"/m/#{@current_scope.entity.slug}/duties/new"}
             class={[
               "flex flex-col items-center gap-1 py-3 active:bg-base-200",
               @active == :new_duty && "text-primary",
@@ -506,7 +506,7 @@ defmodule TugasWeb.Layouts do
           }>
             <.link
               id="m-more-types-link"
-              navigate={~p"/m/#{@current_scope.entity.slug}/obligation-types"}
+              navigate={~p"/m/#{@current_scope.entity.slug}/duty-types"}
               class="flex items-center gap-3 px-4 py-4 active:bg-base-200"
             >
               <.icon name="hero-tag" class="size-5 text-base-content/60" />

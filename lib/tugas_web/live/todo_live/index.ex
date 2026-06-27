@@ -66,10 +66,10 @@ defmodule TugasWeb.TodoLive.Index do
                   <.todo_badge todo={todo} />
                 </div>
                 <.link
-                  :if={Todo.escalated?(todo) && todo.escalated_obligation_id}
+                  :if={Todo.escalated?(todo) && todo.escalated_duty_id}
                   id={"todo-view-duty-#{todo.id}"}
                   navigate={
-                    ~p"/entities/#{@current_scope.entity.slug}/obligations/#{todo.escalated_obligation_id}"
+                    ~p"/entities/#{@current_scope.entity.slug}/duties/#{todo.escalated_duty_id}"
                   }
                   class="text-xs link link-primary"
                 >

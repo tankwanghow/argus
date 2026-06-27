@@ -1,10 +1,10 @@
-defmodule TugasWeb.ObligationLive.IndexHelpersTest do
+defmodule TugasWeb.DutyLive.IndexHelpersTest do
   use Tugas.DataCase, async: true
 
-  import Tugas.ObligationsFixtures
+  import Tugas.DutiesFixtures
 
-  alias TugasWeb.ObligationLive.IndexHelpers, as: Index
-  alias Tugas.Obligations.Urgency
+  alias TugasWeb.DutyLive.IndexHelpers, as: Index
+  alias Tugas.Duties.Urgency
 
   test "parse_sort whitelists with due_asc default" do
     assert Index.parse_sort("title") == :title
@@ -13,7 +13,7 @@ defmodule TugasWeb.ObligationLive.IndexHelpersTest do
 
   test "cycle_status: series_ended only when the cycle is closed; a live replacement stays :live" do
     now = DateTime.utc_now(:second)
-    ob = %Tugas.Obligations.Obligation{}
+    ob = %Tugas.Duties.Duty{}
 
     assert Index.cycle_status(%{ob | completed_at: now}) == :completed
     # real end-series stamps BOTH closed_at and series_ended_at
@@ -46,9 +46,9 @@ defmodule TugasWeb.ObligationLive.IndexHelpersTest do
 
     for {title, due} <- [{"a", ~D[2026-01-01]}, {"b", ~D[2026-02-01]}, {"c", ~D[2026-03-01]}] do
       {:ok, _} =
-        Tugas.Obligations.create_obligation(manager, %{
+        Tugas.Duties.create_duty(manager, %{
           title: title,
-          obligation_type_id: type.id,
+          duty_type_id: type.id,
           due_by: due,
           open_note: "n"
         })
@@ -57,7 +57,7 @@ defmodule TugasWeb.ObligationLive.IndexHelpersTest do
     today = Urgency.today_for(manager.entity.timezone)
     page = Index.load_page(manager, today, false, :live, "", :due_asc, nil)
 
-    assert Enum.map(page.rows, & &1.obligation.title) == ["a", "b", "c"]
+    assert Enum.map(page.rows, & &1.duty.title) == ["a", "b", "c"]
     assert page.end?
     assert Enum.all?(page.rows, &Map.has_key?(&1, :tier))
   end
@@ -71,9 +71,9 @@ defmodule TugasWeb.ObligationLive.IndexHelpersTest do
 
       mk = fn title, due ->
         {:ok, o} =
-          Tugas.Obligations.create_obligation(manager, %{
+          Tugas.Duties.create_duty(manager, %{
             title: title,
-            obligation_type_id: type.id,
+            duty_type_id: type.id,
             due_by: due,
             open_note: "n"
           })
@@ -92,12 +92,12 @@ defmodule TugasWeb.ObligationLive.IndexHelpersTest do
          %{manager: m, today: today, overdue: o, soon: s, ok: k, far: f} do
       p1 = Index.load_page(m, today, false, :live, "", :urgency, nil)
 
-      assert Enum.map(p1.rows, & &1.obligation.id) == [o.id, s.id, k.id]
+      assert Enum.map(p1.rows, & &1.duty.id) == [o.id, s.id, k.id]
       refute p1.end?
 
       p2 = Index.load_page(m, today, false, :live, "", :urgency, p1.cursor)
 
-      assert Enum.map(p2.rows, & &1.obligation.id) == [f.id]
+      assert Enum.map(p2.rows, & &1.duty.id) == [f.id]
       assert p2.end?
     end
   end

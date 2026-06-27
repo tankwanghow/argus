@@ -3,7 +3,7 @@ defmodule TugasWeb.CycleBadgeTest do
   import Phoenix.LiveViewTest
   import TugasWeb.CycleBadge
 
-  alias Tugas.Obligations.Obligation
+  alias Tugas.Duties.Duty
 
   @today ~D[2026-06-23]
   @at ~U[2026-03-22 04:30:00Z]
@@ -17,7 +17,7 @@ defmodule TugasWeb.CycleBadgeTest do
       badge_html(%{
         cycle_status: :live,
         tier: :overdue,
-        obligation: %Obligation{due_by: ~D[2026-06-20]}
+        duty: %Duty{due_by: ~D[2026-06-20]}
       })
 
     assert html =~ "3d overdue"
@@ -29,14 +29,14 @@ defmodule TugasWeb.CycleBadgeTest do
     assert badge_html(%{
              cycle_status: :live,
              tier: :ok,
-             obligation: %Obligation{due_by: ~D[2027-01-01]}
+             duty: %Duty{due_by: ~D[2027-01-01]}
            }) ==
              ""
   end
 
   test "live undated (Someday) cycle shows a green Anytime badge" do
     html =
-      badge_html(%{cycle_status: :live, tier: :none, obligation: %Obligation{due_by: nil}})
+      badge_html(%{cycle_status: :live, tier: :none, duty: %Duty{due_by: nil}})
 
     assert html =~ "Anytime"
     assert html =~ "text-success"
@@ -47,7 +47,7 @@ defmodule TugasWeb.CycleBadgeTest do
       badge_html(%{
         cycle_status: :completed,
         tier: :ok,
-        obligation: %Obligation{completed_at: @at}
+        duty: %Duty{completed_at: @at}
       })
 
     assert html =~ "Completed"
@@ -61,7 +61,7 @@ defmodule TugasWeb.CycleBadgeTest do
         cycle_status: :completed,
         tier: :ok,
         in_error: true,
-        obligation: %Obligation{completed_at: @at}
+        duty: %Duty{completed_at: @at}
       })
 
     assert html =~ "Completed error"
@@ -70,7 +70,7 @@ defmodule TugasWeb.CycleBadgeTest do
 
   test "skipped cycle shows Skipped + closed date in warning colour" do
     html =
-      badge_html(%{cycle_status: :skipped, tier: :ok, obligation: %Obligation{closed_at: @at}})
+      badge_html(%{cycle_status: :skipped, tier: :ok, duty: %Duty{closed_at: @at}})
 
     assert html =~ "Skipped"
     assert html =~ "2026-03-22"

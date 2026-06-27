@@ -3,7 +3,7 @@ defmodule TugasWeb.DashboardFilter do
 
   alias Tugas.Accounts.Scope
   alias TugasWeb.DashboardFilter.Store
-  alias TugasWeb.ObligationLive.IndexHelpers, as: Index
+  alias TugasWeb.DutyLive.IndexHelpers, as: Index
 
   @session_key "dashboard_filters"
   @lifecycles ~w(live completed skipped all)

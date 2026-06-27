@@ -2,10 +2,10 @@ defmodule TugasWeb.ModalEscape do
   @moduledoc false
 
   @doc """
-  Closes the topmost open obligation modal on `socket`, if any.
+  Closes the topmost open duty modal on `socket`, if any.
   Nested document-void UI is dismissed before the documents modal.
   """
-  def close_obligation_modals(socket, opts \\ []) do
+  def close_duty_modals(socket, opts \\ []) do
     end_series? = Keyword.get(opts, :end_series?, true)
 
     cond do
@@ -55,7 +55,7 @@ defmodule TugasWeb.ModalEscape do
   end
 
   @doc """
-  Closes the obligation type editor modal on `socket`, if open.
+  Closes the duty type editor modal on `socket`, if open.
   """
   def close_type_modal(socket) do
     if socket.assigns[:type_form] do

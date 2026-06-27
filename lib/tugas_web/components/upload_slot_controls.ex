@@ -15,7 +15,7 @@ defmodule TugasWeb.UploadSlotControls do
   attr :slot, :string, required: true
   attr :id_prefix, :string, required: true
   attr :upload_url, :string, required: true
-  attr :obligation_id, :string, required: true
+  attr :duty_id, :string, required: true
   attr :event_id, :string, default: nil
   attr :idle_label, :string, default: nil
   attr :completion_slot?, :boolean, default: false
@@ -35,7 +35,7 @@ defmodule TugasWeb.UploadSlotControls do
           type="button"
           phx-hook="UploadDirect"
           data-upload-url={@upload_url}
-          data-obligation-id={@obligation_id}
+          data-duty-id={@duty_id}
           data-id-prefix={@id_prefix}
           data-slot={@slot}
           data-document-slot={if(@completion_slot?, do: @slot, else: "")}

@@ -1,7 +1,7 @@
 defmodule TugasWeb.CycleBadge do
   @moduledoc """
   The single badge shown top-right on dashboard rows, mobile cards, and the show
-  pages. One consistent pill that adapts to the obligation cycle:
+  pages. One consistent pill that adapts to the duty cycle:
 
     * live → the urgency countdown ("3d overdue" / "Due today" / "5d left"),
       coloured by tier; nothing when on-track or undated
@@ -16,7 +16,7 @@ defmodule TugasWeb.CycleBadge do
 
   attr :cycle_status, :atom, required: true
   attr :tier, :atom, default: :ok
-  attr :obligation, :any, required: true
+  attr :duty, :any, required: true
   attr :today, :any, required: true
   attr :timezone, :string, default: nil
   attr :in_error, :boolean, default: false
@@ -40,24 +40,24 @@ defmodule TugasWeb.CycleBadge do
     """
   end
 
-  defp badge(%{cycle_status: :completed, in_error: true, obligation: o, timezone: tz}),
+  defp badge(%{cycle_status: :completed, in_error: true, duty: o, timezone: tz}),
     do: %{color: "bg-error", label: "Completed error", date: fmt(o.completed_at, tz)}
 
-  defp badge(%{cycle_status: :completed, obligation: o, timezone: tz}),
+  defp badge(%{cycle_status: :completed, duty: o, timezone: tz}),
     do: %{color: "bg-success", label: "Completed", date: fmt(o.completed_at, tz)}
 
-  defp badge(%{cycle_status: :skipped, obligation: o, timezone: tz}),
+  defp badge(%{cycle_status: :skipped, duty: o, timezone: tz}),
     do: %{color: "bg-warning", label: "Skipped", date: fmt(o.closed_at, tz)}
 
-  defp badge(%{cycle_status: :series_ended, obligation: o, timezone: tz}),
+  defp badge(%{cycle_status: :series_ended, duty: o, timezone: tz}),
     do: %{color: "border-warning text-warning", label: "Series ended", date: fmt(o.closed_at, tz)}
 
   # A live duty with no due date is workable "anytime" — show a green badge
   # rather than the (date-driven) urgency countdown.
-  defp badge(%{cycle_status: :live, obligation: %{due_by: nil}}),
+  defp badge(%{cycle_status: :live, duty: %{due_by: nil}}),
     do: %{color: "border-success text-success", label: "Anytime", date: nil}
 
-  defp badge(%{cycle_status: :live, tier: tier, obligation: o, today: today}) do
+  defp badge(%{cycle_status: :live, tier: tier, duty: o, today: today}) do
     case UrgencyBadge.badge_text(tier, o.due_by, today) do
       nil -> nil
       text -> %{color: urgency_color(tier), label: text, date: nil}

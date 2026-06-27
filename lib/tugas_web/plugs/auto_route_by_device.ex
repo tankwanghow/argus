@@ -23,8 +23,8 @@ defmodule TugasWeb.Plugs.AutoRouteByDevice do
 
   @mobile_capable_tails [
     "",
-    "/obligations/new",
-    "/obligation-types",
+    "/duties/new",
+    "/duty-types",
     "/todos",
     "/todos/new",
     "/members"
@@ -115,7 +115,7 @@ defmodule TugasWeb.Plugs.AutoRouteByDevice do
   defp maybe_redirect_to_mobile(conn, path) do
     case path_tail(path, "/entities/") do
       {:ok, _slug, tail} ->
-        if tail in @mobile_capable_tails or obligation_show?(tail) or invite_session?(tail) do
+        if tail in @mobile_capable_tails or duty_show?(tail) or invite_session?(tail) do
           redirect_swap(conn, path, "/entities/", "/m/")
         else
           conn
@@ -149,7 +149,7 @@ defmodule TugasWeb.Plugs.AutoRouteByDevice do
     end
   end
 
-  defp obligation_show?(tail), do: String.match?(tail, ~r{^/obligations/[0-9a-f-]+$})
+  defp duty_show?(tail), do: String.match?(tail, ~r{^/duties/[0-9a-f-]+$})
 
   defp invite_session?(tail),
     do: String.match?(tail, ~r{^/invite-session/(manager|member)$})

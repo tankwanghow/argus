@@ -1,7 +1,7 @@
 defmodule TugasWeb.UrgencyBadge do
   @moduledoc """
-  Graded urgency helpers for obligations: the countdown text and the matching
-  left-accent border class, both keyed off `Tugas.Obligations.Urgency.tier/3`.
+  Graded urgency helpers for duties: the countdown text and the matching
+  left-accent border class, both keyed off `Tugas.Duties.Urgency.tier/3`.
   The countdown is rendered by `TugasWeb.CycleBadge`; the border by the dashboards.
   """
 

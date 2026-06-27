@@ -9,7 +9,7 @@ defmodule Tugas.Entities do
   alias Tugas.Accounts.UserNotifier
   alias Tugas.Authorization
   alias Tugas.Entities.{Entity, Invitation, Membership}
-  alias Tugas.Obligations.SampleTypes
+  alias Tugas.Duties.SampleTypes
   alias Tugas.Repo
 
   @invitation_validity_days 7
@@ -79,7 +79,7 @@ defmodule Tugas.Entities do
   Members-administration list: **all accepted** memberships (active *and*
   disabled, so an admin can re-enable) as `{user, membership, counts}` tuples,
   where `counts` is `%{primary: n, collaborations: m}` of the member's live
-  obligation assignments (used to warn before disabling).
+  duty assignments (used to warn before disabling).
   """
   def list_member_administration(%Entity{} = entity) do
     members =
@@ -90,7 +90,7 @@ defmodule Tugas.Entities do
       |> select([m, u], {u, m})
       |> Repo.all()
 
-    counts = Tugas.Obligations.member_assignment_counts(entity)
+    counts = Tugas.Duties.member_assignment_counts(entity)
 
     Enum.map(members, fn {user, membership} ->
       {user, membership, Map.get(counts, user.id, %{primary: 0, collaborations: 0})}
@@ -259,7 +259,7 @@ defmodule Tugas.Entities do
   member can no longer use the entity and **stops consuming a seat**. In one
   transaction this also auto-detaches them from live work: their live
   primary-assigned cycles become unassigned (audited) and their collaborator
-  rows are removed (`Obligations.purge_member_assignments/2`).
+  rows are removed (`Duties.purge_member_assignments/2`).
 
   Guards: you cannot disable yourself, and you cannot disable the last active
   admin. A membership from another entity returns `:not_found`.
@@ -287,7 +287,7 @@ defmodule Tugas.Entities do
           Membership.changeset(membership, %{disabled_at: now, disabled_by_id: scope.user.id})
         )
         |> Ecto.Multi.run(:purge, fn _repo, _ ->
-          {:ok, Tugas.Obligations.purge_member_assignments(scope, membership.user_id)}
+          {:ok, Tugas.Duties.purge_member_assignments(scope, membership.user_id)}
         end)
         |> Repo.transaction()
         |> case do

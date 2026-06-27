@@ -2,15 +2,15 @@ defmodule Tugas.AuthorizationTest do
   use Tugas.DataCase, async: true
 
   alias Tugas.Authorization
-  alias Tugas.Obligations.Obligation
+  alias Tugas.Duties.Duty
 
   import Tugas.AccountsFixtures
   import Tugas.EntitiesFixtures
 
   describe "can?/2" do
-    test "manager can create obligation" do
+    test "manager can create duty" do
       scope = manager_scope_fixture()
-      assert Authorization.can?(scope, :create_obligation)
+      assert Authorization.can?(scope, :create_duty)
     end
 
     test "manager can skip" do
@@ -46,52 +46,52 @@ defmodule Tugas.AuthorizationTest do
 
   describe "can?/3" do
     test "collaborator cannot mark done" do
-      {scope, obligation} = collaborator_scope_fixture()
-      refute Authorization.can?(scope, :mark_done, obligation)
+      {scope, duty} = collaborator_scope_fixture()
+      refute Authorization.can?(scope, :mark_done, duty)
     end
 
     test "primary assignee member can mark done" do
-      {scope, obligation} = primary_assignee_scope_fixture()
-      assert Authorization.can?(scope, :mark_done, obligation)
+      {scope, duty} = primary_assignee_scope_fixture()
+      assert Authorization.can?(scope, :mark_done, duty)
     end
 
     test "collaborator can start progress" do
-      {scope, obligation} = collaborator_scope_fixture()
-      assert Authorization.can?(scope, :start_progress, obligation)
+      {scope, duty} = collaborator_scope_fixture()
+      assert Authorization.can?(scope, :start_progress, duty)
     end
 
     test "non-assignee member cannot start progress" do
       scope = member_scope_fixture()
       other = user_fixture()
 
-      obligation = %Obligation{
+      duty = %Duty{
         primary_assignee_id: other.id,
         collaborators: []
       }
 
-      refute Authorization.can?(scope, :start_progress, obligation)
+      refute Authorization.can?(scope, :start_progress, duty)
     end
 
-    test "member cannot mark done on unassigned obligation" do
+    test "member cannot mark done on unassigned duty" do
       scope = member_scope_fixture()
 
-      obligation = %Obligation{
+      duty = %Duty{
         primary_assignee_id: nil,
         collaborators: []
       }
 
-      refute Authorization.can?(scope, :mark_done, obligation)
+      refute Authorization.can?(scope, :mark_done, duty)
     end
 
-    test "manager can mark done on unassigned obligation" do
+    test "manager can mark done on unassigned duty" do
       scope = manager_scope_fixture()
 
-      obligation = %Obligation{
+      duty = %Duty{
         primary_assignee_id: nil,
         collaborators: []
       }
 
-      assert Authorization.can?(scope, :mark_done, obligation)
+      assert Authorization.can?(scope, :mark_done, duty)
     end
   end
 
@@ -127,22 +127,22 @@ defmodule Tugas.AuthorizationTest do
 
     primary = user_fixture()
 
-    obligation = %Obligation{
+    duty = %Duty{
       primary_assignee_id: primary.id,
       collaborators: [%{user_id: collaborator.id}]
     }
 
-    {scope, obligation}
+    {scope, duty}
   end
 
   defp primary_assignee_scope_fixture do
     scope = member_scope_fixture()
 
-    obligation = %Obligation{
+    duty = %Duty{
       primary_assignee_id: scope.user.id,
       collaborators: []
     }
 
-    {scope, obligation}
+    {scope, duty}
   end
 end

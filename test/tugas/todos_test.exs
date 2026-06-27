@@ -10,7 +10,7 @@ defmodule Tugas.TodosTest do
 
   import Tugas.AccountsFixtures, only: [user_fixture: 0]
   import Tugas.EntitiesFixtures, only: [entity_scope_fixture: 0, manager_scope_fixture: 0]
-  import Tugas.ObligationsFixtures, only: [member_scope_on_entity: 1, type_fixture: 1]
+  import Tugas.DutiesFixtures, only: [member_scope_on_entity: 1, type_fixture: 1]
 
   describe "authorization" do
     test "list_todos/1 and get_todo/2 return :not_authorise without entity scope" do
@@ -55,15 +55,15 @@ defmodule Tugas.TodosTest do
       {:ok, stale} = Todos.create_todo(manager, %{title: "Cancel me"})
       stale = backdate_todo!(stale, 49)
 
-      assert {:ok, obligation} =
-               Tugas.Obligations.create_obligation(manager, %{
+      assert {:ok, duty} =
+               Tugas.Duties.create_duty(manager, %{
                  title: "Escalate me",
-                 obligation_type_id: type.id,
+                 duty_type_id: type.id,
                  due_by: ~D[2026-07-01],
                  open_note: "Escalated"
                })
 
-      assert {:ok, escalated} = Todos.record_escalation(manager, to_escalate, obligation)
+      assert {:ok, escalated} = Todos.record_escalation(manager, to_escalate, duty)
       assert {:ok, canceled} = Todos.cancel_todo(manager, stale, "No longer needed")
 
       assert {:ok, open} = Todos.list_todos(manager, status: :open)
@@ -305,21 +305,21 @@ defmodule Tugas.TodosTest do
   end
 
   describe "record_escalation/3" do
-    test "links todo to obligation and keeps it visible as escalated" do
+    test "links todo to duty and keeps it visible as escalated" do
       manager = manager_scope_fixture()
       type = type_fixture(manager.entity)
       {:ok, todo} = Todos.create_todo(manager, %{title: "Needs formal duty"})
 
-      assert {:ok, obligation} =
-               Tugas.Obligations.create_obligation(manager, %{
+      assert {:ok, duty} =
+               Tugas.Duties.create_duty(manager, %{
                  title: "Needs formal duty",
-                 obligation_type_id: type.id,
+                 duty_type_id: type.id,
                  due_by: ~D[2026-07-01],
                  open_note: "Escalated from todo"
                })
 
-      assert {:ok, escalated} = Todos.record_escalation(manager, todo, obligation)
-      assert escalated.escalated_obligation_id == obligation.id
+      assert {:ok, escalated} = Todos.record_escalation(manager, todo, duty)
+      assert escalated.escalated_duty_id == duty.id
       assert %DateTime{} = escalated.escalated_at
       assert {:ok, []} = Todos.list_todos(manager, status: :open)
       assert {:ok, [listed]} = Todos.list_todos(manager, status: :escalated)
@@ -327,7 +327,7 @@ defmodule Tugas.TodosTest do
       assert Todo.display_status(listed) == :escalated
 
       audit = Enum.find(Todos.list_audit_logs(escalated), &(&1.action == "escalated"))
-      assert audit.new_value == obligation.id
+      assert audit.new_value == duty.id
     end
 
     test "rejects escalation of completed todo" do
@@ -336,16 +336,16 @@ defmodule Tugas.TodosTest do
       {:ok, todo} = Todos.create_todo(manager, %{title: "Done task"})
       {:ok, completed} = Todos.toggle_complete(manager, todo)
 
-      assert {:ok, obligation} =
-               Tugas.Obligations.create_obligation(manager, %{
+      assert {:ok, duty} =
+               Tugas.Duties.create_duty(manager, %{
                  title: "Done task",
-                 obligation_type_id: type.id,
+                 duty_type_id: type.id,
                  due_by: ~D[2026-07-01],
                  open_note: "Escalated"
                })
 
       assert :not_found = Todos.get_todo_for_escalation(manager, completed.id)
-      assert :not_found = Todos.record_escalation(manager, completed, obligation)
+      assert :not_found = Todos.record_escalation(manager, completed, duty)
     end
   end
 

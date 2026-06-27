@@ -2,7 +2,7 @@ defmodule TugasWeb.MobileLive.Dashboard do
   use TugasWeb, :live_view
 
   alias TugasWeb.DashboardFilter
-  alias TugasWeb.ObligationLive.IndexHelpers, as: Index
+  alias TugasWeb.DutyLive.IndexHelpers, as: Index
   import TugasWeb.MobileLive.Components
 
   @impl true
@@ -16,7 +16,7 @@ defmodule TugasWeb.MobileLive.Dashboard do
         <div class="flex">
           <div class="w-[65%]">
             <input
-              id="m-obligation-search"
+              id="m-duty-search"
               type="search"
               name="q"
               placeholder="Search title, type, assignee…"
@@ -27,7 +27,7 @@ defmodule TugasWeb.MobileLive.Dashboard do
             />
           </div>
           <div class="w-[35%]">
-            <form id="m-obligation-status-filter" phx-change="set_status">
+            <form id="m-duty-status-filter" phx-change="set_status">
               <select name="lifecycle" class="select">
                 <option
                   :for={{value, label} <- Index.lifecycles()}
@@ -41,7 +41,7 @@ defmodule TugasWeb.MobileLive.Dashboard do
           </div>
         </div>
         <div class="flex items-center gap-2">
-          <div id="m-obligation-scope-toggle" class="tabs tabs-box flex-1">
+          <div id="m-duty-scope-toggle" class="tabs tabs-box flex-1">
             <button
               id="m-scope-mine"
               type="button"
@@ -61,8 +61,8 @@ defmodule TugasWeb.MobileLive.Dashboard do
               Team
             </button>
           </div>
-          <form id="m-obligation-sort-filter" phx-change="set_sort">
-            <select id="m-obligation-sort" name="sort" class="select">
+          <form id="m-duty-sort-filter" phx-change="set_sort">
+            <select id="m-duty-sort" name="sort" class="select">
               <option
                 :for={{value, label} <- Index.sorts(@lifecycle)}
                 value={value}
@@ -76,12 +76,12 @@ defmodule TugasWeb.MobileLive.Dashboard do
       </div>
 
       <ul
-        id="mobile-obligations"
+        id="mobile-duties"
         class="px-4 space-y-2"
         phx-update="stream"
         phx-viewport-bottom={!@end? && "load_more"}
       >
-        <.obligation_card
+        <.duty_card
           :for={{dom_id, row} <- @streams.rows}
           id={dom_id}
           row={row}
@@ -92,7 +92,7 @@ defmodule TugasWeb.MobileLive.Dashboard do
       </ul>
       <div
         :if={@empty?}
-        id="m-obligations-empty"
+        id="m-duties-empty"
         class="text-center text-base-content/60 py-12"
       >
         {Index.empty_message(@mine?, @lifecycle)}
@@ -104,7 +104,7 @@ defmodule TugasWeb.MobileLive.Dashboard do
   @impl true
   def mount(_params, session, socket) do
     scope = socket.assigns.current_scope
-    today = Tugas.Obligations.Urgency.today_for(scope.entity.timezone)
+    today = Tugas.Duties.Urgency.today_for(scope.entity.timezone)
 
     {:ok,
      socket
@@ -181,5 +181,5 @@ defmodule TugasWeb.MobileLive.Dashboard do
     |> assign(cursor: cursor, end?: end?, empty?: rows == [])
   end
 
-  defp row_dom_id(row), do: "m-ob-#{row.obligation.id}"
+  defp row_dom_id(row), do: "m-ob-#{row.duty.id}"
 end

@@ -1,0 +1,32 @@
+defmodule Tugas.Duties.Event do
+  use Tugas.Schema
+  import Ecto.Changeset
+
+  alias Tugas.Accounts.User
+  alias Tugas.Duties.{EventDocument, Duty}
+
+  schema "duty_events" do
+    field :status, :string
+    field :note, :string
+
+    belongs_to :duty, Duty
+    belongs_to :status_by, User, foreign_key: :status_by_id
+    has_many :documents, EventDocument, foreign_key: :duty_event_id
+
+    timestamps(type: :utc_datetime, updated_at: false)
+  end
+
+  @statuses ~w(open in_progress done skipped series_ended)
+  @terminal_statuses ~w(done skipped series_ended)
+
+  @doc "Statuses that close a cycle (no further progress allowed)."
+  def terminal_statuses, do: @terminal_statuses
+
+  @doc false
+  def changeset(event, attrs) do
+    event
+    |> cast(attrs, [:status, :note])
+    |> validate_required([:status])
+    |> validate_inclusion(:status, @statuses)
+  end
+end

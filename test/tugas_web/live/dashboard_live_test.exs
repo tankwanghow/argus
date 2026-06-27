@@ -2,14 +2,14 @@ defmodule TugasWeb.DashboardLiveTest do
   use TugasWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
-  import Tugas.ObligationsFixtures
+  import Tugas.DutiesFixtures
 
-  alias Tugas.Obligations
+  alias Tugas.Duties
 
   setup :register_and_log_in_user
 
   test "member defaults to the Mine scope", %{conn: conn} do
-    {scope, _obligation} = assigned_member_scope_fixture()
+    {scope, _duty} = assigned_member_scope_fixture()
 
     conn = log_in_user(conn, scope.user)
 
@@ -21,7 +21,7 @@ defmodule TugasWeb.DashboardLiveTest do
   end
 
   test "manager defaults to the Team scope", %{conn: conn} do
-    {scope, _obligation} = manager_obligation_scope_fixture()
+    {scope, _duty} = manager_duty_scope_fixture()
 
     conn = log_in_user(conn, scope.user)
 
@@ -32,7 +32,7 @@ defmodule TugasWeb.DashboardLiveTest do
   end
 
   test "user menu has all entities and members links", %{conn: conn} do
-    {scope, _} = manager_obligation_scope_fixture()
+    {scope, _} = manager_duty_scope_fixture()
     conn = log_in_user(conn, scope.user)
 
     {:ok, view, _html} =
@@ -45,26 +45,26 @@ defmodule TugasWeb.DashboardLiveTest do
   end
 
   test "changing filters persists for the session across remounts", %{conn: conn} do
-    {scope, _} = manager_obligation_scope_fixture()
+    {scope, _} = manager_duty_scope_fixture()
     conn = log_in_user(conn, scope.user)
 
     {:ok, view, _html} = live(conn, ~p"/entities/#{scope.entity.slug}")
 
     view |> element("#scope-mine") |> render_click()
-    view |> form("#obligation-status-filter", %{lifecycle: "completed"}) |> render_change()
-    view |> element("#obligation-search") |> render_keyup(%{"value" => "tax"})
+    view |> form("#duty-status-filter", %{lifecycle: "completed"}) |> render_change()
+    view |> element("#duty-search") |> render_keyup(%{"value" => "tax"})
 
     {:ok, view, _html} = live(conn, ~p"/entities/#{scope.entity.slug}")
 
     assert has_element?(view, "#scope-mine.tab-active")
-    assert has_element?(view, "#obligation-search[value='tax']")
+    assert has_element?(view, "#duty-search[value='tax']")
 
     html = render(view)
     assert html =~ ~s(value="completed" selected)
   end
 
   test "restores dashboard filters from the session", %{conn: conn} do
-    {scope, _} = manager_obligation_scope_fixture()
+    {scope, _} = manager_duty_scope_fixture()
 
     conn =
       conn
@@ -81,14 +81,14 @@ defmodule TugasWeb.DashboardLiveTest do
     {:ok, view, _html} = live(conn, ~p"/entities/#{scope.entity.slug}")
 
     assert has_element?(view, "#scope-mine.tab-active")
-    assert has_element?(view, "#obligation-search[value='tax']")
+    assert has_element?(view, "#duty-search[value='tax']")
 
     html = render(view)
     assert html =~ ~s(value="completed" selected)
   end
 
   test "switches scope between Mine and Team", %{conn: conn} do
-    {scope, _obligation} = manager_obligation_scope_fixture()
+    {scope, _duty} = manager_duty_scope_fixture()
     conn = log_in_user(conn, scope.user)
 
     {:ok, view, _html} =
@@ -100,28 +100,28 @@ defmodule TugasWeb.DashboardLiveTest do
   end
 
   test "manager sees the New duty button", %{conn: conn} do
-    {scope, _obligation} = manager_obligation_scope_fixture()
+    {scope, _duty} = manager_duty_scope_fixture()
     conn = log_in_user(conn, scope.user)
 
     {:ok, view, _html} = live(conn, ~p"/entities/#{scope.entity.slug}")
 
     assert has_element?(
              view,
-             "a[href='/entities/#{scope.entity.slug}/obligations/new']",
+             "a[href='/entities/#{scope.entity.slug}/duties/new']",
              "New duty"
            )
   end
 
-  test "overdue obligation renders with an overdue badge", %{conn: conn} do
+  test "overdue duty renders with an overdue badge", %{conn: conn} do
     manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     conn = log_in_user(conn, manager.user)
     member = member_fixture(manager.entity)
     type = type_fixture(manager.entity)
 
-    {:ok, obligation} =
-      Obligations.create_obligation(manager, %{
+    {:ok, duty} =
+      Duties.create_duty(manager, %{
         title: "Late filing",
-        obligation_type_id: type.id,
+        duty_type_id: type.id,
         primary_assignee_id: member.id,
         due_by: ~D[2020-01-01],
         open_note: "Late"
@@ -129,7 +129,7 @@ defmodule TugasWeb.DashboardLiveTest do
 
     {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}")
 
-    assert has_element?(view, "#obligation-row-#{obligation.id} [data-urgency=overdue]")
+    assert has_element?(view, "#duty-row-#{duty.id} [data-urgency=overdue]")
   end
 
   test "completed filter marks a completed-in-error cycle", %{conn: conn} do
@@ -137,42 +137,42 @@ defmodule TugasWeb.DashboardLiveTest do
     conn = log_in_user(conn, manager.user)
     type = type_fixture(manager.entity)
 
-    {:ok, obligation} =
-      Obligations.create_obligation(manager, %{
+    {:ok, duty} =
+      Duties.create_duty(manager, %{
         title: "Wrong filing",
-        obligation_type_id: type.id,
+        duty_type_id: type.id,
         primary_assignee_id: manager.user.id,
         due_by: ~D[2026-06-15],
         open_note: "open"
       })
 
-    {:ok, done, _} = Obligations.complete(manager, obligation, %{note: "Done"})
+    {:ok, done, _} = Duties.complete(manager, duty, %{note: "Done"})
 
     {:ok, original, _replacement} =
-      Obligations.mark_completed_in_error(manager, done, %{reason: "oops"})
+      Duties.mark_completed_in_error(manager, done, %{reason: "oops"})
 
     {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}")
 
-    view |> form("#obligation-status-filter", %{lifecycle: "completed"}) |> render_change()
-    assert has_element?(view, "#obligation-row-#{original.id}", "Completed error")
+    view |> form("#duty-status-filter", %{lifecycle: "completed"}) |> render_change()
+    assert has_element?(view, "#duty-row-#{original.id}", "Completed error")
   end
 
   test "rows show the latest event status and actor", %{conn: conn} do
-    {scope, obligation} = manager_obligation_scope_fixture()
+    {scope, duty} = manager_duty_scope_fixture()
     conn = log_in_user(conn, scope.user)
 
     assert {:ok, _} =
-             Obligations.start_progress(scope, obligation, %{note: "Working"})
+             Duties.start_progress(scope, duty, %{note: "Working"})
 
     {:ok, view, _html} = live(conn, ~p"/entities/#{scope.entity.slug}")
 
     assert has_element?(
              view,
-             "#obligation-row-#{obligation.id}[data-event-count='2'][data-event-status='in_progress']",
+             "#duty-row-#{duty.id}[data-event-count='2'][data-event-status='in_progress']",
              "In progress"
            )
 
-    assert has_element?(view, "#obligation-row-#{obligation.id}", scope.user.email)
+    assert has_element?(view, "#duty-row-#{duty.id}", scope.user.email)
   end
 
   test "sort dropdown reorders, hides urgency off-live, and infinite scroll appends", %{
@@ -184,9 +184,9 @@ defmodule TugasWeb.DashboardLiveTest do
 
     for i <- 1..30 do
       {:ok, _} =
-        Obligations.create_obligation(manager, %{
+        Duties.create_duty(manager, %{
           title: "Duty #{String.pad_leading(Integer.to_string(i), 2, "0")}",
-          obligation_type_id: type.id,
+          duty_type_id: type.id,
           due_by: Date.add(~D[2026-06-01], i),
           open_note: "n"
         })
@@ -195,19 +195,19 @@ defmodule TugasWeb.DashboardLiveTest do
     {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}")
 
     # First page caps at 25.
-    assert view |> element("#obligations-list") |> render() =~ "Duty 25"
-    refute view |> element("#obligations-list") |> render() =~ "Duty 26"
+    assert view |> element("#duties-list") |> render() =~ "Duty 25"
+    refute view |> element("#duties-list") |> render() =~ "Duty 26"
 
     # Infinite scroll reveals the rest.
     render_hook(view, "load_more", %{})
-    assert view |> element("#obligations-list") |> render() =~ "Duty 26"
+    assert view |> element("#duties-list") |> render() =~ "Duty 26"
 
     # Urgency option present on live.
-    assert has_element?(view, "#obligation-sort option[value='urgency']")
+    assert has_element?(view, "#duty-sort option[value='urgency']")
 
     # Switching to Completed hides urgency.
-    view |> form("#obligation-status-filter", %{lifecycle: "completed"}) |> render_change()
-    refute has_element?(view, "#obligation-sort option[value='urgency']")
+    view |> form("#duty-status-filter", %{lifecycle: "completed"}) |> render_change()
+    refute has_element?(view, "#duty-sort option[value='urgency']")
   end
 
   test "Someday sort floats no-due-date duties to the top", %{conn: conn} do
@@ -216,17 +216,17 @@ defmodule TugasWeb.DashboardLiveTest do
     type = type_fixture(manager.entity)
 
     {:ok, _dated} =
-      Obligations.create_obligation(manager, %{
+      Duties.create_duty(manager, %{
         title: "Has a deadline",
-        obligation_type_id: type.id,
+        duty_type_id: type.id,
         due_by: ~D[2026-07-01],
         open_note: "n"
       })
 
     {:ok, _sd} =
-      Obligations.create_obligation(manager, %{
+      Duties.create_duty(manager, %{
         title: "Tidy the archive",
-        obligation_type_id: type.id,
+        duty_type_id: type.id,
         someday: true,
         open_note: "n"
       })
@@ -234,29 +234,29 @@ defmodule TugasWeb.DashboardLiveTest do
     {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}")
 
     # Someday is a sort, not a filter: the Live list shows both dated and dateless duties.
-    html = view |> element("#obligations-list") |> render()
+    html = view |> element("#duties-list") |> render()
     assert html =~ "Has a deadline"
     assert html =~ "Tidy the archive"
 
     # Select the Someday sort → the no-due-date duty floats to the top.
-    assert has_element?(view, "#obligation-sort option[value='someday']")
-    view |> form("#obligation-sort-filter", %{sort: "someday"}) |> render_change()
-    html = view |> element("#obligations-list") |> render()
+    assert has_element?(view, "#duty-sort option[value='someday']")
+    view |> form("#duty-sort-filter", %{sort: "someday"}) |> render_change()
+    html = view |> element("#duties-list") |> render()
 
     {sd_pos, _} = :binary.match(html, "Tidy the archive")
     {dated_pos, _} = :binary.match(html, "Has a deadline")
     assert sd_pos < dated_pos
   end
 
-  test "team (Live) list includes unassigned obligations", %{conn: conn} do
+  test "team (Live) list includes unassigned duties", %{conn: conn} do
     manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     conn = log_in_user(conn, manager.user)
     type = type_fixture(manager.entity)
 
-    {:ok, obligation} =
-      Obligations.create_obligation(manager, %{
+    {:ok, duty} =
+      Duties.create_duty(manager, %{
         title: "Unowned task",
-        obligation_type_id: type.id,
+        duty_type_id: type.id,
         primary_assignee_id: nil,
         due_by: ~D[2026-06-20],
         open_note: "Unowned"
@@ -264,7 +264,7 @@ defmodule TugasWeb.DashboardLiveTest do
 
     {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}")
 
-    assert has_element?(view, "#obligation-row-#{obligation.id}", "Unowned task")
-    assert has_element?(view, "#obligation-row-#{obligation.id}", "Unassigned")
+    assert has_element?(view, "#duty-row-#{duty.id}", "Unowned task")
+    assert has_element?(view, "#duty-row-#{duty.id}", "Unassigned")
   end
 end

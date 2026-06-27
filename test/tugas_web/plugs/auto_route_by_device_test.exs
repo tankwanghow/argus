@@ -13,8 +13,8 @@ defmodule TugasWeb.Plugs.AutoRouteByDeviceTest do
     test "desktop-only paths are absent from the whitelist" do
       tails = AutoRouteByDevice.mobile_capable_tails()
 
-      assert "/obligations/new" in tails
-      assert "/obligation-types" in tails
+      assert "/duties/new" in tails
+      assert "/duty-types" in tails
       assert "/todos" in tails
       assert "/todos/new" in tails
       assert "/members" in tails
@@ -35,44 +35,44 @@ defmodule TugasWeb.Plugs.AutoRouteByDeviceTest do
       assert conn.halted
     end
 
-    test "redirects mobile UA from desktop new-obligation form to mobile", %{conn: conn} do
+    test "redirects mobile UA from desktop new-duty form to mobile", %{conn: conn} do
       conn =
         conn
         |> put_req_header("user-agent", @mobile_ua)
-        |> Map.put(:request_path, "/entities/acme/obligations/new")
-        |> Map.put(:path_info, ["entities", "acme", "obligations", "new"])
+        |> Map.put(:request_path, "/entities/acme/duties/new")
+        |> Map.put(:path_info, ["entities", "acme", "duties", "new"])
         |> Map.put(:query_string, "")
         |> AutoRouteByDevice.call([])
 
-      assert redirected_to(conn) == "/m/acme/obligations/new"
+      assert redirected_to(conn) == "/m/acme/duties/new"
       assert conn.halted
     end
 
-    test "redirects mobile UA from desktop obligation show to mobile", %{conn: conn} do
+    test "redirects mobile UA from desktop duty show to mobile", %{conn: conn} do
       id = Ecto.UUID.generate()
 
       conn =
         conn
         |> put_req_header("user-agent", @mobile_ua)
-        |> Map.put(:request_path, "/entities/acme/obligations/#{id}")
-        |> Map.put(:path_info, ["entities", "acme", "obligations", id])
+        |> Map.put(:request_path, "/entities/acme/duties/#{id}")
+        |> Map.put(:path_info, ["entities", "acme", "duties", id])
         |> Map.put(:query_string, "")
         |> AutoRouteByDevice.call([])
 
-      assert redirected_to(conn) == "/m/acme/obligations/#{id}"
+      assert redirected_to(conn) == "/m/acme/duties/#{id}"
       assert conn.halted
     end
 
-    test "redirects mobile UA from desktop obligation create to mobile", %{conn: conn} do
+    test "redirects mobile UA from desktop duty create to mobile", %{conn: conn} do
       conn =
         conn
         |> put_req_header("user-agent", @mobile_ua)
-        |> Map.put(:request_path, "/entities/acme/obligations/new")
-        |> Map.put(:path_info, ["entities", "acme", "obligations", "new"])
+        |> Map.put(:request_path, "/entities/acme/duties/new")
+        |> Map.put(:path_info, ["entities", "acme", "duties", "new"])
         |> Map.put(:query_string, "")
         |> AutoRouteByDevice.call([])
 
-      assert redirected_to(conn) == "/m/acme/obligations/new"
+      assert redirected_to(conn) == "/m/acme/duties/new"
       assert conn.halted
     end
 
@@ -88,29 +88,29 @@ defmodule TugasWeb.Plugs.AutoRouteByDeviceTest do
       refute conn.halted
     end
 
-    test "redirects mobile UA from desktop obligation types to mobile", %{conn: conn} do
+    test "redirects mobile UA from desktop duty types to mobile", %{conn: conn} do
       conn =
         conn
         |> put_req_header("user-agent", @mobile_ua)
-        |> Map.put(:request_path, "/entities/acme/obligation-types")
-        |> Map.put(:path_info, ["entities", "acme", "obligation-types"])
+        |> Map.put(:request_path, "/entities/acme/duty-types")
+        |> Map.put(:path_info, ["entities", "acme", "duty-types"])
         |> Map.put(:query_string, "")
         |> AutoRouteByDevice.call([])
 
-      assert redirected_to(conn) == "/m/acme/obligation-types"
+      assert redirected_to(conn) == "/m/acme/duty-types"
       assert conn.halted
     end
 
-    test "redirects desktop UA from mobile obligation types to desktop", %{conn: conn} do
+    test "redirects desktop UA from mobile duty types to desktop", %{conn: conn} do
       conn =
         conn
         |> put_req_header("user-agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X)")
-        |> Map.put(:request_path, "/m/acme/obligation-types")
-        |> Map.put(:path_info, ["m", "acme", "obligation-types"])
+        |> Map.put(:request_path, "/m/acme/duty-types")
+        |> Map.put(:path_info, ["m", "acme", "duty-types"])
         |> Map.put(:query_string, "")
         |> AutoRouteByDevice.call([])
 
-      assert redirected_to(conn) == "/entities/acme/obligation-types"
+      assert redirected_to(conn) == "/entities/acme/duty-types"
       assert conn.halted
     end
 

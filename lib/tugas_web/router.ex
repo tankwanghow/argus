@@ -59,18 +59,18 @@ defmodule TugasWeb.Router do
         {TugasWeb.Locale, :default}
       ] do
       live "/entities/:entity_slug", DashboardLive.Index, :index
-      live "/entities/:entity_slug/obligations/new", ObligationLive.Form, :new
-      live "/entities/:entity_slug/obligations/:id", ObligationLive.Show, :show
-      live "/entities/:entity_slug/obligation-types", ObligationTypeLive.Index, :index
+      live "/entities/:entity_slug/duties/new", DutyLive.Form, :new
+      live "/entities/:entity_slug/duties/:id", DutyLive.Show, :show
+      live "/entities/:entity_slug/duty-types", DutyTypeLive.Index, :index
       live "/entities/:entity_slug/members", MembershipLive.Index, :index
       live "/entities/:entity_slug/invite-session/:role", MembershipLive.InviteSession, :show
       live "/entities/:entity_slug/todos/team-log", TodoLive.TeamLog, :index
       live "/entities/:entity_slug/todos", TodoLive.Index, :index
 
       live "/m/:entity_slug", MobileLive.Dashboard, :show
-      live "/m/:entity_slug/obligations/new", MobileLive.ObligationForm, :new
-      live "/m/:entity_slug/obligations/:id", MobileLive.ObligationShow, :show
-      live "/m/:entity_slug/obligation-types", MobileLive.ObligationTypes, :index
+      live "/m/:entity_slug/duties/new", MobileLive.DutyForm, :new
+      live "/m/:entity_slug/duties/:id", MobileLive.DutyShow, :show
+      live "/m/:entity_slug/duty-types", MobileLive.DutyTypes, :index
       live "/m/:entity_slug/todos/team-log", MobileLive.TodoTeamLog, :index
       live "/m/:entity_slug/todos", MobileLive.Todos, :index
       live "/m/:entity_slug/todos/new", MobileLive.Todos, :new
@@ -84,11 +84,11 @@ defmodule TugasWeb.Router do
     get "/view-mode", ViewModeController, :set
     get "/set-view", ViewModeController, :set
 
-    get "/entities/:entity_slug/obligations/:obligation_id/documents/:id",
+    get "/entities/:entity_slug/duties/:duty_id/documents/:id",
         DocumentController,
         :show
 
-    post "/entities/:entity_slug/obligations/:obligation_id/documents",
+    post "/entities/:entity_slug/duties/:duty_id/documents",
          DocumentController,
          :create
   end

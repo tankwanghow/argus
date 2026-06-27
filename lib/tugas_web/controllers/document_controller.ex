@@ -3,12 +3,12 @@ defmodule TugasWeb.DocumentController do
 
   alias Tugas.Accounts.Scope
   alias Tugas.Entities
-  alias Tugas.Obligations
-  alias Tugas.Obligations.{Event, EventDocument, Obligation}
+  alias Tugas.Duties
+  alias Tugas.Duties.{Event, EventDocument, Duty}
   alias Tugas.Repo
   alias Tugas.Uploads
   alias Tugas.Uploads.{FileKind, Limits}
-  alias TugasWeb.ObligationLive.DocumentHelpers
+  alias TugasWeb.DutyLive.DocumentHelpers
 
   import Ecto.Query
 
@@ -19,20 +19,20 @@ defmodule TugasWeb.DocumentController do
   longer loses the file (the socket-upload path dropped it on the resulting
   LiveView remount). Size limits are enforced server-side here, authoritatively.
   """
-  def create(conn, %{"entity_slug" => slug, "obligation_id" => obligation_id} = params) do
+  def create(conn, %{"entity_slug" => slug, "duty_id" => duty_id} = params) do
     scope = entity_scope!(conn, slug)
-    obligation = Obligations.get_obligation!(scope, obligation_id)
+    duty = Duties.get_duty!(scope, duty_id)
 
     upload = params["file"]
     document_slot = blank_to_nil(params["document_slot"])
-    event = resolve_event(obligation, params["event_id"])
+    event = resolve_event(duty, params["event_id"])
 
     with %Plug.Upload{path: path, filename: filename, content_type: content_type} = upload <-
            upload,
          %Event{} = event <- event,
          size when is_integer(size) <- file_size(path),
          :ok <- Limits.validate_size(filename, size, content_type) do
-      case Obligations.add_document(scope, obligation, event, upload, document_slot) do
+      case Duties.add_document(scope, duty, event, upload, document_slot) do
         {:ok, document} ->
           json(conn, %{ok: true, id: document.id})
 
@@ -49,7 +49,7 @@ defmodule TugasWeb.DocumentController do
           )
 
         {:error, :invalid_slot} ->
-          error_json(conn, 422, "That document slot is not required for this obligation.")
+          error_json(conn, 422, "That document slot is not required for this duty.")
 
         {:error, :slot_taken} ->
           error_json(
@@ -78,11 +78,11 @@ defmodule TugasWeb.DocumentController do
     end
   end
 
-  def show(conn, %{"entity_slug" => slug, "obligation_id" => obligation_id, "id" => id} = params) do
+  def show(conn, %{"entity_slug" => slug, "duty_id" => duty_id, "id" => id} = params) do
     user = conn.assigns.current_scope.user
     entity = Entities.get_entity_by_slug_for_user!(slug, user)
-    obligation = get_obligation!(obligation_id, entity.id)
-    document = get_document!(id, obligation.id)
+    duty = get_duty!(duty_id, entity.id)
+    document = get_document!(id, duty.id)
 
     # Inline by default so previews can embed the file; ?download=1 forces a "Save as".
     disposition = if params["download"] in ~w(1 true), do: :attachment, else: :inline
@@ -104,12 +104,12 @@ defmodule TugasWeb.DocumentController do
     Scope.put_entity(conn.assigns.current_scope, entity, membership)
   end
 
-  defp resolve_event(obligation, id) when id in [nil, ""] do
-    DocumentHelpers.upload_event(obligation.events)
+  defp resolve_event(duty, id) when id in [nil, ""] do
+    DocumentHelpers.upload_event(duty.events)
   end
 
-  defp resolve_event(obligation, id) do
-    Enum.find(obligation.events, &(to_string(&1.id) == to_string(id)))
+  defp resolve_event(duty, id) do
+    Enum.find(duty.events, &(to_string(&1.id) == to_string(id)))
   end
 
   defp file_size(path) do
@@ -126,17 +126,17 @@ defmodule TugasWeb.DocumentController do
     conn |> put_status(status) |> json(%{ok: false, error: message})
   end
 
-  defp get_obligation!(id, entity_id) do
-    case Repo.get_by(Obligation, id: id, entity_id: entity_id) do
-      %Obligation{} = obligation -> obligation
-      nil -> raise Ecto.NoResultsError, queryable: Obligation
+  defp get_duty!(id, entity_id) do
+    case Repo.get_by(Duty, id: id, entity_id: entity_id) do
+      %Duty{} = duty -> duty
+      nil -> raise Ecto.NoResultsError, queryable: Duty
     end
   end
 
-  defp get_document!(id, obligation_id) do
+  defp get_document!(id, duty_id) do
     EventDocument
-    |> join(:inner, [d], e in Event, on: d.obligation_event_id == e.id)
-    |> where([d, e], d.id == ^id and e.obligation_id == ^obligation_id)
+    |> join(:inner, [d], e in Event, on: d.duty_event_id == e.id)
+    |> where([d, e], d.id == ^id and e.duty_id == ^duty_id)
     |> Repo.one!()
   end
 

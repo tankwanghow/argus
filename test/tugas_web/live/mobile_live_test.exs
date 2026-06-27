@@ -2,10 +2,10 @@ defmodule TugasWeb.MobileLiveTest do
   use TugasWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
-  import Tugas.ObligationsFixtures
+  import Tugas.DutiesFixtures
   import Tugas.UploadFixtures
 
-  alias Tugas.Obligations
+  alias Tugas.Duties
 
   @mobile_ua "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)"
 
@@ -16,7 +16,7 @@ defmodule TugasWeb.MobileLiveTest do
   end
 
   test "mobile dashboard restores filters saved in the session", %{conn: conn} do
-    {scope, _} = manager_obligation_scope_fixture()
+    {scope, _} = manager_duty_scope_fixture()
 
     conn =
       conn
@@ -33,44 +33,44 @@ defmodule TugasWeb.MobileLiveTest do
     {:ok, view, _html} = live(conn, ~p"/m/#{scope.entity.slug}")
 
     assert has_element?(view, "#m-scope-mine.tab-active")
-    assert has_element?(view, "#m-obligation-search[value='audit']")
+    assert has_element?(view, "#m-duty-search[value='audit']")
 
     html = render(view)
     assert html =~ ~s(value="skipped" selected)
   end
 
   test "mobile dashboard renders live cycles", %{conn: conn} do
-    {scope, obligation} = assigned_member_scope_fixture()
+    {scope, duty} = assigned_member_scope_fixture()
     conn = mobile_conn(conn, scope)
 
     {:ok, view, _html} = live(conn, ~p"/m/#{scope.entity.slug}")
 
-    assert has_element?(view, "#mobile-obligations")
-    assert has_element?(view, "#m-ob-#{obligation.id}")
+    assert has_element?(view, "#mobile-duties")
+    assert has_element?(view, "#m-ob-#{duty.id}")
   end
 
   test "mobile dashboard card shows the current event", %{conn: conn} do
-    {scope, obligation} = manager_obligation_scope_fixture()
+    {scope, duty} = manager_duty_scope_fixture()
     conn = mobile_conn(conn, scope)
 
-    assert {:ok, _} = Obligations.start_progress(scope, obligation, %{note: "On it"})
+    assert {:ok, _} = Duties.start_progress(scope, duty, %{note: "On it"})
 
     {:ok, view, _html} = live(conn, ~p"/m/#{scope.entity.slug}")
 
     assert has_element?(
              view,
-             "#m-ob-#{obligation.id}[data-event-count='2'][data-event-status='in_progress']",
+             "#m-ob-#{duty.id}[data-event-count='2'][data-event-status='in_progress']",
              "In progress"
            )
 
-    assert has_element?(view, "#m-ob-#{obligation.id}", "On it")
+    assert has_element?(view, "#m-ob-#{duty.id}", "On it")
   end
 
   test "mobile show runs start_progress workflow", %{conn: conn} do
-    {scope, obligation} = assigned_member_scope_fixture()
+    {scope, duty} = assigned_member_scope_fixture()
     conn = mobile_conn(conn, scope)
 
-    {:ok, view, _html} = live(conn, ~p"/m/#{scope.entity.slug}/obligations/#{obligation.id}")
+    {:ok, view, _html} = live(conn, ~p"/m/#{scope.entity.slug}/duties/#{duty.id}")
 
     view |> element("#m-start-progress-btn") |> render_click()
     assert has_element?(view, "#m-progress-modal")
@@ -83,28 +83,28 @@ defmodule TugasWeb.MobileLiveTest do
   end
 
   test "mobile skip button shown for all live cycles (recurring and one-off)", %{conn: conn} do
-    {scope, obligation} = recurring_manager_scope_fixture(interval: "monthly")
+    {scope, duty} = recurring_manager_scope_fixture(interval: "monthly")
     conn = mobile_conn(conn, scope)
 
-    {:ok, view, _html} = live(conn, ~p"/m/#{scope.entity.slug}/obligations/#{obligation.id}")
+    {:ok, view, _html} = live(conn, ~p"/m/#{scope.entity.slug}/duties/#{duty.id}")
 
     refute has_element?(view, "#m-cancel-btn")
     assert has_element?(view, "#m-skip-btn")
 
-    {scope2, obligation2} = manager_obligation_scope_fixture()
+    {scope2, duty2} = manager_duty_scope_fixture()
     conn2 = mobile_conn(build_conn(), scope2)
 
-    {:ok, view2, _html} = live(conn2, ~p"/m/#{scope2.entity.slug}/obligations/#{obligation2.id}")
+    {:ok, view2, _html} = live(conn2, ~p"/m/#{scope2.entity.slug}/duties/#{duty2.id}")
 
     refute has_element?(view2, "#m-cancel-btn")
     assert has_element?(view2, "#m-skip-btn")
   end
 
   test "mobile escape closes open modals", %{conn: conn} do
-    {scope, obligation} = manager_obligation_scope_fixture()
+    {scope, duty} = manager_duty_scope_fixture()
     conn = mobile_conn(conn, scope)
 
-    {:ok, view, _html} = live(conn, ~p"/m/#{scope.entity.slug}/obligations/#{obligation.id}")
+    {:ok, view, _html} = live(conn, ~p"/m/#{scope.entity.slug}/duties/#{duty.id}")
 
     view |> element("#m-done-btn") |> render_click()
     assert has_element?(view, "#m-done-modal")
@@ -114,26 +114,26 @@ defmodule TugasWeb.MobileLiveTest do
   end
 
   test "mobile completed badge shows the completion datetime", %{conn: conn} do
-    {scope, obligation} = manager_obligation_scope_fixture()
+    {scope, duty} = manager_duty_scope_fixture()
     conn = mobile_conn(conn, scope)
 
-    {:ok, done, _} = Obligations.complete(scope, obligation, %{note: "Done"})
+    {:ok, done, _} = Duties.complete(scope, duty, %{note: "Done"})
     # Mobile timeline renders the short datetime format in the entity timezone.
     stamp =
       TugasWeb.CoreComponents.format_datetime(done.completed_at, scope.entity.timezone, :short)
 
-    {:ok, view, _html} = live(conn, ~p"/m/#{scope.entity.slug}/obligations/#{done.id}")
+    {:ok, view, _html} = live(conn, ~p"/m/#{scope.entity.slug}/duties/#{done.id}")
 
     assert render(view) =~ "Completed"
     assert render(view) =~ stamp
   end
 
   test "mobile note editing happens in a modal", %{conn: conn} do
-    {scope, obligation} = manager_obligation_scope_fixture()
+    {scope, duty} = manager_duty_scope_fixture()
     conn = mobile_conn(conn, scope)
-    event = hd(Tugas.Obligations.list_events(obligation))
+    event = hd(Tugas.Duties.list_events(duty))
 
-    {:ok, view, _html} = live(conn, ~p"/m/#{scope.entity.slug}/obligations/#{obligation.id}")
+    {:ok, view, _html} = live(conn, ~p"/m/#{scope.entity.slug}/duties/#{duty.id}")
 
     refute has_element?(view, "#m-note-modal")
     view |> element("#m-edit-note-#{event.id}") |> render_click()
@@ -146,10 +146,10 @@ defmodule TugasWeb.MobileLiveTest do
   end
 
   test "mobile skip modal closes a one-off cycle", %{conn: conn} do
-    {scope, obligation} = manager_obligation_scope_fixture()
+    {scope, duty} = manager_duty_scope_fixture()
     conn = mobile_conn(conn, scope)
 
-    {:ok, view, _html} = live(conn, ~p"/m/#{scope.entity.slug}/obligations/#{obligation.id}")
+    {:ok, view, _html} = live(conn, ~p"/m/#{scope.entity.slug}/duties/#{duty.id}")
 
     view |> element("#m-skip-btn") |> render_click()
     assert has_element?(view, "#m-skip-modal")
@@ -157,14 +157,14 @@ defmodule TugasWeb.MobileLiveTest do
     view |> form("#m-skip-form", %{"skip" => %{"note" => "Not needed"}}) |> render_submit()
 
     assert_redirect(view, ~p"/m/#{scope.entity.slug}")
-    assert Obligations.get_obligation!(scope, obligation.id).closed_at
+    assert Duties.get_duty!(scope, duty.id).closed_at
   end
 
   test "mobile done modal requires next due for recurring", %{conn: conn} do
-    {scope, obligation} = recurring_primary_scope_fixture(interval: "monthly")
+    {scope, duty} = recurring_primary_scope_fixture(interval: "monthly")
     conn = mobile_conn(conn, scope)
 
-    {:ok, view, _html} = live(conn, ~p"/m/#{scope.entity.slug}/obligations/#{obligation.id}")
+    {:ok, view, _html} = live(conn, ~p"/m/#{scope.entity.slug}/duties/#{duty.id}")
 
     view |> element("#m-done-btn") |> render_click()
 
@@ -176,10 +176,10 @@ defmodule TugasWeb.MobileLiveTest do
   end
 
   test "completing on mobile spawns successor and redirects to dashboard", %{conn: conn} do
-    {scope, obligation} = recurring_primary_scope_fixture(interval: "monthly")
+    {scope, duty} = recurring_primary_scope_fixture(interval: "monthly")
     conn = mobile_conn(conn, scope)
 
-    {:ok, view, _html} = live(conn, ~p"/m/#{scope.entity.slug}/obligations/#{obligation.id}")
+    {:ok, view, _html} = live(conn, ~p"/m/#{scope.entity.slug}/duties/#{duty.id}")
 
     view |> element("#m-done-btn") |> render_click()
 
@@ -188,7 +188,7 @@ defmodule TugasWeb.MobileLiveTest do
     |> render_submit()
 
     assert_redirect(view, ~p"/m/#{scope.entity.slug}")
-    refute Obligations.get_obligation!(scope, obligation.id).completed_at == nil
+    refute Duties.get_duty!(scope, duty.id).completed_at == nil
   end
 
   test "mobile dashboard filters completed cycles", %{conn: conn} do
@@ -198,32 +198,32 @@ defmodule TugasWeb.MobileLiveTest do
     type = type_fixture(manager.entity)
 
     {:ok, _} =
-      Obligations.create_obligation(manager, %{
+      Duties.create_duty(manager, %{
         title: "Alpha Live",
-        obligation_type_id: type.id,
+        duty_type_id: type.id,
         primary_assignee_id: member_scope.user.id,
         due_by: ~D[2026-06-30],
         open_note: "Alpha"
       })
 
     {:ok, to_complete} =
-      Obligations.create_obligation(manager, %{
+      Duties.create_duty(manager, %{
         title: "Beta Done",
-        obligation_type_id: type.id,
+        duty_type_id: type.id,
         primary_assignee_id: member_scope.user.id,
         due_by: ~D[2026-05-30],
         open_note: "Beta"
       })
 
     assert {:ok, completed, _} =
-             Obligations.complete(member_scope, to_complete, %{note: "Done"})
+             Duties.complete(member_scope, to_complete, %{note: "Done"})
 
     {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}")
 
     # member defaults to Mine; switch the status dropdown to Completed
-    view |> form("#m-obligation-status-filter", %{lifecycle: "completed"}) |> render_change()
+    view |> form("#m-duty-status-filter", %{lifecycle: "completed"}) |> render_change()
     assert has_element?(view, "#m-ob-#{completed.id}")
-    refute has_element?(view, "#m-obligations-empty")
+    refute has_element?(view, "#m-duties-empty")
   end
 
   test "mobile dashboard filters skipped cycles", %{conn: conn} do
@@ -232,18 +232,18 @@ defmodule TugasWeb.MobileLiveTest do
     type = type_fixture(manager.entity)
 
     {:ok, to_skip} =
-      Obligations.create_obligation(manager, %{
+      Duties.create_duty(manager, %{
         title: "Skip Me",
-        obligation_type_id: type.id,
+        duty_type_id: type.id,
         due_by: ~D[2026-06-30],
         open_note: "Opening"
       })
 
-    assert {:ok, skipped, nil} = Obligations.skip(manager, to_skip, %{note: "Skipping it"})
+    assert {:ok, skipped, nil} = Duties.skip(manager, to_skip, %{note: "Skipping it"})
 
     {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}")
 
-    view |> form("#m-obligation-status-filter", %{lifecycle: "skipped"}) |> render_change()
+    view |> form("#m-duty-status-filter", %{lifecycle: "skipped"}) |> render_change()
     assert has_element?(view, "#m-ob-#{skipped.id}")
     assert render(view) =~ "skipped"
   end
@@ -315,9 +315,9 @@ defmodule TugasWeb.MobileLiveTest do
     manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     conn = mobile_conn(conn, manager)
 
-    {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}/obligation-types")
+    {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}/duty-types")
 
-    assert has_element?(view, "#m-obligation-types")
+    assert has_element?(view, "#m-duty-types")
     assert has_element?(view, "#m-types")
     assert has_element?(view, "#m-new-type-btn")
 
@@ -342,10 +342,10 @@ defmodule TugasWeb.MobileLiveTest do
     conn = mobile_conn(conn, manager)
 
     [epf | _] =
-      Obligations.list_types(manager)
+      Duties.list_types(manager)
       |> Enum.filter(&(&1.name == "EPF Monthly"))
 
-    {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}/obligation-types")
+    {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}/duty-types")
 
     view |> element("#m-clone-type-#{epf.id}") |> render_click()
     assert has_element?(view, "#m-type-form")
@@ -366,7 +366,7 @@ defmodule TugasWeb.MobileLiveTest do
     member = member_scope_on_entity(Tugas.EntitiesFixtures.manager_scope_fixture().entity)
     conn = mobile_conn(conn, member)
 
-    {:ok, view, _html} = live(conn, ~p"/m/#{member.entity.slug}/obligation-types")
+    {:ok, view, _html} = live(conn, ~p"/m/#{member.entity.slug}/duty-types")
 
     assert has_element?(view, "#m-types")
     refute has_element?(view, "#m-new-type-btn")
@@ -378,7 +378,7 @@ defmodule TugasWeb.MobileLiveTest do
     manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     conn = mobile_conn(conn, manager)
 
-    {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}/obligation-types")
+    {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}/duty-types")
 
     view |> element("#m-new-type-btn") |> render_click()
     assert has_element?(view, "#m-type-modal")
@@ -397,7 +397,7 @@ defmodule TugasWeb.MobileLiveTest do
   end
 
   test "mobile UA is redirected from desktop dashboard to /m", %{conn: conn} do
-    {scope, _obligation} = assigned_member_scope_fixture()
+    {scope, _duty} = assigned_member_scope_fixture()
 
     conn =
       conn
@@ -413,19 +413,19 @@ defmodule TugasWeb.MobileLiveTest do
     conn = mobile_conn(conn, manager)
     type = type_fixture(manager.entity)
 
-    {:ok, obligation} =
-      Obligations.create_obligation(manager, %{
+    {:ok, duty} =
+      Duties.create_duty(manager, %{
         title: "EPF Jan",
-        obligation_type_id: type.id,
+        duty_type_id: type.id,
         primary_assignee_id: manager.user.id,
         due_by: ~D[2026-06-15],
         open_note: "open"
       })
 
-    {:ok, done, _} = Obligations.complete(manager, obligation, %{note: "Done"})
+    {:ok, done, _} = Duties.complete(manager, duty, %{note: "Done"})
 
     {:ok, view, _html} =
-      live(conn, ~p"/m/#{manager.entity.slug}/obligations/#{done.id}")
+      live(conn, ~p"/m/#{manager.entity.slug}/duties/#{done.id}")
 
     assert has_element?(view, "#m-mark-error-btn")
 
@@ -437,7 +437,7 @@ defmodule TugasWeb.MobileLiveTest do
     |> render_submit()
 
     {path, _flash} = assert_redirect(view)
-    assert path =~ "/m/#{manager.entity.slug}/obligations/"
+    assert path =~ "/m/#{manager.entity.slug}/duties/"
     refute path =~ done.id
 
     {:ok, replacement_view, _} = live(conn, path)
@@ -449,21 +449,21 @@ defmodule TugasWeb.MobileLiveTest do
     conn = mobile_conn(conn, manager)
     type = type_fixture(manager.entity, complete_documents: "receipt")
 
-    {:ok, obligation} =
-      Obligations.create_obligation(manager, %{
+    {:ok, duty} =
+      Duties.create_duty(manager, %{
         title: "EPF",
-        obligation_type_id: type.id,
+        duty_type_id: type.id,
         due_by: ~D[2026-06-30],
         open_note: "open"
       })
 
     {:ok, view, _html} =
-      live(conn, ~p"/m/#{manager.entity.slug}/obligations/#{obligation.id}")
+      live(conn, ~p"/m/#{manager.entity.slug}/duties/#{duty.id}")
 
     # Attach the receipt (as the UploadDirect/controller path would), then the
     # client signals the LiveView to refresh.
-    seed_document(manager, obligation, "receipt", "receipt.pdf")
-    view |> element("#mobile-obligation-show") |> render_hook("document_uploaded", %{})
+    seed_document(manager, duty, "receipt", "receipt.pdf")
+    view |> element("#mobile-duty-show") |> render_hook("document_uploaded", %{})
 
     assert has_element?(
              view,
@@ -476,23 +476,23 @@ defmodule TugasWeb.MobileLiveTest do
     conn = mobile_conn(conn, manager)
     type = type_fixture(manager.entity, complete_documents: "receipt")
 
-    {:ok, obligation} =
-      Obligations.create_obligation(manager, %{
+    {:ok, duty} =
+      Duties.create_duty(manager, %{
         title: "EPF",
-        obligation_type_id: type.id,
+        duty_type_id: type.id,
         due_by: ~D[2026-06-30],
         open_note: "open"
       })
 
     {:ok, view, _html} =
-      live(conn, ~p"/m/#{manager.entity.slug}/obligations/#{obligation.id}")
+      live(conn, ~p"/m/#{manager.entity.slug}/duties/#{duty.id}")
 
     view |> element("#m-open-completion-slot-receipt") |> render_click()
 
     assert has_element?(
              view,
              "#m-select-slot-receipt[phx-hook='UploadDirect']" <>
-               "[data-upload-url='/entities/#{manager.entity.slug}/obligations/#{obligation.id}/documents']"
+               "[data-upload-url='/entities/#{manager.entity.slug}/duties/#{duty.id}/documents']"
            )
   end
 
@@ -503,43 +503,43 @@ defmodule TugasWeb.MobileLiveTest do
     conn = mobile_conn(conn, manager)
     type = type_fixture(manager.entity, complete_documents: "receipt")
 
-    {:ok, obligation} =
-      Obligations.create_obligation(manager, %{
+    {:ok, duty} =
+      Duties.create_duty(manager, %{
         title: "EPF",
-        obligation_type_id: type.id,
+        duty_type_id: type.id,
         due_by: ~D[2026-06-30],
         open_note: "open"
       })
 
     {:ok, view, _html} =
-      live(conn, ~p"/m/#{manager.entity.slug}/obligations/#{obligation.id}")
+      live(conn, ~p"/m/#{manager.entity.slug}/duties/#{duty.id}")
 
     assert has_element?(view, "#m-completion-summary.w-full")
     assert has_element?(view, "#m-open-completion-slot-receipt")
 
-    obligation = Obligations.get_obligation!(manager, obligation.id)
-    [open_event] = Enum.filter(obligation.events, &(&1.status == "open"))
+    duty = Duties.get_duty!(manager, duty.id)
+    [open_event] = Enum.filter(duty.events, &(&1.status == "open"))
 
     {:ok, _receipt} =
-      Obligations.add_document(
+      Duties.add_document(
         manager,
-        obligation,
+        duty,
         open_event,
         upload_fixture("receipt.pdf"),
         "receipt"
       )
 
     {:ok, notes} =
-      Obligations.add_document(
+      Duties.add_document(
         manager,
-        obligation,
+        duty,
         open_event,
         upload_fixture("notes.jpg"),
         nil
       )
 
     {:ok, view, _html} =
-      live(conn, ~p"/m/#{manager.entity.slug}/obligations/#{obligation.id}")
+      live(conn, ~p"/m/#{manager.entity.slug}/duties/#{duty.id}")
 
     assert has_element?(
              view,
@@ -563,7 +563,7 @@ defmodule TugasWeb.MobileLiveTest do
 
     assert has_element?(
              view,
-             "#m-new-duties-nav-link[href='/m/#{manager.entity.slug}/obligations/new']"
+             "#m-new-duties-nav-link[href='/m/#{manager.entity.slug}/duties/new']"
            )
   end
 
@@ -574,9 +574,9 @@ defmodule TugasWeb.MobileLiveTest do
 
     for i <- 1..30 do
       {:ok, _} =
-        Tugas.Obligations.create_obligation(manager, %{
+        Tugas.Duties.create_duty(manager, %{
           title: "Duty #{String.pad_leading(Integer.to_string(i), 2, "0")}",
-          obligation_type_id: type.id,
+          duty_type_id: type.id,
           due_by: Date.add(~D[2026-06-01], i),
           open_note: "n"
         })
@@ -584,13 +584,13 @@ defmodule TugasWeb.MobileLiveTest do
 
     {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}")
 
-    assert view |> element("#mobile-obligations") |> render() =~ "Duty 25"
-    refute view |> element("#mobile-obligations") |> render() =~ "Duty 26"
+    assert view |> element("#mobile-duties") |> render() =~ "Duty 25"
+    refute view |> element("#mobile-duties") |> render() =~ "Duty 26"
 
     render_hook(view, "load_more", %{})
-    assert view |> element("#mobile-obligations") |> render() =~ "Duty 26"
+    assert view |> element("#mobile-duties") |> render() =~ "Duty 26"
 
-    assert has_element?(view, "#m-obligation-sort option[value='urgency']")
+    assert has_element?(view, "#m-duty-sort option[value='urgency']")
   end
 
   test "mobile show renders assignees, event actors, corrections, and end series control", %{
@@ -602,30 +602,30 @@ defmodule TugasWeb.MobileLiveTest do
     collaborator = member_fixture(manager.entity)
     type = type_fixture(manager.entity, recurring_interval: "monthly")
 
-    {:ok, obligation} =
-      Obligations.create_obligation(manager, %{
+    {:ok, duty} =
+      Duties.create_duty(manager, %{
         title: "Shared work",
-        obligation_type_id: type.id,
+        duty_type_id: type.id,
         primary_assignee_id: assignee.id,
         collaborator_ids: [collaborator.id],
         due_by: ~D[2026-06-30],
         open_note: "open"
       })
 
-    assert {:ok, _} = Obligations.start_progress(manager, obligation, %{note: "Working"})
+    assert {:ok, _} = Duties.start_progress(manager, duty, %{note: "Working"})
 
     assert {:ok, _} =
-             Obligations.update_obligation(manager, obligation, %{title: "Shared work (updated)"})
+             Duties.update_duty(manager, duty, %{title: "Shared work (updated)"})
 
     {:ok, view, _html} =
-      live(conn, ~p"/m/#{manager.entity.slug}/obligations/#{obligation.id}")
+      live(conn, ~p"/m/#{manager.entity.slug}/duties/#{duty.id}")
 
     assert has_element?(view, "#m-assignees-toggle", assignee.email)
     assert has_element?(view, "#m-assignees-dropdown", collaborator.email)
     assert has_element?(view, "#m-end-series-btn")
 
-    obligation = Obligations.get_obligation!(manager, obligation.id)
-    in_progress = Enum.find(obligation.events, &(&1.status == "in_progress"))
+    duty = Duties.get_duty!(manager, duty.id)
+    in_progress = Enum.find(duty.events, &(&1.status == "in_progress"))
 
     assert has_element?(view, "#m-event-#{in_progress.id}", manager.user.email)
     assert view |> element("#m-event-#{in_progress.id}") |> render() =~ "border-warning"
@@ -638,11 +638,11 @@ defmodule TugasWeb.MobileLiveTest do
   end
 
   test "mobile end series flow closes recurring series and redirects", %{conn: conn} do
-    {scope, obligation} = recurring_manager_scope_fixture(interval: "monthly")
+    {scope, duty} = recurring_manager_scope_fixture(interval: "monthly")
     conn = mobile_conn(conn, scope)
 
     {:ok, view, _html} =
-      live(conn, ~p"/m/#{scope.entity.slug}/obligations/#{obligation.id}")
+      live(conn, ~p"/m/#{scope.entity.slug}/duties/#{duty.id}")
 
     view |> element("#m-end-series-btn") |> render_click()
     assert has_element?(view, "#m-end-series-modal")
@@ -653,16 +653,16 @@ defmodule TugasWeb.MobileLiveTest do
 
     assert_redirect(view, ~p"/m/#{scope.entity.slug}")
 
-    ended = Obligations.get_obligation!(scope, obligation.id)
+    ended = Duties.get_duty!(scope, duty.id)
     assert ended.series_ended_at
   end
 
   test "mobile escape closes end series modal", %{conn: conn} do
-    {scope, obligation} = recurring_manager_scope_fixture(interval: "monthly")
+    {scope, duty} = recurring_manager_scope_fixture(interval: "monthly")
     conn = mobile_conn(conn, scope)
 
     {:ok, view, _html} =
-      live(conn, ~p"/m/#{scope.entity.slug}/obligations/#{obligation.id}")
+      live(conn, ~p"/m/#{scope.entity.slug}/duties/#{duty.id}")
 
     view |> element("#m-end-series-btn") |> render_click()
     assert has_element?(view, "#m-end-series-modal")
@@ -671,23 +671,23 @@ defmodule TugasWeb.MobileLiveTest do
     refute has_element?(view, "#m-end-series-modal")
   end
 
-  test "mobile: new-obligation form creates and redirects to the mobile show page", %{conn: conn} do
+  test "mobile: new-duty form creates and redirects to the mobile show page", %{conn: conn} do
     manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     conn = mobile_conn(conn, manager)
     type = type_fixture(manager.entity)
 
-    {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}/obligations/new")
+    {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}/duties/new")
 
-    assert has_element?(view, "#m-obligation-form", "New duty")
+    assert has_element?(view, "#m-duty-form", "New duty")
 
     # The mobile shell binds a global Escape keydown; the form must not crash on it.
     assert view |> element("#tugas-shell") |> render_keydown() =~ "New duty"
 
     view
-    |> form("#m-obligation-create-form", %{
-      "obligation" => %{
+    |> form("#m-duty-create-form", %{
+      "duty" => %{
         "title" => "Mobile EPF",
-        "obligation_type_id" => type.id,
+        "duty_type_id" => type.id,
         "due_by" => "2026-06-30",
         "open_note" => "Created on mobile"
       }
@@ -695,10 +695,10 @@ defmodule TugasWeb.MobileLiveTest do
     |> render_submit()
 
     {path, _flash} = assert_redirect(view)
-    assert path =~ "/m/#{manager.entity.slug}/obligations/"
+    assert path =~ "/m/#{manager.entity.slug}/duties/"
     refute path =~ "/new"
 
-    [created] = Tugas.Obligations.list_team_overview(manager)
+    [created] = Tugas.Duties.list_team_overview(manager)
     assert created.title == "Mobile EPF"
   end
 end

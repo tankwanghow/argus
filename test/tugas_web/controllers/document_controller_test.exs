@@ -2,10 +2,10 @@ defmodule TugasWeb.DocumentControllerTest do
   use TugasWeb.ConnCase, async: true
 
   alias Tugas.Entities
-  alias Tugas.Obligations
+  alias Tugas.Duties
 
   import Tugas.EntitiesFixtures
-  import Tugas.ObligationsFixtures
+  import Tugas.DutiesFixtures
 
   setup :register_and_log_in_user
 
@@ -21,8 +21,8 @@ defmodule TugasWeb.DocumentControllerTest do
     |> Entities.Membership.changeset(%{})
     |> Tugas.Repo.insert!()
 
-    {_, obligation} = obligation_fixture(manager)
-    event = hd(Obligations.list_events(obligation))
+    {_, duty} = duty_fixture(manager)
+    event = hd(Duties.list_events(duty))
 
     path = Path.join(System.tmp_dir!(), "serve_test_#{System.unique_integer()}.txt")
     File.write!(path, "file contents")
@@ -34,12 +34,12 @@ defmodule TugasWeb.DocumentControllerTest do
     }
 
     {:ok, document} =
-      Obligations.add_document(manager, obligation, event, upload, nil)
+      Duties.add_document(manager, duty, event, upload, nil)
 
     conn =
       get(
         conn,
-        ~p"/entities/#{manager.entity.slug}/obligations/#{obligation.id}/documents/#{document.id}"
+        ~p"/entities/#{manager.entity.slug}/duties/#{duty.id}/documents/#{document.id}"
       )
 
     assert response(conn, 200)
@@ -57,17 +57,17 @@ defmodule TugasWeb.DocumentControllerTest do
     |> Entities.Membership.changeset(%{})
     |> Tugas.Repo.insert!()
 
-    {_, obligation} = obligation_fixture(manager)
-    event = hd(Obligations.list_events(obligation))
+    {_, duty} = duty_fixture(manager)
+    event = hd(Duties.list_events(duty))
 
     path = Path.join(System.tmp_dir!(), "disp_test_#{System.unique_integer()}.txt")
     File.write!(path, "file contents")
 
     upload = %Plug.Upload{path: path, filename: "disp_test.txt", content_type: "text/plain"}
-    {:ok, document} = Obligations.add_document(manager, obligation, event, upload, nil)
+    {:ok, document} = Duties.add_document(manager, duty, event, upload, nil)
 
     base =
-      ~p"/entities/#{manager.entity.slug}/obligations/#{obligation.id}/documents/#{document.id}"
+      ~p"/entities/#{manager.entity.slug}/duties/#{duty.id}/documents/#{document.id}"
 
     inline_conn = get(conn, base)
     assert [disp] = get_resp_header(inline_conn, "content-disposition")
@@ -84,10 +84,10 @@ defmodule TugasWeb.DocumentControllerTest do
       conn = log_in_user(conn, manager.user)
       type = type_fixture(manager.entity, complete_documents: "receipt")
 
-      {:ok, obligation} =
-        Obligations.create_obligation(manager, %{
+      {:ok, duty} =
+        Duties.create_duty(manager, %{
           title: "EPF",
-          obligation_type_id: type.id,
+          duty_type_id: type.id,
           due_by: ~D[2026-06-30],
           open_note: "open"
         })
@@ -96,7 +96,7 @@ defmodule TugasWeb.DocumentControllerTest do
       File.write!(path, "receipt contents")
 
       conn =
-        post(conn, ~p"/entities/#{manager.entity.slug}/obligations/#{obligation.id}/documents", %{
+        post(conn, ~p"/entities/#{manager.entity.slug}/duties/#{duty.id}/documents", %{
           "file" => %Plug.Upload{
             path: path,
             filename: "receipt.pdf",
@@ -107,8 +107,8 @@ defmodule TugasWeb.DocumentControllerTest do
 
       assert json_response(conn, 200)["ok"] == true
 
-      obligation = Obligations.get_obligation!(manager, obligation.id)
-      docs = Obligations.list_cycle_documents(obligation)
+      duty = Duties.get_duty!(manager, duty.id)
+      docs = Duties.list_cycle_documents(duty)
 
       assert Enum.any?(
                docs,
@@ -121,10 +121,10 @@ defmodule TugasWeb.DocumentControllerTest do
       conn = log_in_user(conn, manager.user)
       type = type_fixture(manager.entity, complete_documents: "receipt")
 
-      {:ok, obligation} =
-        Obligations.create_obligation(manager, %{
+      {:ok, duty} =
+        Duties.create_duty(manager, %{
           title: "EPF",
-          obligation_type_id: type.id,
+          duty_type_id: type.id,
           due_by: ~D[2026-06-30],
           open_note: "open"
         })
@@ -133,7 +133,7 @@ defmodule TugasWeb.DocumentControllerTest do
       File.write!(path, String.duplicate("x", 11_000_000))
 
       conn =
-        post(conn, ~p"/entities/#{manager.entity.slug}/obligations/#{obligation.id}/documents", %{
+        post(conn, ~p"/entities/#{manager.entity.slug}/duties/#{duty.id}/documents", %{
           "file" => %Plug.Upload{path: path, filename: "clip.mp4", content_type: "video/mp4"}
         })
 
@@ -147,10 +147,10 @@ defmodule TugasWeb.DocumentControllerTest do
       conn = log_in_user(conn, manager.user)
       type = type_fixture(manager.entity, complete_documents: "receipt")
 
-      {:ok, obligation} =
-        Obligations.create_obligation(manager, %{
+      {:ok, duty} =
+        Duties.create_duty(manager, %{
           title: "EPF",
-          obligation_type_id: type.id,
+          duty_type_id: type.id,
           due_by: ~D[2026-06-30],
           open_note: "open"
         })
@@ -159,7 +159,7 @@ defmodule TugasWeb.DocumentControllerTest do
       File.write!(path, "x")
 
       conn =
-        post(conn, ~p"/entities/#{manager.entity.slug}/obligations/#{obligation.id}/documents", %{
+        post(conn, ~p"/entities/#{manager.entity.slug}/duties/#{duty.id}/documents", %{
           "file" => %Plug.Upload{
             path: path,
             filename: "extra.pdf",
@@ -177,10 +177,10 @@ defmodule TugasWeb.DocumentControllerTest do
       conn = log_in_user(conn, manager.user)
       type = type_fixture(manager.entity, complete_documents: "receipt")
 
-      {:ok, obligation} =
-        Obligations.create_obligation(manager, %{
+      {:ok, duty} =
+        Duties.create_duty(manager, %{
           title: "EPF",
-          obligation_type_id: type.id,
+          duty_type_id: type.id,
           due_by: ~D[2026-06-30],
           open_note: "open"
         })
@@ -190,7 +190,7 @@ defmodule TugasWeb.DocumentControllerTest do
       File.write!(path1, "first")
       File.write!(path2, "second")
 
-      base = ~p"/entities/#{manager.entity.slug}/obligations/#{obligation.id}/documents"
+      base = ~p"/entities/#{manager.entity.slug}/duties/#{duty.id}/documents"
 
       post(conn, base, %{
         "file" => %Plug.Upload{
@@ -219,10 +219,10 @@ defmodule TugasWeb.DocumentControllerTest do
       manager = manager_scope_fixture()
       member = member_fixture(manager.entity)
 
-      {:ok, obligation} =
-        Obligations.create_obligation(manager, %{
+      {:ok, duty} =
+        Duties.create_duty(manager, %{
           title: "EPF",
-          obligation_type_id: type_fixture(manager.entity).id,
+          duty_type_id: type_fixture(manager.entity).id,
           due_by: ~D[2026-06-30],
           open_note: "open"
         })
@@ -233,7 +233,7 @@ defmodule TugasWeb.DocumentControllerTest do
       File.write!(path, "x")
 
       conn =
-        post(conn, ~p"/entities/#{manager.entity.slug}/obligations/#{obligation.id}/documents", %{
+        post(conn, ~p"/entities/#{manager.entity.slug}/duties/#{duty.id}/documents", %{
           "file" => %Plug.Upload{
             path: path,
             filename: "denied.pdf",
@@ -249,21 +249,21 @@ defmodule TugasWeb.DocumentControllerTest do
       conn = log_in_user(conn, manager.user)
       type = type_fixture(manager.entity, complete_documents: "")
 
-      {:ok, obligation} =
-        Obligations.create_obligation(manager, %{
+      {:ok, duty} =
+        Duties.create_duty(manager, %{
           title: "EPF",
-          obligation_type_id: type.id,
+          duty_type_id: type.id,
           due_by: ~D[2026-06-30],
           open_note: "open"
         })
 
-      [open_event] = Enum.filter(Obligations.list_events(obligation), &(&1.status == "open"))
+      [open_event] = Enum.filter(Duties.list_events(duty), &(&1.status == "open"))
 
       path = Path.join(System.tmp_dir!(), "step_#{System.unique_integer()}.pdf")
       File.write!(path, "step file contents")
 
       conn =
-        post(conn, ~p"/entities/#{manager.entity.slug}/obligations/#{obligation.id}/documents", %{
+        post(conn, ~p"/entities/#{manager.entity.slug}/duties/#{duty.id}/documents", %{
           "file" => %Plug.Upload{
             path: path,
             filename: "notes.pdf",
@@ -274,8 +274,8 @@ defmodule TugasWeb.DocumentControllerTest do
 
       assert json_response(conn, 200)["ok"] == true
 
-      obligation = Obligations.get_obligation!(manager, obligation.id)
-      event = Enum.find(obligation.events, &(&1.id == open_event.id))
+      duty = Duties.get_duty!(manager, duty.id)
+      event = Enum.find(duty.events, &(&1.id == open_event.id))
 
       assert Enum.any?(event.documents, &(&1.file["original"] == "notes.pdf"))
     end
@@ -285,10 +285,10 @@ defmodule TugasWeb.DocumentControllerTest do
       conn = log_in_user(conn, manager.user)
       type = type_fixture(manager.entity, complete_documents: "")
 
-      {:ok, obligation} =
-        Obligations.create_obligation(manager, %{
+      {:ok, duty} =
+        Duties.create_duty(manager, %{
           title: "EPF",
-          obligation_type_id: type.id,
+          duty_type_id: type.id,
           due_by: ~D[2026-06-30],
           open_note: "open"
         })
@@ -297,7 +297,7 @@ defmodule TugasWeb.DocumentControllerTest do
       File.write!(path, String.duplicate("x", 6_000_000))
 
       conn =
-        post(conn, ~p"/entities/#{manager.entity.slug}/obligations/#{obligation.id}/documents", %{
+        post(conn, ~p"/entities/#{manager.entity.slug}/duties/#{duty.id}/documents", %{
           "file" => %Plug.Upload{
             path: path,
             filename: "photo.jpg",
@@ -316,15 +316,15 @@ defmodule TugasWeb.DocumentControllerTest do
     conn = log_in_user(conn, manager.user)
     type = type_fixture(manager.entity, complete_documents: "receipt")
 
-    {:ok, obligation} =
-      Obligations.create_obligation(manager, %{
+    {:ok, duty} =
+      Duties.create_duty(manager, %{
         title: "EPF",
-        obligation_type_id: type.id,
+        duty_type_id: type.id,
         due_by: ~D[2026-06-30],
         open_note: "open"
       })
 
-    event = hd(Obligations.list_events(obligation))
+    event = hd(Duties.list_events(duty))
 
     path = Path.join(System.tmp_dir!(), "receipt_#{System.unique_integer()}.pdf")
     File.write!(path, "receipt contents")
@@ -336,7 +336,7 @@ defmodule TugasWeb.DocumentControllerTest do
     }
 
     {:ok, document} =
-      Obligations.add_document(manager, obligation, event, upload, "receipt")
+      Duties.add_document(manager, duty, event, upload, "receipt")
 
     # Make it old enough to be voidable (past 48 hour window)
     old_document =
@@ -348,12 +348,12 @@ defmodule TugasWeb.DocumentControllerTest do
 
     # Void it (admin, with reason).
     {:ok, _} =
-      Obligations.void_document(manager, obligation, old_document, %{reason: "wrong file"})
+      Duties.void_document(manager, duty, old_document, %{reason: "wrong file"})
 
     conn =
       get(
         conn,
-        ~p"/entities/#{manager.entity.slug}/obligations/#{obligation.id}/documents/#{old_document.id}"
+        ~p"/entities/#{manager.entity.slug}/duties/#{duty.id}/documents/#{old_document.id}"
       )
 
     assert response(conn, 200)
