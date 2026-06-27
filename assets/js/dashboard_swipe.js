@@ -1,5 +1,5 @@
 // Mobile dashboard: three full-width panels (Someday | Calendar | Todos).
-// Native horizontal scroll + scroll-snap; hint buttons jump between panels.
+// Tab strip jumps between panels; native scroll + snap still works.
 export const DashboardSwipe = {
   mounted() {
     this.swipeEl = this.el.querySelector("#m-dashboard-swipe")
@@ -20,7 +20,7 @@ export const DashboardSwipe = {
 
   updated() {
     this.scrollToPanel(this.panelIndex, false)
-    this.updateIndicators(this.panelIndex)
+    this.updateTabs(this.panelIndex)
   },
 
   destroyed() {
@@ -46,7 +46,7 @@ export const DashboardSwipe = {
     if (!w) return
 
     this.panelIndex = Math.round(this.swipeEl.scrollLeft / w)
-    this.updateIndicators(this.panelIndex)
+    this.updateTabs(this.panelIndex)
   },
 
   scrollToPanel(index, smooth) {
@@ -54,21 +54,14 @@ export const DashboardSwipe = {
     if (!w) return
 
     this.swipeEl.scrollTo({left: w * index, behavior: smooth ? "smooth" : "instant"})
-    this.updateIndicators(index)
+    this.updateTabs(index)
   },
 
-  updateIndicators(index) {
-    this.el.querySelectorAll("[data-dashboard-panel]").forEach(dot => {
-      const active = Number(dot.dataset.dashboardPanel) === index
-      dot.classList.toggle("bg-primary", active)
-      dot.classList.toggle("bg-base-content/20", !active)
-    })
-
+  updateTabs(index) {
     this.el.querySelectorAll("[data-dashboard-go]").forEach(btn => {
       const active = Number(btn.dataset.dashboardGo) === index
-      btn.classList.toggle("text-primary", active)
-      btn.classList.toggle("font-semibold", active)
-      btn.classList.toggle("text-base-content/50", !active)
+      btn.classList.toggle("tab-active", active)
+      btn.classList.toggle("font-bold", active)
     })
   },
 }

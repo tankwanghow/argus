@@ -82,7 +82,7 @@ defmodule TugasWeb.DashboardLive.CalendarHelpers do
 
   def month_label(year, month) do
     {:ok, dt} = Date.new(year, month, 1)
-    Calendar.strftime(dt, "%B %Y")
+    Calendar.strftime(dt, "%b %Y")
   end
 
   def current_month(today), do: {today.year, today.month}

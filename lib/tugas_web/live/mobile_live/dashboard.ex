@@ -8,18 +8,18 @@ defmodule TugasWeb.MobileLive.Dashboard do
   def render(assigns) do
     ~H"""
     <Layouts.mobile_app flash={@flash} current_scope={@current_scope} nav_context={:calendar}>
-      <div class="sticky top-0 z-30 px-4 py-3 bg-base-100/95 backdrop-blur border-b border-base-200 space-y-2">
+      <div class="sticky top-0 z-30 px-4 pt-3 bg-base-100/95 backdrop-blur space-y-1">
         <h1 class="flex items-center gap-2 text-lg font-semibold truncate">
           <.brand_logo class="size-9" /> Calendar -
           <span class="text-base-content/50">{@current_scope.entity.slug}</span>
         </h1>
-        <div id="dashboard-scope-toggle" class="tabs tabs-box">
+        <div id="dashboard-scope-toggle" class="flex items-center justify-between gap-2">
           <button
             id="dashboard-scope-mine"
             type="button"
             phx-click="set_scope"
             phx-value-mine="true"
-            class={["tab flex-1", @mine? && "tab-active font-bold"]}
+            class={["border border-base-300 rounded-lg px-2 py-1", @mine? && "border-2 font-bold"]}
           >
             Mine
           </button>
@@ -28,16 +28,14 @@ defmodule TugasWeb.MobileLive.Dashboard do
             type="button"
             phx-click="set_scope"
             phx-value-mine="false"
-            class={["tab flex-1", !@mine? && "tab-active font-bold"]}
+            class={["border border-base-300 rounded-lg px-2 py-1", !@mine? && "border-2 font-bold"]}
           >
             Team
           </button>
-        </div>
-        <div class="flex items-center gap-1">
           <button
             id="dashboard-prev-month"
             type="button"
-            class="btn btn-outline btn-sm font-bold"
+            class="border border-base-300 rounded-lg px-3 py-1 font-bold"
             phx-click="prev_month"
           >
             ‹
@@ -48,7 +46,7 @@ defmodule TugasWeb.MobileLive.Dashboard do
           <button
             id="dashboard-next-month"
             type="button"
-            class="btn btn-outline btn-sm font-bold"
+            class="border border-base-300 rounded-lg px-3 py-1 font-bold"
             phx-click="next_month"
           >
             ›
@@ -56,7 +54,7 @@ defmodule TugasWeb.MobileLive.Dashboard do
           <button
             id="dashboard-today"
             type="button"
-            class="btn btn-outline btn-sm"
+            class="border border-base-300 rounded-lg px-2 py-1"
             phx-click="today"
           >
             Today
@@ -64,31 +62,31 @@ defmodule TugasWeb.MobileLive.Dashboard do
         </div>
       </div>
 
-      <div id="m-dashboard" phx-hook="DashboardSwipe" class="px-4 py-3 space-y-2">
-        <div
-          id="m-dashboard-swipe-hint"
-          class="flex items-center justify-between px-1"
-        >
+      <div id="m-dashboard" phx-hook="DashboardSwipe" class="px-1 py-1 space-y-1">
+        <div id="m-dashboard-swipe-hint" class="tabs tabs-box w-full">
           <button
             type="button"
             id="m-dashboard-go-someday"
             data-dashboard-go="0"
-            class="min-h-10 px-2 py-2 text-sm text-base-content/50 rounded-lg active:bg-base-200"
+            class="tab flex-1 min-h-8 text-sm"
           >
-            ← Someday
+            someday
           </button>
-          <div id="m-dashboard-dots" class="flex items-center gap-1.5" aria-hidden="true">
-            <span data-dashboard-panel="0" class="size-1.5 rounded-full bg-base-content/20" />
-            <span data-dashboard-panel="1" class="size-1.5 rounded-full bg-primary" />
-            <span data-dashboard-panel="2" class="size-1.5 rounded-full bg-base-content/20" />
-          </div>
+          <button
+            type="button"
+            id="m-dashboard-go-calendar"
+            data-dashboard-go="1"
+            class="tab flex-1 min-h-8 text-sm tab-active font-bold"
+          >
+            calendar
+          </button>
           <button
             type="button"
             id="m-dashboard-go-todos"
             data-dashboard-go="2"
-            class="min-h-10 px-2 py-2 text-sm text-base-content/50 rounded-lg active:bg-base-200"
+            class="tab flex-1 min-h-8 text-sm"
           >
-            Todos →
+            todo
           </button>
         </div>
 
