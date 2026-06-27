@@ -329,6 +329,38 @@ defmodule ArgusWeb.UserAuthTest do
 
       assert {:redirect, %{to: "/entities"}} = updated_socket.redirected
     end
+
+    test "redirects when the membership is disabled", %{conn: conn, user: user} do
+      admin_scope = entity_scope_fixture()
+
+      %Argus.Entities.Membership{
+        user_id: user.id,
+        entity_id: admin_scope.entity.id,
+        role: "member",
+        accepted_at: DateTime.utc_now(:second),
+        disabled_at: DateTime.utc_now(:second)
+      }
+      |> Argus.Entities.Membership.changeset(%{})
+      |> Argus.Repo.insert!()
+
+      user_token = Accounts.generate_user_session_token(user)
+      session = conn |> put_session(:user_token, user_token) |> get_session()
+
+      socket = %LiveView.Socket{
+        endpoint: ArgusWeb.Endpoint,
+        assigns: %{__changed__: %{}, flash: %{}, current_scope: Scope.for_user(user)}
+      }
+
+      {:halt, updated_socket} =
+        UserAuth.on_mount(
+          :require_entity,
+          %{"entity_slug" => admin_scope.entity.slug},
+          session,
+          socket
+        )
+
+      assert {:redirect, %{to: "/entities"}} = updated_socket.redirected
+    end
   end
 
   describe "on_mount :require_sudo_mode" do

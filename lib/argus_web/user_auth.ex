@@ -248,12 +248,21 @@ defmodule ArgusWeb.UserAuth do
       entity = Entities.get_entity_by_slug_for_user!(slug, scope.user)
       membership = Entities.get_membership!(scope.user, entity)
 
-      {:cont,
-       Phoenix.Component.assign(
-         socket,
-         :current_scope,
-         Scope.put_entity(scope, entity, membership)
-       )}
+      if is_nil(membership.disabled_at) do
+        {:cont,
+         Phoenix.Component.assign(
+           socket,
+           :current_scope,
+           Scope.put_entity(scope, entity, membership)
+         )}
+      else
+        socket =
+          socket
+          |> Phoenix.LiveView.put_flash(:error, "Your access to this entity has been disabled.")
+          |> Phoenix.LiveView.redirect(to: ~p"/entities")
+
+        {:halt, socket}
+      end
     rescue
       Ecto.NoResultsError ->
         socket =

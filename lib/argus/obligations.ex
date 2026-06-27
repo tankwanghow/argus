@@ -562,6 +562,101 @@ defmodule Argus.Obligations do
     |> Repo.all()
   end
 
+  @doc """
+  Counts the *live* obligations `user_id` is attached to in the scope's
+  entity: cycles they primarily own and cycles they collaborate on. Used to
+  warn an admin before disabling a member (the assignments that will be
+  cleared). Returns `%{primary: n, collaborations: m}`.
+  """
+  def count_member_assignments(%Scope{entity: %{id: entity_id}}, user_id) do
+    primary =
+      Obligation
+      |> where([o], o.entity_id == ^entity_id and o.primary_assignee_id == ^user_id)
+      |> live()
+      |> Repo.aggregate(:count)
+
+    collaborations =
+      Obligation
+      |> join(:inner, [o], c in Collaborator, on: c.obligation_id == o.id)
+      |> where([o, c], o.entity_id == ^entity_id and c.user_id == ^user_id)
+      |> live()
+      |> Repo.aggregate(:count)
+
+    %{primary: primary, collaborations: collaborations}
+  end
+
+  @doc """
+  Batch variant of `count_member_assignments/2` for a whole entity: returns a
+  map `%{user_id => %{primary: n, collaborations: m}}` over *live* obligations,
+  for the members-administration list. Users with no live assignments are
+  absent from the map.
+  """
+  def member_assignment_counts(%{id: entity_id}) do
+    primary =
+      Obligation
+      |> where([o], o.entity_id == ^entity_id and not is_nil(o.primary_assignee_id))
+      |> live()
+      |> group_by([o], o.primary_assignee_id)
+      |> select([o], {o.primary_assignee_id, count(o.id)})
+      |> Repo.all()
+      |> Map.new()
+
+    collaborations =
+      Obligation
+      |> join(:inner, [o], c in Collaborator, on: c.obligation_id == o.id)
+      |> where([o, c], o.entity_id == ^entity_id)
+      |> live()
+      |> group_by([o, c], c.user_id)
+      |> select([o, c], {c.user_id, count(o.id)})
+      |> Repo.all()
+      |> Map.new()
+
+    (Map.keys(primary) ++ Map.keys(collaborations))
+    |> Enum.uniq()
+    |> Map.new(fn uid ->
+      {uid, %{primary: Map.get(primary, uid, 0), collaborations: Map.get(collaborations, uid, 0)}}
+    end)
+  end
+
+  @doc """
+  Detaches `user_id` from every *live* obligation in the scope's entity:
+  nulls `primary_assignee_id` (writing a `"primary_assignee"` audit row by the
+  acting admin) on cycles they lead, and deletes their collaborator rows.
+  Runs against `Repo`, so call it inside the disabling transaction. Returns
+  `%{primary: n, collaborations: m}`.
+  """
+  def purge_member_assignments(%Scope{entity: %{id: entity_id}} = scope, user_id) do
+    primary =
+      Obligation
+      |> where([o], o.entity_id == ^entity_id and o.primary_assignee_id == ^user_id)
+      |> live()
+      |> Repo.all()
+
+    Enum.each(primary, fn obligation ->
+      {:ok, updated} =
+        obligation
+        |> Obligation.changeset(%{primary_assignee_id: nil})
+        |> Repo.update()
+
+      insert_audit_log!(Repo, scope, updated, "primary_assignee", assignee_label(user_id), nil)
+    end)
+
+    collab_ids =
+      Obligation
+      |> join(:inner, [o], c in Collaborator, on: c.obligation_id == o.id)
+      |> where([o, c], o.entity_id == ^entity_id and c.user_id == ^user_id)
+      |> live()
+      |> select([o], o.id)
+      |> Repo.all()
+
+    {collaborations, _} =
+      Collaborator
+      |> where([c], c.user_id == ^user_id and c.obligation_id in ^collab_ids)
+      |> Repo.delete_all()
+
+    %{primary: length(primary), collaborations: collaborations}
+  end
+
   def update_obligation(%Scope{} = scope, %Obligation{} = obligation, attrs) do
     with :ok <- ensure_obligation_entity(scope, obligation),
          true <- Authorization.can?(scope, :edit_obligation),
@@ -1470,11 +1565,8 @@ defmodule Argus.Obligations do
       :ok
     else
       count =
-        Membership
-        |> where(
-          [m],
-          m.entity_id == ^entity_id and m.user_id in ^ids and not is_nil(m.accepted_at)
-        )
+        Membership.active()
+        |> where([m], m.entity_id == ^entity_id and m.user_id in ^ids)
         |> Repo.aggregate(:count)
 
       if count == length(ids), do: :ok, else: {:error, :invalid_assignee}

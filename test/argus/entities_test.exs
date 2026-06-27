@@ -8,6 +8,131 @@ defmodule Argus.EntitiesTest do
   alias Argus.Obligations.SampleTypes
 
   import Argus.AccountsFixtures
+  import Argus.EntitiesFixtures
+  import Argus.ObligationsFixtures
+
+  describe "disable_member/2 and enable_member/2" do
+    test "admin disables a member, stamping disabled_at and freeing a seat" do
+      admin_scope = entity_scope_fixture(%{seat_limit: 2})
+      member = member_scope_on_entity(admin_scope.entity)
+
+      assert {:ok, disabled} = Entities.disable_member(admin_scope, member.membership)
+      assert disabled.disabled_at
+      assert disabled.disabled_by_id == admin_scope.user.id
+
+      # admin + member filled 2 seats; disabling frees one
+      assert Entities.seats_available?(admin_scope.entity)
+    end
+
+    test "disabling auto-unassigns the member's live primary duties with an audit row" do
+      admin_scope = entity_scope_fixture()
+      member = member_scope_on_entity(admin_scope.entity)
+      obligation = live_obligation_assigned_to(admin_scope, member.user.id)
+
+      assert {:ok, _} = Entities.disable_member(admin_scope, member.membership)
+
+      reloaded = Argus.Repo.get!(Argus.Obligations.Obligation, obligation.id)
+      assert is_nil(reloaded.primary_assignee_id)
+
+      audit = Obligations.list_audit_logs(reloaded)
+      assert Enum.any?(audit, &(&1.field == "primary_assignee" and is_nil(&1.new_value)))
+    end
+
+    test "disabling removes the member's collaborator rows on live obligations" do
+      admin_scope = entity_scope_fixture()
+      member = member_scope_on_entity(admin_scope.entity)
+      other = live_obligation_assigned_to(admin_scope, nil)
+
+      {:ok, _} = Obligations.update_collaborators(admin_scope, other, [member.user.id])
+      assert member.user.id in collaborator_ids(other)
+
+      assert {:ok, _} = Entities.disable_member(admin_scope, member.membership)
+      refute member.user.id in collaborator_ids(other)
+    end
+
+    test "manager cannot disable a member" do
+      admin_scope = entity_scope_fixture()
+      manager = manager_scope_fixture_on_entity(admin_scope.entity)
+      member = member_scope_on_entity(admin_scope.entity)
+
+      assert :not_authorise = Entities.disable_member(manager, member.membership)
+    end
+
+    test "cannot disable yourself" do
+      admin_scope = entity_scope_fixture()
+      membership = Entities.get_membership!(admin_scope.user, admin_scope.entity)
+
+      assert {:error, :cannot_disable_self} = Entities.disable_member(admin_scope, membership)
+    end
+
+    test "cannot disable the last active admin" do
+      admin_scope = entity_scope_fixture()
+      second_admin_membership = add_admin(admin_scope.entity)
+
+      # two admins -> disabling the second is allowed
+      assert {:ok, _} = Entities.disable_member(admin_scope, second_admin_membership)
+
+      # only one active admin remains; the self-guard blocks disabling it
+      remaining = Entities.get_membership!(admin_scope.user, admin_scope.entity)
+      assert {:error, :cannot_disable_self} = Entities.disable_member(admin_scope, remaining)
+    end
+
+    test "membership from another entity is rejected" do
+      admin_scope = entity_scope_fixture()
+      other_scope = entity_scope_fixture()
+      foreign = Entities.get_membership!(other_scope.user, other_scope.entity)
+
+      assert :not_found = Entities.disable_member(admin_scope, foreign)
+    end
+
+    test "enable re-checks the seat limit and rejects when full" do
+      admin_scope = entity_scope_fixture(%{seat_limit: 2})
+      member = member_scope_on_entity(admin_scope.entity)
+
+      {:ok, disabled} = Entities.disable_member(admin_scope, member.membership)
+      # fill the freed seat with another active member
+      member_scope_on_entity(admin_scope.entity)
+
+      assert {:error, :seat_limit_reached} = Entities.enable_member(admin_scope, disabled)
+    end
+
+    test "enable clears disabled_at when a seat is available" do
+      admin_scope = entity_scope_fixture(%{seat_limit: 5})
+      member = member_scope_on_entity(admin_scope.entity)
+
+      {:ok, disabled} = Entities.disable_member(admin_scope, member.membership)
+      assert {:ok, enabled} = Entities.enable_member(admin_scope, disabled)
+      assert is_nil(enabled.disabled_at)
+      assert is_nil(enabled.disabled_by_id)
+    end
+
+    test "list_entity_memberships hides entities the user is disabled in" do
+      admin_scope = entity_scope_fixture()
+      member = member_scope_on_entity(admin_scope.entity)
+
+      assert admin_scope.entity.id in entity_ids(Entities.list_entity_memberships(member.user))
+
+      {:ok, _} = Entities.disable_member(admin_scope, member.membership)
+
+      refute admin_scope.entity.id in entity_ids(Entities.list_entity_memberships(member.user))
+    end
+
+    test "list_member_administration includes disabled members with assignment counts" do
+      admin_scope = entity_scope_fixture()
+      member = member_scope_on_entity(admin_scope.entity)
+      _obligation = live_obligation_assigned_to(admin_scope, member.user.id)
+
+      {:ok, _} = Entities.disable_member(admin_scope, member.membership)
+
+      rows = Entities.list_member_administration(admin_scope.entity)
+      member_row = Enum.find(rows, fn {u, _m, _c} -> u.id == member.user.id end)
+
+      assert {_user, membership, counts} = member_row
+      assert membership.disabled_at
+      # the auto-unassign on disable cleared the live primary duty
+      assert counts == %{primary: 0, collaborations: 0}
+    end
+  end
 
   describe "create_entity/2" do
     test "creates entity and admin membership" do
@@ -64,6 +189,44 @@ defmodule Argus.EntitiesTest do
 
       assert {:error, :seat_limit_reached} =
                Entities.invite_member(scope, "other@example.com", "member")
+    end
+
+    test "disabled members do not count toward seats" do
+      admin_scope = Argus.EntitiesFixtures.entity_scope_fixture(%{seat_limit: 2})
+      disabled_user = user_fixture()
+
+      %Membership{
+        user_id: disabled_user.id,
+        entity_id: admin_scope.entity.id,
+        role: "member",
+        accepted_at: DateTime.utc_now(:second),
+        disabled_at: DateTime.utc_now(:second)
+      }
+      |> Membership.changeset(%{})
+      |> Argus.Repo.insert!()
+
+      # admin (active) + disabled member = 1 active of 2 seats -> still a free seat
+      assert Entities.seats_available?(admin_scope.entity)
+    end
+
+    test "list_entity_members excludes disabled members" do
+      admin_scope = Argus.EntitiesFixtures.entity_scope_fixture()
+      disabled_user = user_fixture(%{email: "disabled@example.com"})
+
+      %Membership{
+        user_id: disabled_user.id,
+        entity_id: admin_scope.entity.id,
+        role: "member",
+        accepted_at: DateTime.utc_now(:second),
+        disabled_at: DateTime.utc_now(:second)
+      }
+      |> Membership.changeset(%{})
+      |> Argus.Repo.insert!()
+
+      emails =
+        Entities.list_entity_members(admin_scope.entity) |> Enum.map(fn {u, _} -> u.email end)
+
+      refute "disabled@example.com" in emails
     end
 
     test "accept re-checks seat limit at accept time" do
@@ -285,4 +448,45 @@ defmodule Argus.EntitiesTest do
       assert {:error, :closed} = Entities.accept_invitation(u, inv.token)
     end
   end
+
+  defp add_admin(entity) do
+    user = user_fixture()
+
+    %Membership{
+      user_id: user.id,
+      entity_id: entity.id,
+      role: "admin",
+      accepted_at: DateTime.utc_now(:second)
+    }
+    |> Membership.changeset(%{})
+    |> Argus.Repo.insert!()
+
+    Entities.get_membership!(user, entity)
+  end
+
+  defp live_obligation_assigned_to(scope, assignee_id) do
+    type = type_fixture(scope.entity)
+
+    {:ok, obligation} =
+      Obligations.create_obligation(scope, %{
+        title: "Duty #{System.unique_integer([:positive])}",
+        obligation_type_id: type.id,
+        primary_assignee_id: assignee_id,
+        due_by: ~D[2026-06-15],
+        open_note: "opened"
+      })
+
+    obligation
+  end
+
+  defp collaborator_ids(obligation) do
+    import Ecto.Query
+
+    Argus.Obligations.Collaborator
+    |> where([c], c.obligation_id == ^obligation.id)
+    |> Argus.Repo.all()
+    |> Enum.map(& &1.user_id)
+  end
+
+  defp entity_ids(memberships), do: Enum.map(memberships, fn {entity, _m} -> entity.id end)
 end

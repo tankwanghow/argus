@@ -67,18 +67,40 @@ defmodule Argus.Entities do
   end
 
   def list_entity_members(%Entity{} = entity) do
-    Membership
+    Membership.active()
     |> join(:inner, [m], u in User, on: u.id == m.user_id)
-    |> where([m], m.entity_id == ^entity.id and not is_nil(m.accepted_at))
+    |> where([m], m.entity_id == ^entity.id)
     |> order_by([m, u], asc: u.email)
     |> select([m, u], {u, m})
     |> Repo.all()
   end
 
+  @doc """
+  Members-administration list: **all accepted** memberships (active *and*
+  disabled, so an admin can re-enable) as `{user, membership, counts}` tuples,
+  where `counts` is `%{primary: n, collaborations: m}` of the member's live
+  obligation assignments (used to warn before disabling).
+  """
+  def list_member_administration(%Entity{} = entity) do
+    members =
+      Membership
+      |> join(:inner, [m], u in User, on: u.id == m.user_id)
+      |> where([m], m.entity_id == ^entity.id and not is_nil(m.accepted_at))
+      |> order_by([m, u], asc: u.email)
+      |> select([m, u], {u, m})
+      |> Repo.all()
+
+    counts = Argus.Obligations.member_assignment_counts(entity)
+
+    Enum.map(members, fn {user, membership} ->
+      {user, membership, Map.get(counts, user.id, %{primary: 0, collaborations: 0})}
+    end)
+  end
+
   def list_entity_memberships(%User{} = user) do
     Membership
     |> join(:inner, [m], e in Entity, on: e.id == m.entity_id)
-    |> where([m, e], m.user_id == ^user.id and is_nil(e.deleted_at))
+    |> where([m, e], m.user_id == ^user.id and is_nil(e.deleted_at) and is_nil(m.disabled_at))
     |> order_by([m, e], asc: e.name)
     |> select([m, e], {e, m})
     |> Repo.all()
@@ -105,8 +127,8 @@ defmodule Argus.Entities do
 
   def seats_available?(%Entity{} = entity) do
     count =
-      Membership
-      |> where([m], m.entity_id == ^entity.id and not is_nil(m.accepted_at))
+      Membership.active()
+      |> where([m], m.entity_id == ^entity.id)
       |> Repo.aggregate(:count)
 
     count < entity.seat_limit
@@ -231,6 +253,87 @@ defmodule Argus.Entities do
       :not_authorise
     end
   end
+
+  @doc """
+  Disables a member's access to the entity (admin-only, `:manage_entity`). The
+  member can no longer use the entity and **stops consuming a seat**. In one
+  transaction this also auto-detaches them from live work: their live
+  primary-assigned cycles become unassigned (audited) and their collaborator
+  rows are removed (`Obligations.purge_member_assignments/2`).
+
+  Guards: you cannot disable yourself, and you cannot disable the last active
+  admin. A membership from another entity returns `:not_found`.
+  """
+  def disable_member(%Scope{} = scope, %Membership{} = membership) do
+    cond do
+      not Authorization.can?(scope, :manage_entity) ->
+        :not_authorise
+
+      membership.entity_id != scope.entity.id ->
+        :not_found
+
+      membership.user_id == scope.user.id ->
+        {:error, :cannot_disable_self}
+
+      last_active_admin?(scope.entity, membership) ->
+        {:error, :last_admin}
+
+      true ->
+        now = DateTime.utc_now(:second)
+
+        Ecto.Multi.new()
+        |> Ecto.Multi.update(
+          :membership,
+          Membership.changeset(membership, %{disabled_at: now, disabled_by_id: scope.user.id})
+        )
+        |> Ecto.Multi.run(:purge, fn _repo, _ ->
+          {:ok, Argus.Obligations.purge_member_assignments(scope, membership.user_id)}
+        end)
+        |> Repo.transaction()
+        |> case do
+          {:ok, %{membership: updated}} -> {:ok, updated}
+          {:error, _, reason, _} -> {:error, reason}
+        end
+    end
+  end
+
+  @doc """
+  Re-enables a disabled member (admin-only, `:manage_entity`). Because the
+  member's seat was freed while disabled, this **re-checks the seat limit** and
+  returns `{:error, :seat_limit_reached}` if no seat is available. A membership
+  from another entity returns `:not_found`.
+  """
+  def enable_member(%Scope{} = scope, %Membership{} = membership) do
+    cond do
+      not Authorization.can?(scope, :manage_entity) ->
+        :not_authorise
+
+      membership.entity_id != scope.entity.id ->
+        :not_found
+
+      is_nil(membership.disabled_at) ->
+        {:ok, membership}
+
+      not seats_available?(scope.entity) ->
+        {:error, :seat_limit_reached}
+
+      true ->
+        membership
+        |> Membership.changeset(%{disabled_at: nil, disabled_by_id: nil})
+        |> Repo.update()
+    end
+  end
+
+  defp last_active_admin?(%Entity{} = entity, %Membership{role: "admin"}) do
+    active_admins =
+      Membership.active()
+      |> where([m], m.entity_id == ^entity.id and m.role == "admin")
+      |> Repo.aggregate(:count)
+
+    active_admins <= 1
+  end
+
+  defp last_active_admin?(_entity, _membership), do: false
 
   @doc """
   Fetches a pending, non-expired invitation by its URL-safe encoded token,

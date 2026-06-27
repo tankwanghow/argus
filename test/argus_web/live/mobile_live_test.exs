@@ -284,6 +284,23 @@ defmodule ArgusWeb.MobileLiveTest do
     assert has_element?(view, "#m-invite-link")
   end
 
+  test "mobile admin disables a member through the confirm modal", %{conn: conn} do
+    admin = Argus.EntitiesFixtures.entity_scope_fixture()
+    conn = mobile_conn(conn, admin)
+    member = member_fixture(admin.entity)
+    membership = Argus.Entities.get_membership!(member, admin.entity)
+
+    {:ok, view, _html} = live(conn, ~p"/m/#{admin.entity.slug}/members")
+
+    view |> element("#m-disable-member-#{membership.id}") |> render_click()
+    assert has_element?(view, "#m-disable-member-modal")
+
+    view |> element("#m-confirm-disable") |> render_click()
+
+    assert Argus.Entities.get_membership!(member, admin.entity).disabled_at
+    assert has_element?(view, "#m-enable-member-#{membership.id}")
+  end
+
   test "mobile more sheet hides Types link for members", %{conn: conn} do
     manager = Argus.EntitiesFixtures.manager_scope_fixture()
     member = member_scope_on_entity(manager.entity)

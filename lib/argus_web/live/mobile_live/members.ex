@@ -22,36 +22,78 @@ defmodule ArgusWeb.MobileLive.Members do
             class="mt-2 divide-y divide-base-300 rounded-box border border-base-300"
           >
             <li
-              :for={{user, membership} <- @members}
+              :for={{user, membership, counts} <- @members}
               id={"m-member-#{membership.id}"}
-              class="flex flex-col gap-2 p-3 sm:flex-row sm:items-center"
+              class={[
+                "flex flex-col gap-2 p-3 sm:flex-row sm:items-center",
+                membership.disabled_at && "opacity-60"
+              ]}
             >
-              <div class="flex-1 min-w-0">
-                <div class="font-medium truncate">{user.email}</div>
+              <div class="flex flex-wrap items-center gap-2 min-w-0">
+                <div class="font-medium truncate">
+                  {user.email}
+                  <span :if={membership.disabled_at} class="badge badge-ghost badge-sm ml-1">
+                    disabled
+                  </span>
+                </div>
                 <div :if={user.username} class="text-sm text-base-content/60 truncate">
                   {user.username}
                 </div>
+                <div
+                  :if={is_nil(membership.disabled_at) and IndexHelpers.assignment_total(counts) > 0}
+                  class="text-xs text-base-content/50"
+                >
+                  {IndexHelpers.assignment_summary(counts)}
+                </div>
               </div>
-              <form
-                :if={@can_manage?}
-                id={"m-role-form-#{membership.id}"}
-                phx-change="change_role"
-                class="shrink-0"
-              >
-                <input type="hidden" name="membership_id" value={membership.id} />
-                <select name="role" class="select select-sm w-full sm:w-36">
-                  <option
-                    :for={{label, value} <- IndexHelpers.roles()}
-                    value={value}
-                    selected={membership.role == value}
-                  >
-                    {label}
-                  </option>
-                </select>
-              </form>
-              <span :if={not @can_manage?} class="badge badge-ghost badge-sm capitalize">
-                {membership.role}
-              </span>
+              <div class="flex justify-between items-center gap-2">
+                <form
+                  :if={@can_manage? and is_nil(membership.disabled_at)}
+                  id={"m-role-form-#{membership.id}"}
+                  phx-change="change_role"
+                  class="shrink-0"
+                >
+                  <input type="hidden" name="membership_id" value={membership.id} />
+                  <select name="role" class="select select-sm w-full sm:w-36">
+                    <option
+                      :for={{label, value} <- IndexHelpers.roles()}
+                      value={value}
+                      selected={membership.role == value}
+                    >
+                      {label}
+                    </option>
+                  </select>
+                </form>
+                <span
+                  :if={not @can_manage? or membership.disabled_at}
+                  class="badge badge-ghost badge-sm capitalize"
+                >
+                  {membership.role}
+                </span>
+                <button
+                  :if={
+                    @can_manage? and is_nil(membership.disabled_at) and
+                      user.id != @current_scope.user.id
+                  }
+                  id={"m-disable-member-#{membership.id}"}
+                  type="button"
+                  phx-click="request_disable"
+                  phx-value-membership_id={membership.id}
+                  class="btn btn-ghost btn-xs text-error"
+                >
+                  Disable
+                </button>
+                <button
+                  :if={@can_manage? and membership.disabled_at}
+                  id={"m-enable-member-#{membership.id}"}
+                  type="button"
+                  phx-click="enable_member"
+                  phx-value-membership_id={membership.id}
+                  class="btn btn-ghost btn-xs text-success"
+                >
+                  Enable
+                </button>
+              </div>
             </li>
           </ul>
         </section>
@@ -120,6 +162,32 @@ defmodule ArgusWeb.MobileLive.Members do
             </li>
           </ul>
         </section>
+
+        <div :if={@disabling} id="m-disable-member-modal" class="modal modal-open">
+          <div class="modal-box">
+            <h3 class="text-lg font-semibold">Disable {@disabling.user.email}?</h3>
+            <p class="mt-2 text-sm text-base-content/70">
+              They lose access to {@current_scope.entity.name} and stop using a seat. You can re-enable them later.
+            </p>
+            <ul class="mt-3 list-inside list-disc text-sm text-base-content/80">
+              <li>{IndexHelpers.assignment_summary(@disabling.counts)} will be cleared</li>
+              <li>their live duties become unassigned for a manager to reassign</li>
+            </ul>
+            <div class="modal-action">
+              <button type="button" phx-click="cancel_disable" class="btn btn-ghost btn-sm">
+                Cancel
+              </button>
+              <button
+                type="button"
+                id="m-confirm-disable"
+                phx-click="confirm_disable"
+                class="btn btn-error btn-sm"
+              >
+                Disable
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </Layouts.mobile_app>
     """
@@ -143,5 +211,23 @@ defmodule ArgusWeb.MobileLive.Members do
     IndexHelpers.handle_invite(socket, params) |> IndexHelpers.handle_result()
   end
 
-  def handle_event("close_modal_on_escape", _params, socket), do: {:noreply, socket}
+  def handle_event("request_disable", params, socket) do
+    IndexHelpers.handle_request_disable(socket, params)
+  end
+
+  def handle_event("confirm_disable", _params, socket) do
+    IndexHelpers.handle_confirm_disable(socket)
+  end
+
+  def handle_event("cancel_disable", _params, socket) do
+    {:noreply, IndexHelpers.close_disable_modal(socket)}
+  end
+
+  def handle_event("enable_member", params, socket) do
+    IndexHelpers.handle_enable_member(socket, params)
+  end
+
+  def handle_event("close_modal_on_escape", _params, socket) do
+    {:noreply, IndexHelpers.close_disable_modal(socket)}
+  end
 end

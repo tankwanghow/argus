@@ -42,6 +42,47 @@ defmodule ArgusWeb.MembershipLiveTest do
     assert Entities.get_membership!(member, admin.entity).role == "manager"
   end
 
+  test "admin disables a member through the confirm modal", %{conn: conn} do
+    admin = Argus.EntitiesFixtures.entity_scope_fixture()
+    conn = log_in_user(conn, admin.user)
+    member = member_fixture(admin.entity)
+    membership = Entities.get_membership!(member, admin.entity)
+
+    {:ok, view, _html} = live(conn, ~p"/entities/#{admin.entity.slug}/members")
+
+    view |> element("#disable-member-#{membership.id}") |> render_click()
+    assert has_element?(view, "#disable-member-modal")
+
+    view |> element("#confirm-disable") |> render_click()
+
+    assert Entities.get_membership!(member, admin.entity).disabled_at
+    assert has_element?(view, "#enable-member-#{membership.id}")
+  end
+
+  test "admin re-enables a disabled member", %{conn: conn} do
+    admin = Argus.EntitiesFixtures.entity_scope_fixture()
+    conn = log_in_user(conn, admin.user)
+    member = member_fixture(admin.entity)
+    membership = Entities.get_membership!(member, admin.entity)
+    {:ok, _} = Entities.disable_member(admin, membership)
+
+    {:ok, view, _html} = live(conn, ~p"/entities/#{admin.entity.slug}/members")
+
+    view |> element("#enable-member-#{membership.id}") |> render_click()
+
+    refute Entities.get_membership!(member, admin.entity).disabled_at
+  end
+
+  test "an admin cannot disable themselves (no disable control on own row)", %{conn: conn} do
+    admin = Argus.EntitiesFixtures.entity_scope_fixture()
+    conn = log_in_user(conn, admin.user)
+    own = Entities.get_membership!(admin.user, admin.entity)
+
+    {:ok, view, _html} = live(conn, ~p"/entities/#{admin.entity.slug}/members")
+
+    refute has_element?(view, "#disable-member-#{own.id}")
+  end
+
   test "admin can revoke a pending invitation", %{conn: conn} do
     admin = Argus.EntitiesFixtures.entity_scope_fixture()
     conn = log_in_user(conn, admin.user)

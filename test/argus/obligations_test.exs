@@ -1140,4 +1140,53 @@ defmodule Argus.ObligationsTest do
                Obligations.mark_completed_in_error(member, done, %{reason: "x"})
     end
   end
+
+  describe "member assignment counts" do
+    test "count_member_assignments/2 counts live primary duties and collaborations" do
+      admin = entity_scope_fixture()
+      member = member_scope_on_entity(admin.entity)
+      type = type_fixture(admin.entity)
+
+      {:ok, _primary} =
+        Obligations.create_obligation(admin, %{
+          title: "Led duty",
+          obligation_type_id: type.id,
+          primary_assignee_id: member.user.id,
+          due_by: ~D[2026-06-15],
+          open_note: "opened"
+        })
+
+      {:ok, collab_duty} =
+        Obligations.create_obligation(admin, %{
+          title: "Collab duty",
+          obligation_type_id: type.id,
+          primary_assignee_id: nil,
+          due_by: ~D[2026-06-15],
+          open_note: "opened"
+        })
+
+      {:ok, _} = Obligations.update_collaborators(admin, collab_duty, [member.user.id])
+
+      assert %{primary: 1, collaborations: 1} =
+               Obligations.count_member_assignments(admin, member.user.id)
+    end
+
+    test "member_assignment_counts/1 returns a per-user map for the entity" do
+      admin = entity_scope_fixture()
+      member = member_scope_on_entity(admin.entity)
+      type = type_fixture(admin.entity)
+
+      {:ok, _} =
+        Obligations.create_obligation(admin, %{
+          title: "Led duty",
+          obligation_type_id: type.id,
+          primary_assignee_id: member.user.id,
+          due_by: ~D[2026-06-15],
+          open_note: "opened"
+        })
+
+      counts = Obligations.member_assignment_counts(admin.entity)
+      assert %{primary: 1, collaborations: 0} = counts[member.user.id]
+    end
+  end
 end
