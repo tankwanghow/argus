@@ -47,7 +47,7 @@ defmodule TugasWeb.DutyCalendar do
             :for={cell <- @grid.weeks |> List.flatten()}
             id={"calendar-day-#{cell.date}"}
             class={[
-              "bg-base-100 p-1 space-y-0.5",
+              "bg-base-100 p-1 space-y-0.5 min-w-0 overflow-hidden",
               cell_class(@mobile?),
               !cell.in_month? && "bg-base-200/40 text-base-content/40",
               cell.today? && "ring-2 ring-inset ring-primary/40"
@@ -180,9 +180,6 @@ defmodule TugasWeb.DutyCalendar do
       ]}
     >
       <span class={chip_title_class(@variant, @layout)}>{@row.duty.title}</span>
-      <span :if={@show_type?} class={chip_type_class(@variant, @layout)}>
-        {@row.duty.duty_type.name}
-      </span>
     </.link>
     """
   end
@@ -196,13 +193,14 @@ defmodule TugasWeb.DutyCalendar do
     <div id="someday-modal" class="modal modal-open">
       <div class="modal-box max-w-md">
         <h3 class="font-bold text-lg">Someday</h3>
-        <ul class="mt-3 space-y-1">
+        <ul class="mt-3 space-y-2 max-h-[70vh] overflow-y-auto">
           <li :for={row <- @rows}>
             <.duty_chip
               row={row}
               slug={@slug}
               variant={@variant}
               id_prefix="someday-modal-duty-chip"
+              layout={:list}
             />
           </li>
         </ul>
@@ -232,9 +230,15 @@ defmodule TugasWeb.DutyCalendar do
         <h3 class="font-bold text-lg">
           {Calendar.strftime(@date, "%A, %B %-d")}
         </h3>
-        <ul class="mt-3 space-y-1">
+        <ul class="mt-3 space-y-2 max-h-[70vh] overflow-y-auto">
           <li :for={row <- @rows}>
-            <.duty_chip row={row} slug={@slug} variant={@variant} id_prefix="day-modal-duty-chip" />
+            <.duty_chip
+              row={row}
+              slug={@slug}
+              variant={@variant}
+              id_prefix="day-modal-duty-chip"
+              layout={:list}
+            />
           </li>
         </ul>
         <div class="modal-action">
@@ -268,10 +272,8 @@ defmodule TugasWeb.DutyCalendar do
   defp chip_surface_class(_, _), do: "px-1.5 py-0.5 rounded hover:bg-base-200"
 
   defp chip_title_class(:mobile, :list), do: "font-medium block"
-  defp chip_title_class(_, _), do: "font-medium truncate"
-
-  defp chip_type_class(:mobile, :list), do: "text-sm text-base-content/50 block mt-0.5"
-  defp chip_type_class(_, _), do: "text-base-content/50 ml-1"
+  defp chip_title_class(_, :calendar), do: "font-medium block overflow-hidden whitespace-nowrap"
+  defp chip_title_class(_, _), do: "font-medium block truncate"
 
   defp chip_tier_border(:mobile, :list, tier), do: ["border-l-4", tier_border(tier)]
   defp chip_tier_border(_, _, tier), do: ["border-l-2", tier_border(tier)]
