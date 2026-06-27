@@ -14,8 +14,7 @@ defmodule TugasWeb.MobileLive.DutyForm do
     <Layouts.mobile_app
       flash={@flash}
       current_scope={@current_scope}
-      nav_context={:calendar}
-      nav_highlight={:new_duty}
+      nav_context={:other}
     >
       <div id="m-duty-form" class="p-4">
         <h1 class="text-lg font-semibold">New duty</h1>

@@ -11,17 +11,17 @@ defmodule TugasWeb.MobileLive.NavTest do
     conn |> log_in_user(scope.user) |> put_req_header("user-agent", @mobile_ua)
   end
 
-  test "calendar context shows five tabs", %{conn: conn} do
+  test "calendar context shows three tabs", %{conn: conn} do
     manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     conn = mobile_conn(conn, manager)
     slug = manager.entity.slug
 
     {:ok, view, _html} = live(conn, ~p"/m/#{slug}")
 
-    assert has_element?(view, "#m-nav-new-todo[href='/m/#{slug}/todos/new']")
     assert has_element?(view, "#m-nav-todos[href='/m/#{slug}/todos']")
-    assert has_element?(view, "#m-nav-new-duty[href='/m/#{slug}/duties/new']")
     assert has_element?(view, "#m-nav-duties[href='/m/#{slug}/duties']")
+    refute has_element?(view, "#m-nav-new-todo")
+    refute has_element?(view, "#m-nav-new-duty")
     refute has_element?(view, "#m-nav-calendar")
     assert has_element?(view, "#m-nav-more")
   end
@@ -34,6 +34,7 @@ defmodule TugasWeb.MobileLive.NavTest do
     {:ok, view, _html} = live(conn, ~p"/m/#{slug}/todos")
 
     refute has_element?(view, "#m-nav-todos")
+    assert has_element?(view, "#m-nav-new-todo[href='/m/#{slug}/todos/new']")
     assert has_element?(view, "#m-nav-duties[href='/m/#{slug}/duties']")
     assert has_element?(view, "#m-nav-calendar[href='/m/#{slug}']")
   end
@@ -46,7 +47,23 @@ defmodule TugasWeb.MobileLive.NavTest do
     {:ok, view, _html} = live(conn, ~p"/m/#{slug}/duties")
 
     refute has_element?(view, "#m-nav-duties")
+    assert has_element?(view, "#m-nav-new-duty[href='/m/#{slug}/duties/new']")
     assert has_element?(view, "#m-nav-todos[href='/m/#{slug}/todos']")
     assert has_element?(view, "#m-nav-calendar[href='/m/#{slug}']")
+  end
+
+  test "other context shows navigation tabs without create shortcuts", %{conn: conn} do
+    manager = Tugas.EntitiesFixtures.manager_scope_fixture()
+    conn = mobile_conn(conn, manager)
+    slug = manager.entity.slug
+
+    {:ok, view, _html} = live(conn, ~p"/m/#{slug}/duty-types")
+
+    assert has_element?(view, "#m-nav-todos[href='/m/#{slug}/todos']")
+    assert has_element?(view, "#m-nav-duties[href='/m/#{slug}/duties']")
+    assert has_element?(view, "#m-nav-calendar[href='/m/#{slug}']")
+    refute has_element?(view, "#m-nav-new-todo")
+    refute has_element?(view, "#m-nav-new-duty")
+    assert has_element?(view, "#m-nav-more")
   end
 end

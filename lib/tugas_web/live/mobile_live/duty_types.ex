@@ -9,7 +9,7 @@ defmodule TugasWeb.MobileLive.DutyTypes do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.mobile_app flash={@flash} current_scope={@current_scope} nav_context={:calendar}>
+    <Layouts.mobile_app flash={@flash} current_scope={@current_scope} nav_context={:other}>
       <div id="m-duty-types" class="p-4">
         <div class="flex items-center justify-between gap-2 mb-3">
           <div class="font-semibold text-xl">Duty types</div>

@@ -359,7 +359,7 @@ defmodule TugasWeb.Layouts do
 
   attr :nav_context, :atom,
     default: :calendar,
-    doc: "bottom-nav tab set: :calendar, :todos, or :duties"
+    doc: "bottom-nav tab set: :calendar, :todos, :duties, or :other"
 
   attr :nav_highlight, :atom, default: nil, doc: "optional active tab within the nav set"
 
@@ -388,9 +388,10 @@ defmodule TugasWeb.Layouts do
   end
 
   @mobile_nav_sets %{
-    calendar: [:new_todo, :todos, :new_duty, :duties, :more],
+    calendar: [:todos, :duties, :more],
     todos: [:new_todo, :duties, :calendar, :more],
-    duties: [:todos, :new_duty, :calendar, :more]
+    duties: [:new_duty, :todos, :calendar, :more],
+    other: [:todos, :duties, :calendar, :more]
   }
 
   attr :nav_context, :atom, required: true
@@ -463,6 +464,7 @@ defmodule TugasWeb.Layouts do
     """
   end
 
+  defp nav_grid_class(3), do: "grid-cols-3"
   defp nav_grid_class(4), do: "grid-cols-4"
   defp nav_grid_class(_), do: "grid-cols-5"
 

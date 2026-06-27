@@ -6,7 +6,7 @@ defmodule TugasWeb.MobileLive.TodoTeamLog do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.mobile_app flash={@flash} current_scope={@current_scope} nav_context={:calendar}>
+    <Layouts.mobile_app flash={@flash} current_scope={@current_scope} nav_context={:other}>
       <div id="m-todo-team-log-page" class="p-4">
         <div class="flex items-center justify-between gap-2 mb-3">
           <div class="font-semibold text-xl">Todo team log</div>

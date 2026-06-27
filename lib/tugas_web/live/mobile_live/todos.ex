@@ -11,7 +11,7 @@ defmodule TugasWeb.MobileLive.Todos do
     <Layouts.mobile_app
       flash={@flash}
       current_scope={@current_scope}
-      nav_context={if(@live_action == :new, do: :calendar, else: :todos)}
+      nav_context={:todos}
       nav_highlight={if(@live_action == :new, do: :new_todo, else: nil)}
     >
       <div id="m-todos-page" class="p-4" phx-hook="TodoHighlight" data-highlight-id={@highlight_id}>

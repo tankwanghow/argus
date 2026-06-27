@@ -6,7 +6,7 @@ defmodule TugasWeb.MobileLive.Members do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.mobile_app flash={@flash} current_scope={@current_scope} nav_context={:calendar}>
+    <Layouts.mobile_app flash={@flash} current_scope={@current_scope} nav_context={:other}>
       <div id="m-members" class="p-4 space-y-6">
         <div>
           <h1 class="font-semibold text-xl">Members</h1>

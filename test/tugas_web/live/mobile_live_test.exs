@@ -555,11 +555,11 @@ defmodule TugasWeb.MobileLiveTest do
            )
   end
 
-  test "mobile: bottom nav shows the New entry point for a manager", %{conn: conn} do
+  test "mobile: duties tab shows the New entry point for a manager", %{conn: conn} do
     manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     conn = mobile_conn(conn, manager)
 
-    {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}")
+    {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}/duties")
 
     assert has_element?(
              view,
