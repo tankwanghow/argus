@@ -1,4 +1,4 @@
-defmodule Argus.Repo.Migrations.CreateTodos do
+defmodule Tugas.Repo.Migrations.CreateTodos do
   use Ecto.Migration
 
   def change do

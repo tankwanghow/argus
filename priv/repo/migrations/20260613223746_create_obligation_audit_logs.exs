@@ -1,4 +1,4 @@
-defmodule Argus.Repo.Migrations.CreateObligationAuditLogs do
+defmodule Tugas.Repo.Migrations.CreateObligationAuditLogs do
   use Ecto.Migration
 
   def change do

@@ -12,7 +12,7 @@ RUN apt-get update -y && apt-get install -y \
     git \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app/argus
+WORKDIR /app/tugas
 
 RUN mix local.hex --force && mix local.rebar --force
 
@@ -21,24 +21,24 @@ ENV MIX_ENV="prod"
 COPY shared_config /app/shared_config
 COPY .global_assets /app/.global_assets
 
-COPY argus/mix.exs argus/mix.lock ./
+COPY tugas/mix.exs tugas/mix.lock ./
 RUN HEX_HTTP_CONCURRENCY=8 HEX_HTTP_TIMEOUT=240 mix deps.get --only $MIX_ENV
 RUN mkdir config
 
-COPY argus/config/config.exs argus/config/${MIX_ENV}.exs config/
+COPY tugas/config/config.exs tugas/config/${MIX_ENV}.exs config/
 RUN mix deps.compile
 
-COPY argus/priv priv
-COPY argus/lib lib
-COPY argus/assets assets
+COPY tugas/priv priv
+COPY tugas/lib lib
+COPY tugas/assets assets
 
 RUN mix assets.deploy
 
 RUN mix compile
 
-COPY argus/config/runtime.exs config/
+COPY tugas/config/runtime.exs config/
 
-COPY argus/rel rel
+COPY tugas/rel rel
 RUN mix release
 
 FROM ${RUNNER_IMAGE}
@@ -62,7 +62,7 @@ RUN chown nobody /app
 
 ENV MIX_ENV="prod"
 
-COPY --from=builder --chown=nobody:root /app/argus/_build/${MIX_ENV}/rel/argus ./
+COPY --from=builder --chown=nobody:root /app/tugas/_build/${MIX_ENV}/rel/tugas ./
 
 USER nobody
 

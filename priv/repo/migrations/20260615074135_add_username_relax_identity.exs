@@ -1,4 +1,4 @@
-defmodule Argus.Repo.Migrations.AddUsernameRelaxIdentity do
+defmodule Tugas.Repo.Migrations.AddUsernameRelaxIdentity do
   use Ecto.Migration
 
   def change do

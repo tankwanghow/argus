@@ -1,4 +1,4 @@
-defmodule Argus.Repo.Migrations.AddSoftDeleteToTodos do
+defmodule Tugas.Repo.Migrations.AddSoftDeleteToTodos do
   use Ecto.Migration
 
   def change do

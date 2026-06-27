@@ -1,13 +1,13 @@
 import Config
 
-config :argus, :uploads_dir, Path.expand("../priv/uploads", __DIR__)
+config :tugas, :uploads_dir, Path.expand("../priv/uploads", __DIR__)
 
 # Configure your database
-config :argus, Argus.Repo,
-  username: "argus",
+config :tugas, Tugas.Repo,
+  username: "tugas",
   password: "nyhlisted",
   hostname: "localhost",
-  database: "argus_dev",
+  database: "tugas_dev",
   stacktrace: true,
   show_sensitive_data_on_connection_error: true,
   pool_size: 10
@@ -18,7 +18,7 @@ config :argus, Argus.Repo,
 # The watchers configuration can be used to run external
 # watchers to your application. For example, we can use it
 # to bundle .js and .css sources.
-config :argus, ArgusWeb.Endpoint,
+config :tugas, TugasWeb.Endpoint,
   # Binding to loopback ipv4 address prevents access from other machines.
   # Change to `ip: {0, 0, 0, 0}` to allow access from other machines.
   http: [ip: {0, 0, 0, 0}],
@@ -27,8 +27,8 @@ config :argus, ArgusWeb.Endpoint,
   debug_errors: true,
   secret_key_base: "iIu5YsDXtoQsOGl/AtdYGNOlC8bYDf1X/poYwhTOjZPvEFRPUKp3pz/sBgtED84y",
   watchers: [
-    esbuild: {Esbuild, :install_and_run, [:argus, ~w(--sourcemap=inline --watch)]},
-    tailwind: {Tailwind, :install_and_run, [:argus, ~w(--watch)]}
+    esbuild: {Esbuild, :install_and_run, [:tugas, ~w(--sourcemap=inline --watch)]},
+    tailwind: {Tailwind, :install_and_run, [:tugas, ~w(--watch)]}
   ]
 
 # ## SSL Support
@@ -55,7 +55,7 @@ config :argus, ArgusWeb.Endpoint,
 # different ports.
 
 # Reload browser tabs when matching files change.
-config :argus, ArgusWeb.Endpoint,
+config :tugas, TugasWeb.Endpoint,
   live_reload: [
     web_console_logger: true,
     patterns: [
@@ -64,13 +64,13 @@ config :argus, ArgusWeb.Endpoint,
       # Gettext translations
       ~r"priv/gettext/.*\.po$"E,
       # Router, Controllers, LiveViews and LiveComponents
-      ~r"lib/argus_web/router\.ex$"E,
-      ~r"lib/argus_web/(controllers|live|components)/.*\.(ex|heex)$"E
+      ~r"lib/tugas_web/router\.ex$"E,
+      ~r"lib/tugas_web/(controllers|live|components)/.*\.(ex|heex)$"E
     ]
   ]
 
 # Enable dev routes for dashboard and mailbox
-config :argus, dev_routes: true
+config :tugas, dev_routes: true
 
 # Do not include metadata nor timestamps in development logs
 config :logger, :default_formatter, format: "[$level] $message\n"

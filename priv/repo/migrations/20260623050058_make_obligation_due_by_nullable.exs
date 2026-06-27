@@ -1,4 +1,4 @@
-defmodule Argus.Repo.Migrations.MakeObligationDueByNullable do
+defmodule Tugas.Repo.Migrations.MakeObligationDueByNullable do
   use Ecto.Migration
 
   def change do

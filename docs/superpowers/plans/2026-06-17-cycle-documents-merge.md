@@ -11,36 +11,36 @@
 ## Global Constraints
 
 - Unauthorized context calls return `:not_authorise` (never raise).
-- Uploads: single `:document` upload config per LiveView; `accept: :any`, `max_entries: ArgusWeb.LiveUpload.max_document_entries()`, `max_file_size: 20_000_000`, `auto_upload: true`. Only one Documents modal is open at a time, so both surfaces share that one config.
+- Uploads: single `:document` upload config per LiveView; `accept: :any`, `max_entries: TugasWeb.LiveUpload.max_document_entries()`, `max_file_size: 20_000_000`, `auto_upload: true`. Only one Documents modal is open at a time, so both surfaces share that one config.
 - Slots are immutable after upload; there is no Replace and no post-upload slot editing (already shipped). Do not reintroduce them.
 - A document is **required** iff its `document_slot` is in the obligation's **current snapshot** `complete_documents`; otherwise it is **other/supporting** (nil slot or stale slot). Classify at render time; never mutate document rows to reclassify.
 - Completion rules unchanged: a required slot is satisfied by one non-voided document with that slot name, counted cycle-wide.
 - `mix precommit` must pass before a task is considered done (it runs `compile --warnings-as-errors`, `deps.unlock --unused`, `format`, `test`).
-- Run from repo root `/home/tankwanghow/Projects/elixir/argus`. Work happens on branch `cycle-documents-merge`.
+- Run from repo root `/home/tankwanghow/Projects/elixir/tugas`. Work happens on branch `cycle-documents-merge`.
 
 ---
 
 ## File Structure
 
-- **Create** `lib/argus_web/components/obligation_completion_documents.ex` — Surface A component (cycle-level required slots + voided-required section + per-slot uploader for unsatisfied slots). Hosts the colocated `SlotFilePicker` hook.
-- **Create** `lib/argus_web/components/obligation_step_files.ex` — Surface B component (one event's live other files + voided-other + additional-file uploader).
-- **Modify** `lib/argus_web/live/obligation_live/document_helpers.ex` — add pure classification helpers.
-- **Modify** `lib/argus_web/live/obligation_live/show.ex` — desktop wiring: one cycle "Completion documents" button + modal (Surface A), per-event "Files" button + modal (Surface B), state, handlers, upload-target resolution.
-- **Modify** `lib/argus_web/live/mobile_live/obligation_show.ex` — mobile wiring mirroring desktop (id prefix `m-`).
-- **Modify** `lib/argus_web/controllers/document_controller.ex` — allow downloading voided files.
-- **Delete** `lib/argus_web/components/obligation_document_upload.ex`, `lib/argus_web/components/obligation_document_list.ex`.
-- **Tests** `test/argus_web/live/obligation_live/document_helpers_test.exs` (new), `test/argus_web/controllers/document_controller_test.exs` (extend), `test/argus_web/live/obligation_live_test.exs` (extend/migrate), `test/argus_web/live/mobile_live_test.exs` (extend).
+- **Create** `lib/tugas_web/components/obligation_completion_documents.ex` — Surface A component (cycle-level required slots + voided-required section + per-slot uploader for unsatisfied slots). Hosts the colocated `SlotFilePicker` hook.
+- **Create** `lib/tugas_web/components/obligation_step_files.ex` — Surface B component (one event's live other files + voided-other + additional-file uploader).
+- **Modify** `lib/tugas_web/live/obligation_live/document_helpers.ex` — add pure classification helpers.
+- **Modify** `lib/tugas_web/live/obligation_live/show.ex` — desktop wiring: one cycle "Completion documents" button + modal (Surface A), per-event "Files" button + modal (Surface B), state, handlers, upload-target resolution.
+- **Modify** `lib/tugas_web/live/mobile_live/obligation_show.ex` — mobile wiring mirroring desktop (id prefix `m-`).
+- **Modify** `lib/tugas_web/controllers/document_controller.ex` — allow downloading voided files.
+- **Delete** `lib/tugas_web/components/obligation_document_upload.ex`, `lib/tugas_web/components/obligation_document_list.ex`.
+- **Tests** `test/tugas_web/live/obligation_live/document_helpers_test.exs` (new), `test/tugas_web/controllers/document_controller_test.exs` (extend), `test/tugas_web/live/obligation_live_test.exs` (extend/migrate), `test/tugas_web/live/mobile_live_test.exs` (extend).
 
 ---
 
 ## Task 1: Document classification helpers
 
 **Files:**
-- Modify: `lib/argus_web/live/obligation_live/document_helpers.ex`
-- Test: `test/argus_web/live/obligation_live/document_helpers_test.exs` (create)
+- Modify: `lib/tugas_web/live/obligation_live/document_helpers.ex`
+- Test: `test/tugas_web/live/obligation_live/document_helpers_test.exs` (create)
 
 **Interfaces:**
-- Consumes: `Argus.Obligations.EventDocument` (`:document_slot`, `:voided_at`).
+- Consumes: `Tugas.Obligations.EventDocument` (`:document_slot`, `:voided_at`).
 - Produces:
   - `parse_slots(csv :: String.t() | nil) :: [String.t()]`
   - `completion_view(documents :: [EventDocument.t()], required_slots :: [String.t()]) :: {slot_rows, voided_required}` where `slot_rows :: [{String.t(), EventDocument.t() | nil}]` (one tuple per required slot, in given order; second element is the live file or `nil`), `voided_required :: [EventDocument.t()]`.
@@ -48,14 +48,14 @@
 
 - [ ] **Step 1: Write the failing test**
 
-Create `test/argus_web/live/obligation_live/document_helpers_test.exs`:
+Create `test/tugas_web/live/obligation_live/document_helpers_test.exs`:
 
 ```elixir
-defmodule ArgusWeb.ObligationLive.DocumentHelpersTest do
+defmodule TugasWeb.ObligationLive.DocumentHelpersTest do
   use ExUnit.Case, async: true
 
-  alias ArgusWeb.ObligationLive.DocumentHelpers, as: H
-  alias Argus.Obligations.EventDocument
+  alias TugasWeb.ObligationLive.DocumentHelpers, as: H
+  alias Tugas.Obligations.EventDocument
 
   defp doc(slot, voided? \\ false) do
     %EventDocument{
@@ -104,12 +104,12 @@ end
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `mix test test/argus_web/live/obligation_live/document_helpers_test.exs`
+Run: `mix test test/tugas_web/live/obligation_live/document_helpers_test.exs`
 Expected: FAIL — `function H.parse_slots/1 (or completion_view/2, step_files/2) is undefined`.
 
 - [ ] **Step 3: Write minimal implementation**
 
-In `lib/argus_web/live/obligation_live/document_helpers.ex`, add `alias Argus.Obligations.EventDocument` under the `@moduledoc` and append these functions (keep the existing `upload_event/1`):
+In `lib/tugas_web/live/obligation_live/document_helpers.ex`, add `alias Tugas.Obligations.EventDocument` under the `@moduledoc` and append these functions (keep the existing `upload_event/1`):
 
 ```elixir
   def parse_slots(nil), do: []
@@ -158,13 +158,13 @@ In `lib/argus_web/live/obligation_live/document_helpers.ex`, add `alias Argus.Ob
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `mix test test/argus_web/live/obligation_live/document_helpers_test.exs`
+Run: `mix test test/tugas_web/live/obligation_live/document_helpers_test.exs`
 Expected: PASS (3 tests).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add lib/argus_web/live/obligation_live/document_helpers.ex test/argus_web/live/obligation_live/document_helpers_test.exs
+git add lib/tugas_web/live/obligation_live/document_helpers.ex test/tugas_web/live/obligation_live/document_helpers_test.exs
 git commit -m "feat: document classification helpers for unified Documents view
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
@@ -175,45 +175,45 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ## Task 2: Allow downloading voided files
 
 **Files:**
-- Modify: `lib/argus_web/controllers/document_controller.ex:11-25`
-- Test: `test/argus_web/controllers/document_controller_test.exs`
+- Modify: `lib/tugas_web/controllers/document_controller.ex:11-25`
+- Test: `test/tugas_web/controllers/document_controller_test.exs`
 
 **Interfaces:**
-- Consumes: `Argus.Obligations.void_document/4` (existing), `Argus.Uploads.path/1` (existing).
+- Consumes: `Tugas.Obligations.void_document/4` (existing), `Tugas.Uploads.path/1` (existing).
 - Produces: `GET /entities/:entity_slug/obligations/:obligation_id/documents/:id` now serves a voided file (200) as long as the file exists on disk.
 
 - [ ] **Step 1: Write the failing test**
 
-Find the existing download test for context (`grep -n "send_download\|disposition\|defmodule" test/argus_web/controllers/document_controller_test.exs`). Add this test inside the module (use the file's existing setup/fixtures; adapt fixture names to those already used in that file):
+Find the existing download test for context (`grep -n "send_download\|disposition\|defmodule" test/tugas_web/controllers/document_controller_test.exs`). Add this test inside the module (use the file's existing setup/fixtures; adapt fixture names to those already used in that file):
 
 ```elixir
   test "serves a voided document so it can still be downloaded", %{conn: conn} do
-    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     conn = log_in_user(conn, manager.user)
-    type = Argus.ObligationsFixtures.type_fixture(manager.entity, complete_documents: "receipt")
+    type = Tugas.ObligationsFixtures.type_fixture(manager.entity, complete_documents: "receipt")
 
     {:ok, obligation} =
-      Argus.Obligations.create_obligation(manager, %{
+      Tugas.Obligations.create_obligation(manager, %{
         title: "EPF",
         obligation_type_id: type.id,
         due_by: ~D[2026-06-30],
         open_note: "open"
       })
 
-    event = hd(Argus.Obligations.list_events(obligation))
+    event = hd(Tugas.Obligations.list_events(obligation))
 
     {:ok, document} =
-      Argus.Obligations.add_document(
+      Tugas.Obligations.add_document(
         manager,
         obligation,
         event,
-        Argus.ObligationsFixtures.upload_fixture("receipt.pdf"),
+        Tugas.ObligationsFixtures.upload_fixture("receipt.pdf"),
         "receipt"
       )
 
     # Void it (admin, with reason).
     {:ok, _} =
-      Argus.Obligations.void_document(manager, obligation, document, %{reason: "wrong file"})
+      Tugas.Obligations.void_document(manager, obligation, document, %{reason: "wrong file"})
 
     conn =
       get(
@@ -227,12 +227,12 @@ Find the existing download test for context (`grep -n "send_download\|dispositio
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `mix test test/argus_web/controllers/document_controller_test.exs`
+Run: `mix test test/tugas_web/controllers/document_controller_test.exs`
 Expected: FAIL — the voided document returns 404 ("Not found"), so `conn.status` is 404, not 200.
 
 - [ ] **Step 3: Write minimal implementation**
 
-In `lib/argus_web/controllers/document_controller.ex`, change the guard in `show/2` to drop the voided check (keep the file-existence check):
+In `lib/tugas_web/controllers/document_controller.ex`, change the guard in `show/2` to drop the voided check (keep the file-existence check):
 
 ```elixir
     if File.exists?(Uploads.path(document)) do
@@ -247,13 +247,13 @@ In `lib/argus_web/controllers/document_controller.ex`, change the guard in `show
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `mix test test/argus_web/controllers/document_controller_test.exs`
+Run: `mix test test/tugas_web/controllers/document_controller_test.exs`
 Expected: PASS (all tests in the file).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add lib/argus_web/controllers/document_controller.ex test/argus_web/controllers/document_controller_test.exs
+git add lib/tugas_web/controllers/document_controller.ex test/tugas_web/controllers/document_controller_test.exs
 git commit -m "feat: allow downloading voided documents
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
@@ -264,23 +264,23 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ## Task 3: Surface A — Completion Documents (component + desktop wiring)
 
 **Files:**
-- Create: `lib/argus_web/components/obligation_completion_documents.ex`
-- Modify: `lib/argus_web/live/obligation_live/show.ex` (modal render ~338-378; mount assigns ~548-551; handlers for open/close/select/clear/add; `assign_obligation`; `open_documents_from_done`)
-- Test: `test/argus_web/live/obligation_live_test.exs`
+- Create: `lib/tugas_web/components/obligation_completion_documents.ex`
+- Modify: `lib/tugas_web/live/obligation_live/show.ex` (modal render ~338-378; mount assigns ~548-551; handlers for open/close/select/clear/add; `assign_obligation`; `open_documents_from_done`)
+- Test: `test/tugas_web/live/obligation_live_test.exs`
 
 **Interfaces:**
-- Consumes: `DocumentHelpers.completion_view/2`, `DocumentHelpers.parse_slots/1`, `DocumentHelpers.upload_event/1`; `Argus.Obligations.{add_document/5, delete_document/3, void_document/4, document_deletable?/3, document_voidable?/3, document_void_reason_required?/1}`; `ArgusWeb.LiveUpload`.
-- Produces (component): `ArgusWeb.ObligationCompletionDocuments.completion_documents/1` with assigns `obligation, current_scope, entity_slug, documents, required_slots, uploads, upload_slot_target, upload_slot_entries, uploadable?, voiding_document_id, void_reason_required?, id_prefix` (default `""`).
+- Consumes: `DocumentHelpers.completion_view/2`, `DocumentHelpers.parse_slots/1`, `DocumentHelpers.upload_event/1`; `Tugas.Obligations.{add_document/5, delete_document/3, void_document/4, document_deletable?/3, document_voidable?/3, document_void_reason_required?/1}`; `TugasWeb.LiveUpload`.
+- Produces (component): `TugasWeb.ObligationCompletionDocuments.completion_documents/1` with assigns `obligation, current_scope, entity_slug, documents, required_slots, uploads, upload_slot_target, upload_slot_entries, uploadable?, voiding_document_id, void_reason_required?, id_prefix` (default `""`).
 - Produces (LiveView events): `open_completion_modal`, `close_completion_modal`, `select_upload_slot` (`%{"slot" => slot}`), `clear_upload_slot` (`%{"slot" => slot}`), `validate_upload`, `add_document` (`%{"slot" => slot}` — no event_id; resolves workable event), `delete_document`, `void_document`, `confirm_void_document`, `cancel_void_document`.
 - Produces (LiveView assign): boolean `show_completion_modal`.
 
 - [ ] **Step 1: Write the failing test**
 
-Add to `test/argus_web/live/obligation_live_test.exs` (it already has `setup :register_and_log_in_user`, imports `Phoenix.LiveViewTest` and `Argus.ObligationsFixtures`, aliases `Argus.Obligations`):
+Add to `test/tugas_web/live/obligation_live_test.exs` (it already has `setup :register_and_log_in_user`, imports `Phoenix.LiveViewTest` and `Tugas.ObligationsFixtures`, aliases `Tugas.Obligations`):
 
 ```elixir
   test "completion modal: satisfied slot shows file, unsatisfied shows uploader", %{conn: conn} do
-    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     conn = log_in_user(conn, manager.user)
     member = member_fixture(manager.entity)
     type = type_fixture(manager.entity, complete_documents: "receipt,form")
@@ -327,7 +327,7 @@ Add to `test/argus_web/live/obligation_live_test.exs` (it already has `setup :re
   end
 
   test "completion modal: voided required file shows in voided section, downloadable", %{conn: conn} do
-    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     conn = log_in_user(conn, manager.user)
     type = type_fixture(manager.entity, complete_documents: "receipt")
 
@@ -355,15 +355,15 @@ Add to `test/argus_web/live/obligation_live_test.exs` (it already has `setup :re
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `mix test test/argus_web/live/obligation_live_test.exs -k "completion modal"` (or by line numbers).
+Run: `mix test test/tugas_web/live/obligation_live_test.exs -k "completion modal"` (or by line numbers).
 Expected: FAIL — `#open-completion-modal` element not found (button/modal don't exist yet).
 
 - [ ] **Step 3: Create the Surface A component**
 
-Create `lib/argus_web/components/obligation_completion_documents.ex`. Use the same daisyUI classes/idioms as the (to-be-deleted) `obligation_document_upload.ex` and `obligation_document_list.ex` for visual consistency; the structure, ids, and events below are required exactly.
+Create `lib/tugas_web/components/obligation_completion_documents.ex`. Use the same daisyUI classes/idioms as the (to-be-deleted) `obligation_document_upload.ex` and `obligation_document_list.ex` for visual consistency; the structure, ids, and events below are required exactly.
 
 ```elixir
-defmodule ArgusWeb.ObligationCompletionDocuments do
+defmodule TugasWeb.ObligationCompletionDocuments do
   @moduledoc """
   Cycle-level required completion documents: one row per required slot (live file
   inline, or an uploader if missing) plus a voided-required section. All file
@@ -371,10 +371,10 @@ defmodule ArgusWeb.ObligationCompletionDocuments do
   """
   use Phoenix.Component
 
-  import ArgusWeb.CoreComponents
+  import TugasWeb.CoreComponents
 
-  alias Argus.Obligations
-  alias ArgusWeb.LiveUpload
+  alias Tugas.Obligations
+  alias TugasWeb.LiveUpload
 
   attr :obligation, :map, required: true
   attr :current_scope, :map, required: true
@@ -391,7 +391,7 @@ defmodule ArgusWeb.ObligationCompletionDocuments do
 
   def completion_documents(assigns) do
     {slot_rows, voided} =
-      ArgusWeb.ObligationLive.DocumentHelpers.completion_view(
+      TugasWeb.ObligationLive.DocumentHelpers.completion_view(
         assigns.documents,
         assigns.required_slots
       )
@@ -408,7 +408,7 @@ defmodule ArgusWeb.ObligationCompletionDocuments do
         This obligation type has no required completion documents.
       </div>
 
-      <div class="argus-meta-label">Completion documents</div>
+      <div class="tugas-meta-label">Completion documents</div>
 
       <ul class="divide-y divide-base-300 rounded-box border border-base-300">
         <li
@@ -481,7 +481,7 @@ defmodule ArgusWeb.ObligationCompletionDocuments do
       </ul>
 
       <section :if={@voided != []} id={"#{@id_prefix}completion-voided"} class="space-y-1">
-        <div class="argus-meta-label">Voided required files</div>
+        <div class="tugas-meta-label">Voided required files</div>
         <ul class="divide-y divide-base-300 rounded-box border border-base-300">
           <li
             :for={doc <- @voided}
@@ -647,14 +647,14 @@ end
 
 - [ ] **Step 4: Wire Surface A into the desktop LiveView render**
 
-In `lib/argus_web/live/obligation_live/show.ex`:
+In `lib/tugas_web/live/obligation_live/show.ex`:
 
 (a) Add an import near the top with the other imports/aliases:
 ```elixir
-  import ArgusWeb.ObligationCompletionDocuments
+  import TugasWeb.ObligationCompletionDocuments
 ```
 
-(b) Replace the documents modal block (currently `lib/argus_web/live/obligation_live/show.ex:338-378`, the `<div :if={@documents_modal_event} ...>...</div>`) with the cycle completion modal:
+(b) Replace the documents modal block (currently `lib/tugas_web/live/obligation_live/show.ex:338-378`, the `<div :if={@documents_modal_event} ...>...</div>`) with the cycle completion modal:
 ```elixir
       <div :if={@show_completion_modal} id="completion-modal" class="modal modal-open">
         <div class="modal-box max-w-lg">
@@ -684,7 +684,7 @@ In `lib/argus_web/live/obligation_live/show.ex`:
       </div>
 ```
 
-(c) Add a "Completion documents" button to the obligation header/action area. Place it near the existing action buttons (e.g. just above the Timeline `<section class="argus-section">` at `:156`):
+(c) Add a "Completion documents" button to the obligation header/action area. Place it near the existing action buttons (e.g. just above the Timeline `<section class="tugas-section">` at `:156`):
 ```elixir
         <button
           id="open-completion-modal"
@@ -705,7 +705,7 @@ In `lib/argus_web/live/obligation_live/show.ex`:
 
 - [ ] **Step 5: Wire Surface A state + handlers**
 
-In `lib/argus_web/live/obligation_live/show.ex`:
+In `lib/tugas_web/live/obligation_live/show.ex`:
 
 (a) In `mount` (the assigns block around `:548-551`), replace
 ```elixir
@@ -729,7 +729,7 @@ with
      socket
      |> assign(:show_completion_modal, false)
      |> assign(:upload_slot_target, nil)
-     |> ArgusWeb.LiveUpload.clear_all_slot_entries()
+     |> TugasWeb.LiveUpload.clear_all_slot_entries()
      |> assign(:voiding_document_id, nil)}
   end
 ```
@@ -750,7 +750,7 @@ with
     obligation = socket.assigns.obligation
     slot = params["slot"]
     document_slot = if slot in [nil, "additional"], do: nil, else: slot
-    ref = Map.get(socket.assigns.upload_slot_entries, ArgusWeb.LiveUpload.slot_key(slot || "additional"))
+    ref = Map.get(socket.assigns.upload_slot_entries, TugasWeb.LiveUpload.slot_key(slot || "additional"))
 
     event =
       case params["event_id"] do
@@ -764,7 +764,7 @@ with
         {:ok, _document} ->
           {:noreply,
            socket
-           |> ArgusWeb.LiveUpload.clear_slot_entry(slot || "additional")
+           |> TugasWeb.LiveUpload.clear_slot_entry(slot || "additional")
            |> assign(:upload_slot_target, nil)
            |> reload()
            |> put_flash(:info, "Document added.")}
@@ -804,13 +804,13 @@ Note: `Event` is already aliased in this module; `consume_slot_upload/6`, `reloa
 
 - [ ] **Step 6: Run the tests to verify they pass**
 
-Run: `mix test test/argus_web/live/obligation_live_test.exs -k "completion modal"`
+Run: `mix test test/tugas_web/live/obligation_live_test.exs -k "completion modal"`
 Expected: PASS for the two new tests. (Other tests in the file may still reference removed per-event document ids — those are migrated in Task 6.)
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add lib/argus_web/components/obligation_completion_documents.ex lib/argus_web/live/obligation_live/show.ex test/argus_web/live/obligation_live_test.exs
+git add lib/tugas_web/components/obligation_completion_documents.ex lib/tugas_web/live/obligation_live/show.ex test/tugas_web/live/obligation_live_test.exs
 git commit -m "feat: cycle-level Completion Documents surface (desktop)
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
@@ -821,23 +821,23 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ## Task 4: Surface B — Step Files (component + desktop wiring)
 
 **Files:**
-- Create: `lib/argus_web/components/obligation_step_files.ex`
-- Modify: `lib/argus_web/live/obligation_live/show.ex` (timeline doc button ~171-180; add step-files modal; add open/close handlers + `step_files_modal_event_id` state; `add_document` already accepts `event_id`)
-- Test: `test/argus_web/live/obligation_live_test.exs`
+- Create: `lib/tugas_web/components/obligation_step_files.ex`
+- Modify: `lib/tugas_web/live/obligation_live/show.ex` (timeline doc button ~171-180; add step-files modal; add open/close handlers + `step_files_modal_event_id` state; `add_document` already accepts `event_id`)
+- Test: `test/tugas_web/live/obligation_live_test.exs`
 
 **Interfaces:**
-- Consumes: `DocumentHelpers.step_files/2`, `DocumentHelpers.parse_slots/1`; `Argus.Obligations.{document_deletable?/3, document_voidable?/3}`; `ArgusWeb.LiveUpload`.
-- Produces (component): `ArgusWeb.ObligationStepFiles.step_files/1` with assigns `event, obligation, current_scope, entity_slug, required_slots, uploads, upload_slot_target, upload_slot_entries, uploadable?, voiding_document_id, void_reason_required?, id_prefix`.
+- Consumes: `DocumentHelpers.step_files/2`, `DocumentHelpers.parse_slots/1`; `Tugas.Obligations.{document_deletable?/3, document_voidable?/3}`; `TugasWeb.LiveUpload`.
+- Produces (component): `TugasWeb.ObligationStepFiles.step_files/1` with assigns `event, obligation, current_scope, entity_slug, required_slots, uploads, upload_slot_target, upload_slot_entries, uploadable?, voiding_document_id, void_reason_required?, id_prefix`.
 - Produces (LiveView events): `open_step_files` (`%{"event_id" => id}`), `close_step_files`; reuses `add_document` (with `event_id` + `slot: "additional"`), `select_upload_slot`, `clear_upload_slot`, `validate_upload`, `delete_document`, `void_document`, `confirm_void_document`, `cancel_void_document`.
 - Produces (assign): `step_files_modal_event_id`.
 
 - [ ] **Step 1: Write the failing test**
 
-Add to `test/argus_web/live/obligation_live_test.exs`:
+Add to `test/tugas_web/live/obligation_live_test.exs`:
 
 ```elixir
   test "step files modal: additional (no-slot) file appears per step, not in completion view", %{conn: conn} do
-    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     conn = log_in_user(conn, manager.user)
     type = type_fixture(manager.entity, complete_documents: "receipt")
 
@@ -875,7 +875,7 @@ Add to `test/argus_web/live/obligation_live_test.exs`:
   end
 
   test "step files modal: voided other file shows in step voided area, downloadable", %{conn: conn} do
-    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     conn = log_in_user(conn, manager.user)
     type = type_fixture(manager.entity, complete_documents: "receipt")
 
@@ -903,25 +903,25 @@ Add to `test/argus_web/live/obligation_live_test.exs`:
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `mix test test/argus_web/live/obligation_live_test.exs -k "step files modal"`
+Run: `mix test test/tugas_web/live/obligation_live_test.exs -k "step files modal"`
 Expected: FAIL — `#step-files-btn-...` not found.
 
 - [ ] **Step 3: Create the Surface B component**
 
-Create `lib/argus_web/components/obligation_step_files.ex`:
+Create `lib/tugas_web/components/obligation_step_files.ex`:
 
 ```elixir
-defmodule ArgusWeb.ObligationStepFiles do
+defmodule TugasWeb.ObligationStepFiles do
   @moduledoc """
   Per-step supporting (non-required) files: this event's live "other" files and a
   voided-other area, plus an additional-file uploader when the step is uploadable.
   """
   use Phoenix.Component
 
-  import ArgusWeb.CoreComponents
+  import TugasWeb.CoreComponents
 
-  alias Argus.Obligations
-  alias ArgusWeb.LiveUpload
+  alias Tugas.Obligations
+  alias TugasWeb.LiveUpload
 
   attr :event, :map, required: true
   attr :obligation, :map, required: true
@@ -938,7 +938,7 @@ defmodule ArgusWeb.ObligationStepFiles do
 
   def step_files(assigns) do
     {live_other, voided_other} =
-      ArgusWeb.ObligationLive.DocumentHelpers.step_files(
+      TugasWeb.ObligationLive.DocumentHelpers.step_files(
         assigns.event.documents,
         assigns.required_slots
       )
@@ -951,7 +951,7 @@ defmodule ArgusWeb.ObligationStepFiles do
 
     ~H"""
     <section id={"#{@id_prefix}step-files-#{@event.id}"} class="space-y-3">
-      <div class="argus-meta-label">Supporting files</div>
+      <div class="tugas-meta-label">Supporting files</div>
 
       <p :if={@live_other == []} class="text-sm text-base-content/50">No supporting files on this step.</p>
       <ul :if={@live_other != []} class="divide-y divide-base-300 rounded-box border border-base-300">
@@ -1004,7 +1004,7 @@ defmodule ArgusWeb.ObligationStepFiles do
       </ul>
 
       <section :if={@voided_other != []} id={"#{@id_prefix}step-voided-#{@event.id}"} class="space-y-1">
-        <div class="argus-meta-label">Voided files</div>
+        <div class="tugas-meta-label">Voided files</div>
         <ul class="divide-y divide-base-300 rounded-box border border-base-300">
           <li :for={doc <- @voided_other} id={"#{@id_prefix}voided-doc-#{doc.id}"} class="px-2.5 py-2 text-sm">
             <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -1143,11 +1143,11 @@ end
 
 - [ ] **Step 4: Wire Surface B into the desktop LiveView**
 
-In `lib/argus_web/live/obligation_live/show.ex`:
+In `lib/tugas_web/live/obligation_live/show.ex`:
 
 (a) Add import:
 ```elixir
-  import ArgusWeb.ObligationStepFiles
+  import TugasWeb.ObligationStepFiles
 ```
 
 (b) Replace the timeline "Docs" button (`:171-180`) with a Files button keyed to the event:
@@ -1229,7 +1229,7 @@ Add the helper near `cycle_documents/1`:
      |> assign(:step_files_modal_event_id, nil)
      |> assign(:step_files_modal_event, nil)
      |> assign(:upload_slot_target, nil)
-     |> ArgusWeb.LiveUpload.clear_all_slot_entries()
+     |> TugasWeb.LiveUpload.clear_all_slot_entries()
      |> assign(:voiding_document_id, nil)}
   end
 ```
@@ -1255,13 +1255,13 @@ Add the helper near `cycle_documents/1`:
 
 - [ ] **Step 5: Run the tests to verify they pass**
 
-Run: `mix test test/argus_web/live/obligation_live_test.exs -k "step files modal"`
+Run: `mix test test/tugas_web/live/obligation_live_test.exs -k "step files modal"`
 Expected: PASS (2 tests).
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add lib/argus_web/components/obligation_step_files.ex lib/argus_web/live/obligation_live/show.ex test/argus_web/live/obligation_live_test.exs
+git add lib/tugas_web/components/obligation_step_files.ex lib/tugas_web/live/obligation_live/show.ex test/tugas_web/live/obligation_live_test.exs
 git commit -m "feat: per-step Step Files surface (desktop)
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
@@ -1272,20 +1272,20 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ## Task 5: Type-slot-change reclassification (integration test)
 
 **Files:**
-- Test: `test/argus_web/live/obligation_live_test.exs`
+- Test: `test/tugas_web/live/obligation_live_test.exs`
 
 **Interfaces:**
-- Consumes: `Argus.Obligations.update_type/3` (existing propagation), the Surface A/B wiring from Tasks 3–4.
+- Consumes: `Tugas.Obligations.update_type/3` (existing propagation), the Surface A/B wiring from Tasks 3–4.
 
 This task adds no production code — it verifies the spec's reclassification requirement holds end-to-end with the new surfaces. If it fails, the bug is in the surfaces' classification consumption (fix there).
 
 - [ ] **Step 1: Write the test**
 
-Add to `test/argus_web/live/obligation_live_test.exs`:
+Add to `test/tugas_web/live/obligation_live_test.exs`:
 
 ```elixir
   test "removing a required slot reclassifies a live obligation's file as supporting", %{conn: conn} do
-    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     conn = log_in_user(conn, manager.user)
     type = type_fixture(manager.entity, complete_documents: "receipt")
 
@@ -1325,13 +1325,13 @@ Note: `#close-completion-modal` is the modal's Close button — add `id="close-c
 
 - [ ] **Step 2: Run the test**
 
-Run: `mix test test/argus_web/live/obligation_live_test.exs -k "reclassifies"`
+Run: `mix test test/tugas_web/live/obligation_live_test.exs -k "reclassifies"`
 Expected: PASS. If `#close-completion-modal` isn't found, add the id to the Close button and re-run.
 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add test/argus_web/live/obligation_live_test.exs lib/argus_web/live/obligation_live/show.ex
+git add test/tugas_web/live/obligation_live_test.exs lib/tugas_web/live/obligation_live/show.ex
 git commit -m "test: type slot removal reclassifies live file as supporting
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
@@ -1342,8 +1342,8 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ## Task 6: Mobile wiring (Surfaces A + B)
 
 **Files:**
-- Modify: `lib/argus_web/live/mobile_live/obligation_show.ex`
-- Test: `test/argus_web/live/mobile_live_test.exs`
+- Modify: `lib/tugas_web/live/mobile_live/obligation_show.ex`
+- Test: `test/tugas_web/live/mobile_live_test.exs`
 
 **Interfaces:**
 - Consumes: both new components with `id_prefix="m-"`; the same events as desktop (the mobile LiveView already defines parallel handlers for `validate_upload`, `clear_upload_slot`, `delete_document`, `void_document`, `confirm_void_document`, `cancel_void_document`).
@@ -1351,11 +1351,11 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 - [ ] **Step 1: Write the failing test**
 
-Inspect the mobile test file header (`sed -n '1,20p' test/argus_web/live/mobile_live_test.exs`) for its login/fixture helpers and the mobile route prefix (`/m/:entity_slug/...`). Add:
+Inspect the mobile test file header (`sed -n '1,20p' test/tugas_web/live/mobile_live_test.exs`) for its login/fixture helpers and the mobile route prefix (`/m/:entity_slug/...`). Add:
 
 ```elixir
   test "mobile completion modal uploads into a slot", %{conn: conn} do
-    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     conn = log_in_user(conn, manager.user)
     type = type_fixture(manager.entity, complete_documents: "receipt")
 
@@ -1389,13 +1389,13 @@ Inspect the mobile test file header (`sed -n '1,20p' test/argus_web/live/mobile_
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `mix test test/argus_web/live/mobile_live_test.exs -k "mobile completion modal"`
+Run: `mix test test/tugas_web/live/mobile_live_test.exs -k "mobile completion modal"`
 Expected: FAIL — `#m-open-completion-modal` not found.
 
 - [ ] **Step 3: Apply the desktop changes to the mobile LiveView**
 
-Mirror Task 3 Steps 4–5 and Task 4 Step 4 in `lib/argus_web/live/mobile_live/obligation_show.ex`, with `id_prefix="m-"` passed to both components and `m-` prepended to the modal/button ids. Concretely:
-- Add `import ArgusWeb.ObligationCompletionDocuments` and `import ArgusWeb.ObligationStepFiles`.
+Mirror Task 3 Steps 4–5 and Task 4 Step 4 in `lib/tugas_web/live/mobile_live/obligation_show.ex`, with `id_prefix="m-"` passed to both components and `m-` prepended to the modal/button ids. Concretely:
+- Add `import TugasWeb.ObligationCompletionDocuments` and `import TugasWeb.ObligationStepFiles`.
 - Replace the existing per-event documents modal/button with a `m-open-completion-modal` button + `<.completion_documents id_prefix="m-" ...>` modal, and `m-step-files-btn-#{event.id}` buttons + `<.step_files id_prefix="m-" ...>` modal.
 - Replace mount assigns `documents_modal_event_id/documents_modal_event` with `show_completion_modal` (false) and `step_files_modal_event_id/step_files_modal_event` (nil).
 - Replace `open_documents_modal`/`close_documents_modal` with `open_completion_modal`/`close_completion_modal` and add `open_step_files`/`close_step_files` (same bodies as desktop).
@@ -1407,13 +1407,13 @@ Use the desktop `show.ex` (post Tasks 3–4) as the reference implementation for
 
 - [ ] **Step 4: Run the test to verify it passes**
 
-Run: `mix test test/argus_web/live/mobile_live_test.exs -k "mobile completion modal"`
+Run: `mix test test/tugas_web/live/mobile_live_test.exs -k "mobile completion modal"`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add lib/argus_web/live/mobile_live/obligation_show.ex test/argus_web/live/mobile_live_test.exs
+git add lib/tugas_web/live/mobile_live/obligation_show.ex test/tugas_web/live/mobile_live_test.exs
 git commit -m "feat: unified Documents surfaces (mobile)
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
@@ -1424,9 +1424,9 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ## Task 7: Delete old components, migrate tests, full precommit
 
 **Files:**
-- Delete: `lib/argus_web/components/obligation_document_upload.ex`, `lib/argus_web/components/obligation_document_list.ex`
-- Modify: `lib/argus_web/live/obligation_live/show.ex`, `lib/argus_web/live/mobile_live/obligation_show.ex` (remove now-dead imports/handlers/assigns/helpers)
-- Modify: `test/argus_web/live/obligation_live_test.exs`, `test/argus_web/live/mobile_live_test.exs` (migrate tests still using old ids)
+- Delete: `lib/tugas_web/components/obligation_document_upload.ex`, `lib/tugas_web/components/obligation_document_list.ex`
+- Modify: `lib/tugas_web/live/obligation_live/show.ex`, `lib/tugas_web/live/mobile_live/obligation_show.ex` (remove now-dead imports/handlers/assigns/helpers)
+- Modify: `test/tugas_web/live/obligation_live_test.exs`, `test/tugas_web/live/mobile_live_test.exs` (migrate tests still using old ids)
 
 **Interfaces:**
 - Consumes: nothing new.
@@ -1434,7 +1434,7 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 - [ ] **Step 1: Remove old component imports/usages and dead LiveView code**
 
-In both LiveViews, remove `import ArgusWeb.ObligationDocumentUpload` / `import ArgusWeb.ObligationDocumentList` if present, and delete any handlers/assigns no longer referenced: the old `documents_modal_event_id`/`documents_modal_event` assigns and any `reopen_documents_modal/2`, `find_event_document/3` usages that are now unused. Verify with:
+In both LiveViews, remove `import TugasWeb.ObligationDocumentUpload` / `import TugasWeb.ObligationDocumentList` if present, and delete any handlers/assigns no longer referenced: the old `documents_modal_event_id`/`documents_modal_event` assigns and any `reopen_documents_modal/2`, `find_event_document/3` usages that are now unused. Verify with:
 ```bash
 grep -rn "ObligationDocumentUpload\|ObligationDocumentList\|documents_modal_event\|reopen_documents_modal\|open_documents_modal\|close_documents_modal" lib/
 ```
@@ -1443,7 +1443,7 @@ Expected after edits: no matches (or only definitions you then remove).
 - [ ] **Step 2: Delete the old components**
 
 ```bash
-git rm lib/argus_web/components/obligation_document_upload.ex lib/argus_web/components/obligation_document_list.ex
+git rm lib/tugas_web/components/obligation_document_upload.ex lib/tugas_web/components/obligation_document_list.ex
 ```
 
 - [ ] **Step 3: Compile and fix references**

@@ -12,7 +12,7 @@
 //   4. refreshes the LiveView (or reloads) once the file is saved.
 //
 // Size limits are still enforced authoritatively server-side; this is the fast
-// path. See ArgusWeb.DocumentController.create/2.
+// path. See TugasWeb.DocumentController.create/2.
 import {
   persistUploadError,
   clearUploadError,

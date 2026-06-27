@@ -1,3 +1,3 @@
 ExUnit.start()
-Ecto.Adapters.SQL.Sandbox.mode(Argus.Repo, :manual)
-ArgusWeb.DashboardFilter.Store.init()
+Ecto.Adapters.SQL.Sandbox.mode(Tugas.Repo, :manual)
+TugasWeb.DashboardFilter.Store.init()

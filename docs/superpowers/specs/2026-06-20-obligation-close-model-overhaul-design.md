@@ -2,7 +2,7 @@
 
 **Status:** approved design, pre-implementation
 **Date:** 2026-06-20
-**Context:** Argus is not yet deployed, so the schema may be changed freely (no
+**Context:** Tugas is not yet deployed, so the schema may be changed freely (no
 backward-compat / data-migration constraints). See `[[breaking-changes-ok-predeploy]]`.
 
 ## Problem
@@ -39,7 +39,7 @@ write `status: "cancelled"` plus a `cancelled` event. As a result:
 
 ## Data model
 
-`Argus.Obligations.Obligation`:
+`Tugas.Obligations.Obligation`:
 
 | Column | Set by | Meaning |
 |--------|--------|---------|

@@ -1,4 +1,4 @@
-defmodule Argus.Repo.Migrations.AddCompletedInErrorToObligations do
+defmodule Tugas.Repo.Migrations.AddCompletedInErrorToObligations do
   use Ecto.Migration
 
   def change do

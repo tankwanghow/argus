@@ -1,4 +1,4 @@
-defmodule Argus.Repo.Migrations.CreateObligationTypes do
+defmodule Tugas.Repo.Migrations.CreateObligationTypes do
   use Ecto.Migration
 
   def change do

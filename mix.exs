@@ -1,9 +1,9 @@
-defmodule Argus.MixProject do
+defmodule Tugas.MixProject do
   use Mix.Project
 
   def project do
     [
-      app: :argus,
+      app: :tugas,
       version: "0.1.0",
       elixir: "~> 1.19",
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -20,7 +20,7 @@ defmodule Argus.MixProject do
   # Type `mix help compile.app` for more information.
   def application do
     [
-      mod: {Argus.Application, []},
+      mod: {Tugas.Application, []},
       extra_applications: [:logger, :runtime_tools]
     ]
   end
@@ -79,11 +79,11 @@ defmodule Argus.MixProject do
       "ecto.reset": ["ecto.drop", "ecto.setup"],
       test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],
       "assets.setup": assets_setup_tasks(),
-      "assets.build": ["compile", "tailwind argus", "esbuild argus"],
+      "assets.build": ["compile", "tailwind tugas", "esbuild tugas"],
       "assets.deploy": [
         "compile",
-        "tailwind argus --minify",
-        "esbuild argus --minify",
+        "tailwind tugas --minify",
+        "esbuild tugas --minify",
         "phx.digest"
       ],
       precommit: ["compile --warnings-as-errors", "deps.unlock --unused", "format", "test"]

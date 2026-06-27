@@ -4,7 +4,7 @@
 @import "tailwindcss" source(none);
 @source "../css";
 @source "../js";
-@source "../../lib/argus_web";
+@source "../../lib/tugas_web";
 
 /* A Tailwind plugin that makes "hero-#{ICON}" classes available.
    The heroicons installation itself is managed by your mix.exs */
@@ -105,13 +105,13 @@
 /* This file is for your main application CSS */
 
 /* App shell — muted canvas; elevated surfaces use base-100 */
-.argus-app {
+.tugas-app {
   font-family: "Source Sans 3", ui-sans-serif, system-ui, sans-serif;
   background-color: var(--color-base-200);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.025'/%3E%3C/svg%3E");
 }
 
-[data-theme=dark] .argus-app {
+[data-theme=dark] .tugas-app {
   background-color: var(--color-base-100);
   background-image:
     radial-gradient(ellipse 100% 60% at 50% 0%, oklch(30% 0.04 55 / 0.35), transparent 55%),
@@ -119,7 +119,7 @@
 }
 
 /* Page structure: toolbar (controls) vs body (content sections) */
-.argus-page-toolbar {
+.tugas-page-toolbar {
   background: var(--color-base-100);
   border: 1px solid var(--color-base-300);
   border-radius: var(--radius-box);
@@ -127,17 +127,17 @@
   box-shadow: 0 1px 2px oklch(0% 0 0 / 0.05);
 }
 
-.argus-page-toolbar .header,
-.argus-page-toolbar header {
+.tugas-page-toolbar .header,
+.tugas-page-toolbar header {
   padding-bottom: 0;
 }
 
-.argus-page-body {
+.tugas-page-body {
   margin-top: 0.75rem;
 }
 
 /* Compact summary — title, meta, and actions in one scan path */
-.argus-workbench {
+.tugas-workbench {
   background: var(--color-base-100);
   border: 1px solid var(--color-base-300);
   border-radius: var(--radius-box);
@@ -146,7 +146,7 @@
 }
 
 /* Obligation show header — larger type; timeline stays compact */
-.argus-obligation-summary {
+.tugas-obligation-summary {
   font-size: 1rem;
   padding: 1.125rem 1.25rem;
   background: color-mix(in oklch, var(--color-base-100) 90%, white);
@@ -154,41 +154,41 @@
   box-shadow: 0 1px 3px oklch(0% 0 0 / 0.07);
 }
 
-.argus-obligation-summary h1 {
+.tugas-obligation-summary h1 {
   font-size: 1.375rem;
   line-height: 1.25;
 }
 
-.argus-obligation-summary #obligation-meta {
+.tugas-obligation-summary #obligation-meta {
   font-size: 1rem;
 }
 
-.argus-obligation-summary .argus-meta-label {
+.tugas-obligation-summary .tugas-meta-label {
   font-size: 0.75rem;
 }
 
-.argus-obligation-summary .badge {
+.tugas-obligation-summary .badge {
   font-size: 0.875rem;
   height: auto;
   min-height: 1.75rem;
 }
 
-.argus-obligation-summary .text-sm {
+.tugas-obligation-summary .text-sm {
   font-size: 1rem;
 }
 
-.argus-obligation-summary .text-xs {
+.tugas-obligation-summary .text-xs {
   font-size: 0.875rem;
 }
 
-.argus-inline-actions {
+.tugas-inline-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.375rem;
 }
 
-.argus-meta-label {
+.tugas-meta-label {
   font-size: 0.6875rem;
   font-weight: 600;
   letter-spacing: 0.05em;
@@ -197,26 +197,26 @@
   margin-right: 0.25rem;
 }
 
-.argus-event-row {
+.tugas-event-row {
   padding: 0.75rem 0.875rem;
 }
 
-.argus-event-row + .argus-event-row {
+.tugas-event-row + .tugas-event-row {
   border-top: 1px solid var(--color-base-300);
 }
 
-.argus-event-head {
+.tugas-event-head {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.375rem 0.5rem;
 }
 
-.argus-event-note-block {
+.tugas-event-note-block {
   margin-top: 0.625rem;
 }
 
-.argus-event-note {
+.tugas-event-note {
   margin-top: 0.375rem;
   padding: 0.75rem 0.875rem;
   font-size: 0.9375rem;
@@ -228,7 +228,7 @@
   white-space: pre-wrap;
 }
 
-.argus-event-note-empty {
+.tugas-event-note-empty {
   font-size: 0.875rem;
   line-height: 1.45;
   color: color-mix(in oklch, var(--color-base-content) 50%, transparent);
@@ -237,7 +237,7 @@
   border-style: dashed;
 }
 
-.argus-event-attachments {
+.tugas-event-attachments {
   margin-top: 0.625rem;
   padding-top: 0.625rem;
   border-top: 1px solid color-mix(in oklch, var(--color-base-300) 70%, transparent);
@@ -250,7 +250,7 @@
   font-size: 0.8125rem;
 }
 
-.argus-event-attachment-chip {
+.tugas-event-attachment-chip {
   display: inline-flex;
   flex-wrap: nowrap;
   align-items: center;
@@ -264,18 +264,18 @@
   box-shadow: 0 1px 2px oklch(0% 0 0 / 0.04);
 }
 
-.argus-compact-row {
+.tugas-compact-row {
   display: block;
   padding: 0.625rem 0.875rem;
   border-left-width: 4px;
   transition: background-color 0.15s ease;
 }
 
-.argus-compact-row:hover {
+.tugas-compact-row:hover {
   background: color-mix(in oklch, var(--color-base-200) 45%, transparent);
 }
 
-.argus-section {
+.tugas-section {
   background: var(--color-base-100);
   border: 1px solid var(--color-base-300);
   border-radius: var(--radius-box);
@@ -283,7 +283,7 @@
   overflow: hidden;
 }
 
-.argus-section-head {
+.tugas-section-head {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -296,24 +296,24 @@
   text-transform: uppercase;
 }
 
-.argus-section-head button {
+.tugas-section-head button {
   width: 100%;
 }
 
-.argus-row-list li + li {
+.tugas-row-list li + li {
   border-top: 1px solid var(--color-base-300);
 }
 
-.argus-row-list a:hover,
-.argus-row-list button:hover {
+.tugas-row-list a:hover,
+.tugas-row-list button:hover {
   background: color-mix(in oklch, var(--color-base-200) 50%, transparent);
 }
 
 /* ─────────────────────────────  Landing page  ─────────────────────────────
    Self-contained editorial "night-watch" aesthetic for the logged-out marketing
-   page. Scoped under .argus-landing so none of it leaks into the app UI, and it
+   page. Scoped under .tugas-landing so none of it leaks into the app UI, and it
    renders identically regardless of the active daisyUI theme. */
-.argus-landing {
+.tugas-landing {
   --night: #070a14;
   --night-2: #0d1224;
   --line: #1d2640;
@@ -327,13 +327,13 @@
   font-feature-settings: "ss01";
 }
 
-.argus-landing .font-display {
+.tugas-landing .font-display {
   font-family: ui-serif, "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
   letter-spacing: -0.025em;
   font-weight: 600;
 }
 
-.argus-hero {
+.tugas-hero {
   position: relative;
   isolation: isolate;
   background:
@@ -343,7 +343,7 @@
 }
 
 /* Faint topographic grid + film grain for depth */
-.argus-grid::before {
+.tugas-grid::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -355,7 +355,7 @@
   mask-image: radial-gradient(120% 90% at 50% 0%, #000 35%, transparent 78%);
 }
 
-.argus-grain::after {
+.tugas-grain::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -367,47 +367,47 @@
 }
 
 /* The watching eye — concentric radar rings */
-@keyframes argus-ring {
+@keyframes tugas-ring {
   0%   { transform: scale(0.45); opacity: 0.65; }
   100% { transform: scale(1.9); opacity: 0; }
 }
-.argus-ring {
+.tugas-ring {
   transform-origin: center;
-  animation: argus-ring 4.5s ease-out infinite;
+  animation: tugas-ring 4.5s ease-out infinite;
 }
 
-@keyframes argus-sweep {
+@keyframes tugas-sweep {
   to { transform: rotate(360deg); }
 }
-.argus-sweep {
-  animation: argus-sweep 7s linear infinite;
+.tugas-sweep {
+  animation: tugas-sweep 7s linear infinite;
   transform-origin: center;
 }
 
-@keyframes argus-float {
+@keyframes tugas-float {
   0%, 100% { transform: translateY(0); }
   50%      { transform: translateY(-12px); }
 }
-.argus-float { animation: argus-float 7s ease-in-out infinite; }
+.tugas-float { animation: tugas-float 7s ease-in-out infinite; }
 
 /* Staggered page-load reveal */
-@keyframes argus-rise {
+@keyframes tugas-rise {
   from { opacity: 0; transform: translateY(20px); }
   to   { opacity: 1; transform: none; }
 }
-.argus-reveal {
+.tugas-reveal {
   opacity: 0;
-  animation: argus-rise 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+  animation: tugas-rise 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
 }
 
-.argus-underline {
+.tugas-underline {
   background-image: linear-gradient(var(--amber), var(--amber));
   background-size: 0% 2px;
   background-position: 0 100%;
   background-repeat: no-repeat;
   transition: background-size 0.3s ease;
 }
-.argus-underline:hover { background-size: 100% 2px; }
+.tugas-underline:hover { background-size: 100% 2px; }
 
 /* Todo row action highlights — delay lets the row paint before the flash starts */
 @keyframes todo-row-created {
@@ -521,7 +521,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .argus-ring, .argus-sweep, .argus-float, .argus-reveal {
+  .tugas-ring, .tugas-sweep, .tugas-float, .tugas-reveal {
     animation: none;
     opacity: 1;
   }
@@ -544,14 +544,14 @@
 }
 
 /* Scoped, collision-free palette helpers used by the landing markup */
-.argus-landing .c-amber { color: var(--amber); }
-.argus-landing .c-watch { color: var(--watch); }
-.argus-landing .c-slate { color: var(--slate); }
-.argus-landing .c-dim   { color: rgba(234, 237, 246, 0.72); }
-.argus-landing .c-night { color: var(--night); }
-.argus-landing .bg-ink2 { background: var(--night-2); }
-.argus-landing .bg-glass { background: rgba(255, 255, 255, 0.035); }
-.argus-landing .bg-amber { background: var(--amber); }
-.argus-landing .bg-paper { background: var(--paper); }
-.argus-landing .b-line  { border-color: var(--line); }
-.argus-landing .b-amber { border-color: rgba(245, 165, 36, 0.45); }
+.tugas-landing .c-amber { color: var(--amber); }
+.tugas-landing .c-watch { color: var(--watch); }
+.tugas-landing .c-slate { color: var(--slate); }
+.tugas-landing .c-dim   { color: rgba(234, 237, 246, 0.72); }
+.tugas-landing .c-night { color: var(--night); }
+.tugas-landing .bg-ink2 { background: var(--night-2); }
+.tugas-landing .bg-glass { background: rgba(255, 255, 255, 0.035); }
+.tugas-landing .bg-amber { background: var(--amber); }
+.tugas-landing .bg-paper { background: var(--paper); }
+.tugas-landing .b-line  { border-color: var(--line); }
+.tugas-landing .b-amber { border-color: rgba(245, 165, 36, 0.45); }

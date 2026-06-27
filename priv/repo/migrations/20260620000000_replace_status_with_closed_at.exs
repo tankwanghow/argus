@@ -1,4 +1,4 @@
-defmodule Argus.Repo.Migrations.ReplaceStatusWithClosedAt do
+defmodule Tugas.Repo.Migrations.ReplaceStatusWithClosedAt do
   use Ecto.Migration
 
   def up do

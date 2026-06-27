@@ -1,4 +1,4 @@
-defmodule Argus.Repo.Migrations.AddTodoCancelAndEscalation do
+defmodule Tugas.Repo.Migrations.AddTodoCancelAndEscalation do
   use Ecto.Migration
 
   def change do

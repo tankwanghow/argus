@@ -10,9 +10,9 @@
 
 ## Global Constraints
 
-- Argus is **not deployed**; schema may be changed freely. No data migration needed (dev/test DBs are recreated). See `docs/superpowers/specs/2026-06-20-obligation-close-model-overhaul-design.md`.
-- **binary_id (UUID) PKs everywhere** via `use Argus.Schema`.
-- Contexts own domain logic; LiveViews call `Argus.Obligations`/`Argus.Authorization`, never `Repo`. Unauthorized mutations return **`:not_authorise`**.
+- Tugas is **not deployed**; schema may be changed freely. No data migration needed (dev/test DBs are recreated). See `docs/superpowers/specs/2026-06-20-obligation-close-model-overhaul-design.md`.
+- **binary_id (UUID) PKs everywhere** via `use Tugas.Schema`.
+- Contexts own domain logic; LiveViews call `Tugas.Obligations`/`Tugas.Authorization`, never `Repo`. Unauthorized mutations return **`:not_authorise`**.
 - Multi-step writes use `Ecto.Multi`. The liveness guard is a conditional `update_all ... WHERE live` returning 0 rows ⇒ `{:error, :not_live}`.
 - Every state transition **requires a note** (`validate_action_note`).
 - TDD: write the failing test, watch it fail, implement, watch it pass, commit. Run `mix precommit` before declaring a task done.
@@ -23,22 +23,22 @@
 ### Task 1: Add `skipped` & `series_ended` event statuses; centralize terminal statuses
 
 **Files:**
-- Modify: `lib/argus/obligations/event.ex`
-- Modify: `lib/argus/obligations.ex` (`ensure_progressable/1`, ~line 925-931)
-- Test: `test/argus/obligations/event_test.exs` (create)
+- Modify: `lib/tugas/obligations/event.ex`
+- Modify: `lib/tugas/obligations.ex` (`ensure_progressable/1`, ~line 925-931)
+- Test: `test/tugas/obligations/event_test.exs` (create)
 
 **Interfaces:**
 - Produces: `Event.terminal_statuses/0 :: [String.t()]` returning `["done", "skipped", "series_ended"]`; `Event` changeset accepts statuses `open | in_progress | done | skipped | series_ended` (no `cancelled`).
 
 - [ ] **Step 1: Write the failing test**
 
-Create `test/argus/obligations/event_test.exs`:
+Create `test/tugas/obligations/event_test.exs`:
 
 ```elixir
-defmodule Argus.Obligations.EventTest do
+defmodule Tugas.Obligations.EventTest do
   use ExUnit.Case, async: true
 
-  alias Argus.Obligations.Event
+  alias Tugas.Obligations.Event
 
   test "terminal_statuses are the closing statuses" do
     assert Event.terminal_statuses() == ["done", "skipped", "series_ended"]
@@ -59,12 +59,12 @@ end
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `mix test test/argus/obligations/event_test.exs`
+Run: `mix test test/tugas/obligations/event_test.exs`
 Expected: FAIL — `Event.terminal_statuses/0 undefined` and `cancelled` still accepted.
 
 - [ ] **Step 3: Update the Event schema**
 
-In `lib/argus/obligations/event.ex`, replace the `@statuses` line and changeset, and add `terminal_statuses/0`:
+In `lib/tugas/obligations/event.ex`, replace the `@statuses` line and changeset, and add `terminal_statuses/0`:
 
 ```elixir
   @statuses ~w(open in_progress done skipped series_ended)
@@ -84,7 +84,7 @@ In `lib/argus/obligations/event.ex`, replace the `@statuses` line and changeset,
 
 - [ ] **Step 4: Point `ensure_progressable/1` at the centralized list**
 
-In `lib/argus/obligations.ex`, change the closed-check (currently `e.status in ["done", "cancelled"]`):
+In `lib/tugas/obligations.ex`, change the closed-check (currently `e.status in ["done", "cancelled"]`):
 
 ```elixir
   defp ensure_progressable(%Obligation{} = obligation) do
@@ -99,13 +99,13 @@ In `lib/argus/obligations.ex`, change the closed-check (currently `e.status in [
 
 - [ ] **Step 5: Run tests to verify they pass**
 
-Run: `mix test test/argus/obligations/event_test.exs`
+Run: `mix test test/tugas/obligations/event_test.exs`
 Expected: PASS.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add lib/argus/obligations/event.ex lib/argus/obligations.ex test/argus/obligations/event_test.exs
+git add lib/tugas/obligations/event.ex lib/tugas/obligations.ex test/tugas/obligations/event_test.exs
 git commit -m "feat: add skipped/series_ended event statuses + Event.terminal_statuses/0"
 ```
 
@@ -114,9 +114,9 @@ git commit -m "feat: add skipped/series_ended event statuses + Event.terminal_st
 ### Task 2: Render Skipped / Series-ended in badge + event meta (additive)
 
 **Files:**
-- Modify: `lib/argus_web/components/obligation_status_badge.ex`
-- Modify: `lib/argus_web/components/event_meta.ex`
-- Test: `test/argus_web/components/obligation_status_badge_test.exs` (create)
+- Modify: `lib/tugas_web/components/obligation_status_badge.ex`
+- Modify: `lib/tugas_web/components/event_meta.ex`
+- Test: `test/tugas_web/components/obligation_status_badge_test.exs` (create)
 
 **Interfaces:**
 - Consumes: `obligation_status_badge/1` `:cycle_status` now also accepts `:skipped` and `:series_ended`.
@@ -124,13 +124,13 @@ git commit -m "feat: add skipped/series_ended event statuses + Event.terminal_st
 
 - [ ] **Step 1: Write the failing test**
 
-Create `test/argus_web/components/obligation_status_badge_test.exs`:
+Create `test/tugas_web/components/obligation_status_badge_test.exs`:
 
 ```elixir
-defmodule ArgusWeb.ObligationStatusBadgeTest do
+defmodule TugasWeb.ObligationStatusBadgeTest do
   use ExUnit.Case, async: true
   import Phoenix.LiveViewTest
-  import ArgusWeb.ObligationStatusBadge
+  import TugasWeb.ObligationStatusBadge
 
   test "renders a Skipped badge" do
     html = render_component(&obligation_status_badge/1, cycle_status: :skipped, in_error: false)
@@ -146,12 +146,12 @@ end
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `mix test test/argus_web/components/obligation_status_badge_test.exs`
+Run: `mix test test/tugas_web/components/obligation_status_badge_test.exs`
 Expected: FAIL — neither string rendered.
 
 - [ ] **Step 3: Add the badge clauses**
 
-In `lib/argus_web/components/obligation_status_badge.ex`, add inside the `~H` template (after the existing `:cancelled` span):
+In `lib/tugas_web/components/obligation_status_badge.ex`, add inside the `~H` template (after the existing `:cancelled` span):
 
 ```elixir
     <span :if={@cycle_status == :skipped} class="badge badge-warning badge-sm">Skipped</span>
@@ -162,7 +162,7 @@ In `lib/argus_web/components/obligation_status_badge.ex`, add inside the `~H` te
 
 - [ ] **Step 4: Add EventMeta labels/colors**
 
-In `lib/argus_web/components/event_meta.ex`, extend the private helpers (keep existing clauses):
+In `lib/tugas_web/components/event_meta.ex`, extend the private helpers (keep existing clauses):
 
 ```elixir
   defp humanize_status("in_progress"), do: "In progress"
@@ -180,13 +180,13 @@ In `lib/argus_web/components/event_meta.ex`, extend the private helpers (keep ex
 
 - [ ] **Step 5: Run tests to verify they pass**
 
-Run: `mix test test/argus_web/components/obligation_status_badge_test.exs`
+Run: `mix test test/tugas_web/components/obligation_status_badge_test.exs`
 Expected: PASS.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add lib/argus_web/components/obligation_status_badge.ex lib/argus_web/components/event_meta.ex test/argus_web/components/obligation_status_badge_test.exs
+git add lib/tugas_web/components/obligation_status_badge.ex lib/tugas_web/components/event_meta.ex test/tugas_web/components/obligation_status_badge_test.exs
 git commit -m "feat: Skipped / Series ended badge + event-meta labels"
 ```
 
@@ -198,12 +198,12 @@ This is the atomic core. After it, no code references `status`; `skip/3` is the 
 
 **Files:**
 - Create: `priv/repo/migrations/20260620000000_replace_status_with_closed_at.exs`
-- Modify: `lib/argus/obligations/obligation.ex` (schema + changeset)
-- Modify: `lib/argus/obligations.ex` (`live/1`, `apply_status_filter/2`, `spawn_next_cycle`, replace `cancel_obligation`+`skip_cycle` with `skip`, `end_series`, `validate_correctable`, `locked_cycle?`)
-- Modify: `lib/argus/authorization.ex`
-- Modify: `lib/argus_web/live/obligation_live/index_helpers.ex` (`cycle_status`)
-- Modify: `lib/argus_web/live/obligation_live/show.ex` and `lib/argus_web/live/mobile_live/obligation_show.ex` (repoint domain calls + `can?` keys + result-tuple matches; keep existing buttons)
-- Test: `test/argus/obligations_test.exs`, `test/argus/authorization_test.exs`, and any LiveView test asserting cancelled
+- Modify: `lib/tugas/obligations/obligation.ex` (schema + changeset)
+- Modify: `lib/tugas/obligations.ex` (`live/1`, `apply_status_filter/2`, `spawn_next_cycle`, replace `cancel_obligation`+`skip_cycle` with `skip`, `end_series`, `validate_correctable`, `locked_cycle?`)
+- Modify: `lib/tugas/authorization.ex`
+- Modify: `lib/tugas_web/live/obligation_live/index_helpers.ex` (`cycle_status`)
+- Modify: `lib/tugas_web/live/obligation_live/show.ex` and `lib/tugas_web/live/mobile_live/obligation_show.ex` (repoint domain calls + `can?` keys + result-tuple matches; keep existing buttons)
+- Test: `test/tugas/obligations_test.exs`, `test/tugas/authorization_test.exs`, and any LiveView test asserting cancelled
 
 **Interfaces:**
 - Consumes: `Event.terminal_statuses/0` (Task 1); `:skipped`/`:series_ended` badges (Task 2).
@@ -218,7 +218,7 @@ This is the atomic core. After it, no code references `status`; `skip/3` is the 
 Create `priv/repo/migrations/20260620000000_replace_status_with_closed_at.exs`:
 
 ```elixir
-defmodule Argus.Repo.Migrations.ReplaceStatusWithClosedAt do
+defmodule Tugas.Repo.Migrations.ReplaceStatusWithClosedAt do
   use Ecto.Migration
 
   def up do
@@ -261,7 +261,7 @@ end
 
 - [ ] **Step 2: Update the Obligation schema**
 
-In `lib/argus/obligations/obligation.ex`: remove `field :status, :string, default: "active"`, add `field :closed_at, :utc_datetime` (next to `completed_at`), and delete the `|> validate_inclusion(:status, ["active", "cancelled"])` line from the changeset.
+In `lib/tugas/obligations/obligation.ex`: remove `field :status, :string, default: "active"`, add `field :closed_at, :utc_datetime` (next to `completed_at`), and delete the `|> validate_inclusion(:status, ["active", "cancelled"])` line from the changeset.
 
 - [ ] **Step 3: Migrate the DB and run the existing suite to see the breakage surface**
 
@@ -270,7 +270,7 @@ Expected: compile errors / failures everywhere `status` is referenced — this i
 
 - [ ] **Step 4: Update `live/1`**
 
-In `lib/argus/obligations.ex` (~line 27):
+In `lib/tugas/obligations.ex` (~line 27):
 
 ```elixir
   def live(query \\ Obligation) do
@@ -296,7 +296,7 @@ In `spawn_next_cycle/4`, remove `status: "active"` from the `%Obligation{...}` s
 
 - [ ] **Step 7: Write the failing tests for `skip/3` and `end_series/3`**
 
-Add to `test/argus/obligations_test.exs` (uses existing fixtures `manager_obligation_scope_fixture/0`, `recurring_manager_scope_fixture/1`):
+Add to `test/tugas/obligations_test.exs` (uses existing fixtures `manager_obligation_scope_fixture/0`, `recurring_manager_scope_fixture/1`):
 
 ```elixir
   describe "skip/3" do
@@ -317,7 +317,7 @@ Add to `test/argus/obligations_test.exs` (uses existing fixtures `manager_obliga
 
       assert {:error, :next_due_required} = Obligations.skip(scope, obligation, %{note: "skip"})
 
-      assert {:ok, closed, %Argus.Obligations.Obligation{} = spawned} =
+      assert {:ok, closed, %Tugas.Obligations.Obligation{} = spawned} =
                Obligations.skip(scope, obligation, %{note: "skip", next_due_by: ~D[2026-08-01]})
 
       assert closed.closed_at
@@ -345,16 +345,16 @@ Add to `test/argus/obligations_test.exs` (uses existing fixtures `manager_obliga
   end
 ```
 
-(If `list_events/2` does not exist, fetch events with the project's existing accessor used in other tests — check `test/argus/obligations_test.exs` for the established pattern and match it.)
+(If `list_events/2` does not exist, fetch events with the project's existing accessor used in other tests — check `test/tugas/obligations_test.exs` for the established pattern and match it.)
 
 - [ ] **Step 8: Run to verify failure**
 
-Run: `mix test test/argus/obligations_test.exs`
+Run: `mix test test/tugas/obligations_test.exs`
 Expected: FAIL — `Obligations.skip/3` undefined; `end_series` still writes `cancelled`/`status`.
 
 - [ ] **Step 9: Implement `skip/3` (replacing `cancel_obligation/3` and `skip_cycle/3`)**
 
-In `lib/argus/obligations.ex`, delete `cancel_obligation/3`, `skip_cycle/3`, and `skip_cycle_multi/4`. Add:
+In `lib/tugas/obligations.ex`, delete `cancel_obligation/3`, `skip_cycle/3`, and `skip_cycle_multi/4`. Add:
 
 ```elixir
   def skip(%Scope{} = scope, %Obligation{} = obligation, attrs) do
@@ -410,7 +410,7 @@ In `lib/argus/obligations.ex`, delete `cancel_obligation/3`, `skip_cycle/3`, and
 
 - [ ] **Step 10: Update `end_series/3`**
 
-In `lib/argus/obligations.ex`, change its multi's `set:` and event status:
+In `lib/tugas/obligations.ex`, change its multi's `set:` and event status:
 
 ```elixir
         set: [closed_at: now, series_ended_at: now, updated_at: now]
@@ -444,7 +444,7 @@ Replace the `status`-based clauses (read the current clauses first; preserve the
 
 - [ ] **Step 12: Update authorization**
 
-In `lib/argus/authorization.ex`, replace lines 14-15:
+In `lib/tugas/authorization.ex`, replace lines 14-15:
 
 ```elixir
   def can?(%Scope{role: :manager}, :skip), do: true
@@ -454,7 +454,7 @@ In `lib/argus/authorization.ex`, replace lines 14-15:
 
 - [ ] **Step 13: Update `cycle_status/1`**
 
-In `lib/argus_web/live/obligation_live/index_helpers.ex`, replace the `cycle_status` clauses:
+In `lib/tugas_web/live/obligation_live/index_helpers.ex`, replace the `cycle_status` clauses:
 
 ```elixir
   def cycle_status(%Obligation{completed_at: %DateTime{}}), do: :completed
@@ -465,14 +465,14 @@ In `lib/argus_web/live/obligation_live/index_helpers.ex`, replace the `cycle_sta
 
 - [ ] **Step 14: Repoint the show pages' domain calls (keep existing buttons)**
 
-In `lib/argus_web/live/obligation_live/show.ex` and `lib/argus_web/live/mobile_live/obligation_show.ex`:
+In `lib/tugas_web/live/obligation_live/show.ex` and `lib/tugas_web/live/mobile_live/obligation_show.ex`:
 - Replace `Obligations.cancel_obligation(...)` and `Obligations.skip_cycle(...)` calls with `Obligations.skip(...)`.
 - The cancel handler passes only `%{note: ...}`; the skip handler passes `%{note: ..., next_due_by: ...}`. Both now return `{:ok, _obligation, _spawned}` — update the cancel handler's match from `{:ok, _}` to `{:ok, _, _}`.
 - Replace `Authorization.can?(@current_scope, :cancel_obligation)` and `:skip_cycle` with `:skip`.
 
 Use grep to find every occurrence:
 
-Run: `grep -rn "cancel_obligation\|skip_cycle" lib/argus_web/`
+Run: `grep -rn "cancel_obligation\|skip_cycle" lib/tugas_web/`
 Update each. (Leave the button labels/modals as-is for now; Task 4 unifies them.)
 
 - [ ] **Step 15: Migrate the IndexHelpers status vocabulary**
@@ -507,7 +507,7 @@ Run: `mix test 2>&1 | tail -40` and fix each failure:
 
 - [ ] **Step 18: Update the authorization test**
 
-In `test/argus/authorization_test.exs`, replace `:cancel_obligation`/`:skip_cycle` assertions with `:skip` (manager/admin true, member false). Match the file's existing assertion style.
+In `test/tugas/authorization_test.exs`, replace `:cancel_obligation`/`:skip_cycle` assertions with `:skip` (manager/admin true, member false). Match the file's existing assertion style.
 
 - [ ] **Step 19: Run the full suite**
 
@@ -527,10 +527,10 @@ git commit -m "refactor: status string -> closed_at; unify Cancel+Skip into skip
 ### Task 4: Unify the show-page Skip UI (one button + one modal)
 
 **Files:**
-- Modify: `lib/argus_web/live/obligation_live/show.ex`
-- Modify: `lib/argus_web/live/mobile_live/obligation_show.ex`
-- Modify: `lib/argus_web/modal_escape.ex` (if it special-cases the cancel modal)
-- Test: `test/argus_web/live/obligation_live_test.exs`, `test/argus_web/live/mobile_live_test.exs`
+- Modify: `lib/tugas_web/live/obligation_live/show.ex`
+- Modify: `lib/tugas_web/live/mobile_live/obligation_show.ex`
+- Modify: `lib/tugas_web/modal_escape.ex` (if it special-cases the cancel modal)
+- Test: `test/tugas_web/live/obligation_live_test.exs`, `test/tugas_web/live/mobile_live_test.exs`
 
 **Interfaces:**
 - Consumes: `Obligations.skip/3`, `:skip` authorization.
@@ -538,7 +538,7 @@ git commit -m "refactor: status string -> closed_at; unify Cancel+Skip into skip
 
 - [ ] **Step 1: Write the failing test (desktop one-off skip)**
 
-In `test/argus_web/live/obligation_live_test.exs`:
+In `test/tugas_web/live/obligation_live_test.exs`:
 
 ```elixir
   test "skip modal closes a one-off cycle", %{conn: conn} do
@@ -562,12 +562,12 @@ In `test/argus_web/live/obligation_live_test.exs`:
 
 - [ ] **Step 2: Run to verify failure**
 
-Run: `mix test test/argus_web/live/obligation_live_test.exs -n "skip modal closes a one-off cycle"`
+Run: `mix test test/tugas_web/live/obligation_live_test.exs -n "skip modal closes a one-off cycle"`
 Expected: FAIL — `#skip-btn`/`#skip-modal`/`#skip-form` not found (the page still has Cancel + a recurring-only Skip).
 
 - [ ] **Step 3: Unify the desktop show buttons/modal**
 
-In `lib/argus_web/live/obligation_live/show.ex`:
+In `lib/tugas_web/live/obligation_live/show.ex`:
 - Replace the separate Cancel button (`open_cancel_modal`) and recurring-only Skip button with **one** Skip button shown for every live cycle, gated by `Authorization.can?(@current_scope, :skip)`, `id="skip-btn"`, `phx-click="open_skip_modal"`. Keep the **End series** button (recurring only) as-is.
 - Replace the two modals with one `#skip-modal` containing `#skip-form` (`phx-submit="skip"`). Show a `next_due_by` `<.input>` only when `@recurring?` (reuse the Done modal's date-picker markup).
 - Handlers: keep `open_skip_modal`/`close`; the `skip` submit handler reads `%{"skip" => params}`, calls `Obligations.skip(@current_scope, @obligation, params)`, matches `{:ok, _, _}` → flash + `push_navigate` to `~p"/entities/#{slug}"`; map `{:error, :next_due_required}` and `{:error, :note_required}`/changeset to a flash. Delete `open_cancel_modal`/`cancel` handlers and the `@show_cancel_modal` assign.
@@ -575,16 +575,16 @@ In `lib/argus_web/live/obligation_live/show.ex`:
 
 - [ ] **Step 4: Mirror on mobile**
 
-Apply the same change in `lib/argus_web/live/mobile_live/obligation_show.ex` with ids `#m-skip-btn`, `#m-skip-modal`, `#m-skip-form`. The existing mobile `#m-cancel-btn`/`#m-skip-btn` split collapses into the single `#m-skip-btn`.
+Apply the same change in `lib/tugas_web/live/mobile_live/obligation_show.ex` with ids `#m-skip-btn`, `#m-skip-modal`, `#m-skip-form`. The existing mobile `#m-cancel-btn`/`#m-skip-btn` split collapses into the single `#m-skip-btn`.
 
 - [ ] **Step 5: Reconcile ModalEscape**
 
-Run: `grep -n "cancel\|skip" lib/argus_web/modal_escape.ex`
+Run: `grep -n "cancel\|skip" lib/tugas_web/modal_escape.ex`
 If `close_obligation_modals/2` clears a `:show_cancel_modal` assign, rename/remove it so it clears `:show_skip_modal`. Keep the single shared closer consistent with the new assign names.
 
 - [ ] **Step 6: Run the targeted + full suite**
 
-Run: `mix test test/argus_web/live/obligation_live_test.exs test/argus_web/live/mobile_live_test.exs`
+Run: `mix test test/tugas_web/live/obligation_live_test.exs test/tugas_web/live/mobile_live_test.exs`
 Then fix any mobile test referencing `#m-cancel-btn` (point at `#m-skip-btn`) and any "Cancel"/"cancelled" copy assertions (→ "Skip"/"skipped").
 Run: `mix test`
 Expected: PASS.
@@ -602,15 +602,15 @@ git commit -m "feat: single Skip action on obligation show (desktop + mobile)"
 ### Task 5: Rename the dashboard "Cancelled" filter to "Skipped"
 
 **Files:**
-- Modify: `test/argus_web/live/obligation_live_test.exs`, `test/argus_web/live/mobile_live_test.exs`
-- Verify: `lib/argus_web/live/dashboard_live/index.ex`, `lib/argus_web/live/mobile_live/dashboard.ex`, `lib/argus_web/live/mobile_live/components.ex`
+- Modify: `test/tugas_web/live/obligation_live_test.exs`, `test/tugas_web/live/mobile_live_test.exs`
+- Verify: `lib/tugas_web/live/dashboard_live/index.ex`, `lib/tugas_web/live/mobile_live/dashboard.ex`, `lib/tugas_web/live/mobile_live/components.ex`
 
 **Interfaces:**
 - Consumes: `IndexHelpers` `:skipped` status (Task 3, Step 15) and `cycle_status` (Task 3, Step 13).
 
 - [ ] **Step 1: Update the dashboard filter test**
 
-In `test/argus_web/live/obligation_live_test.exs`, in the "dashboard filters completed and cancelled cycles" test, change the cancelled section to skipped:
+In `test/tugas_web/live/obligation_live_test.exs`, in the "dashboard filters completed and cancelled cycles" test, change the cancelled section to skipped:
 
 ```elixir
     {:ok, skipped} = Obligations.skip(manager, to_cancel, %{note: "No longer needed"})
@@ -623,12 +623,12 @@ In `test/argus_web/live/obligation_live_test.exs`, in the "dashboard filters com
 
 - [ ] **Step 2: Run to verify failure**
 
-Run: `mix test test/argus_web/live/obligation_live_test.exs -n "dashboard filters"`
+Run: `mix test test/tugas_web/live/obligation_live_test.exs -n "dashboard filters"`
 Expected: FAIL if any mobile/desktop card still emits the old `:cancelled` badge wording.
 
 - [ ] **Step 3: Fix the card meta wording**
 
-In `lib/argus_web/live/mobile_live/components.ex`, update `card_meta/1` and `accent/1`/`text_color/1` to handle `:skipped` and `:series_ended` (replace the `:cancelled` clause):
+In `lib/tugas_web/live/mobile_live/components.ex`, update `card_meta/1` and `accent/1`/`text_color/1` to handle `:skipped` and `:series_ended` (replace the `:cancelled` clause):
 
 ```elixir
   defp accent(%{cycle_status: status}) when status in [:skipped, :series_ended],
@@ -643,9 +643,9 @@ Add a tiny helper `defp humanize_cycle(:series_ended), do: "series ended"` / `de
 
 - [ ] **Step 4: Update the mobile filter test**
 
-In `test/argus_web/live/mobile_live_test.exs`, the "mobile dashboard filters completed cycles" test already uses `#m-filter-my_completed`; add/adjust a skipped assertion if present, and ensure no `#m-filter-cancelled` reference remains.
+In `test/tugas_web/live/mobile_live_test.exs`, the "mobile dashboard filters completed cycles" test already uses `#m-filter-my_completed`; add/adjust a skipped assertion if present, and ensure no `#m-filter-cancelled` reference remains.
 
-Run: `grep -rn "filter-cancelled\|m-filter-cancelled\|Cancelled" test/argus_web/live/`
+Run: `grep -rn "filter-cancelled\|m-filter-cancelled\|Cancelled" test/tugas_web/live/`
 Update each to `skipped`/`Skipped`.
 
 - [ ] **Step 5: Run the full suite**

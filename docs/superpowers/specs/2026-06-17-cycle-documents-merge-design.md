@@ -64,7 +64,7 @@ rows are never mutated to change classification.
 area opens a cycle-wide modal. (Replaces the old per-event "Documents" buttons for
 required docs.)
 
-**Component:** `ArgusWeb.ObligationCompletionDocuments` — `completion_documents/1`.
+**Component:** `TugasWeb.ObligationCompletionDocuments` — `completion_documents/1`.
 
 **Inputs (assigns):** `obligation`, `current_scope`, `entity_slug`,
 `documents` (cycle-wide, `events |> Enum.flat_map(& &1.documents)`),
@@ -102,7 +102,7 @@ render only when `uploadable?` (live cycle, a workable event exists,
 **Entry point:** a "Files" button on each event row in the timeline opens that step's
 modal.
 
-**Component:** `ArgusWeb.ObligationStepFiles` — `step_files/1`.
+**Component:** `TugasWeb.ObligationStepFiles` — `step_files/1`.
 
 **Inputs (assigns):** `event`, its `documents`, `obligation`, `current_scope`,
 `entity_slug`, upload state, `uploadable?` (this event), `voiding_document_id`,
@@ -163,14 +163,14 @@ Desktop `obligation_live/show.ex` and mobile `mobile_live/obligation_show.ex`:
 
 ## Files touched
 
-- **New:** `lib/argus_web/components/obligation_completion_documents.ex`,
-  `lib/argus_web/components/obligation_step_files.ex` (the colocated `SlotFilePicker`
+- **New:** `lib/tugas_web/components/obligation_completion_documents.ex`,
+  `lib/tugas_web/components/obligation_step_files.ex` (the colocated `SlotFilePicker`
   hook moves to whichever component(s) host the picker).
-- **Deleted:** `lib/argus_web/components/obligation_document_upload.ex`,
-  `lib/argus_web/components/obligation_document_list.ex`.
-- **Edited:** `lib/argus_web/live/obligation_live/show.ex`,
-  `lib/argus_web/live/mobile_live/obligation_show.ex` (render, modal state, handlers,
-  upload-target resolution); `lib/argus_web/controllers/document_controller.ex`
+- **Deleted:** `lib/tugas_web/components/obligation_document_upload.ex`,
+  `lib/tugas_web/components/obligation_document_list.ex`.
+- **Edited:** `lib/tugas_web/live/obligation_live/show.ex`,
+  `lib/tugas_web/live/mobile_live/obligation_show.ex` (render, modal state, handlers,
+  upload-target resolution); `lib/tugas_web/controllers/document_controller.ex`
   (allow downloading voided files).
 - **Context `obligations.ex`:** no new functions; reuses `add_document/5`,
   `delete_document/3`, `void_document/4`, and preloaded cycle documents.

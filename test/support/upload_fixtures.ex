@@ -1,7 +1,7 @@
-defmodule Argus.UploadFixtures do
+defmodule Tugas.UploadFixtures do
   @moduledoc false
 
-  alias Argus.Obligations
+  alias Tugas.Obligations
 
   def upload_fixture(filename \\ "test.txt", content \\ "hello", content_type \\ nil) do
     path = Path.join(System.tmp_dir!(), "#{System.unique_integer()}_#{filename}")

@@ -1,4 +1,4 @@
-defmodule Argus.Repo.Migrations.CreateObligationEventDocuments do
+defmodule Tugas.Repo.Migrations.CreateObligationEventDocuments do
   use Ecto.Migration
 
   def change do

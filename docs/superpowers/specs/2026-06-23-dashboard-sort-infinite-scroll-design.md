@@ -3,7 +3,7 @@
 **Date:** 2026-06-23
 **Status:** Approved (pending spec review)
 **Surface:** `DashboardLive.Index` (Desktop) and `MobileLive.Dashboard` (Mobile), both rendering
-via `ArgusWeb.ObligationLive.IndexHelpers` and `Argus.Obligations.list_obligations/2`.
+via `TugasWeb.ObligationLive.IndexHelpers` and `Tugas.Obligations.list_obligations/2`.
 
 ## Problem
 
@@ -52,7 +52,7 @@ for Most-urgent-on-Live.
 
 ## Architecture
 
-### 1. Context — `Argus.Obligations`
+### 1. Context — `Tugas.Obligations`
 
 Replace the all-rows load with a paginated, SQL-sorted, SQL-filtered query.
 
@@ -80,7 +80,7 @@ Retire `list_obligations/2`'s caller path on the dashboard; the existing fixed `
 clauses collapse into the sort-driven `order_by`. (Other callers, if any, are checked during
 implementation and migrated or left on a thin wrapper.)
 
-### 2. Filter persistence — `ArgusWeb.DashboardFilter`
+### 2. Filter persistence — `TugasWeb.DashboardFilter`
 
 Add `sort` to the per-entity entry, mirroring `mine`/`lifecycle`/`query`:
 
@@ -145,11 +145,11 @@ Exact index set is finalized in the implementation plan's migration step.
 
 ## Components and boundaries
 
-- `Argus.Obligations.list_obligations_page/2` — pure data: SQL filter + sort + keyset page. Testable
+- `Tugas.Obligations.list_obligations_page/2` — pure data: SQL filter + sort + keyset page. Testable
   with fixtures, no LiveView.
-- `Argus.Obligations.Pagination` (small helper, or inline) — cursor encode/decode + keyset `where`.
-- `ArgusWeb.DashboardFilter` — adds `sort` to the persisted entry; unchanged storage/transport.
-- `ArgusWeb.ObligationLive.IndexHelpers` — row building, the urgency-window exception, `sorts/1`.
+- `Tugas.Obligations.Pagination` (small helper, or inline) — cursor encode/decode + keyset `where`.
+- `TugasWeb.DashboardFilter` — adds `sort` to the persisted entry; unchanged storage/transport.
+- `TugasWeb.ObligationLive.IndexHelpers` — row building, the urgency-window exception, `sorts/1`.
 - `DashboardLive.Index` / `MobileLive.Dashboard` — streams, sort control, viewport pagination.
 - `MobileLive.Components.obligation_card` — gains `id` attr.
 

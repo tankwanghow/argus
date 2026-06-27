@@ -1,12 +1,12 @@
-defmodule Argus.EntitiesFixtures do
+defmodule Tugas.EntitiesFixtures do
   @moduledoc """
   Test helpers for entities and scoped fixtures.
   """
 
-  alias Argus.Accounts.Scope
-  alias Argus.Entities
+  alias Tugas.Accounts.Scope
+  alias Tugas.Entities
 
-  import Argus.AccountsFixtures
+  import Tugas.AccountsFixtures
 
   def entity_fixture(scope \\ nil, attrs \\ %{}) do
     scope = scope || Scope.for_user(user_fixture())
@@ -32,14 +32,14 @@ defmodule Argus.EntitiesFixtures do
     admin_scope = entity_scope_fixture(attrs)
     manager = user_fixture()
 
-    %Argus.Entities.Membership{
+    %Tugas.Entities.Membership{
       user_id: manager.id,
       entity_id: admin_scope.entity.id,
       role: "manager",
       accepted_at: DateTime.utc_now(:second)
     }
-    |> Argus.Entities.Membership.changeset(%{})
-    |> Argus.Repo.insert!()
+    |> Tugas.Entities.Membership.changeset(%{})
+    |> Tugas.Repo.insert!()
 
     membership = Entities.get_membership!(manager, admin_scope.entity)
     Scope.put_entity(Scope.for_user(manager), admin_scope.entity, membership)
@@ -49,14 +49,14 @@ defmodule Argus.EntitiesFixtures do
     admin_scope = entity_scope_fixture(attrs)
     member = user_fixture()
 
-    %Argus.Entities.Membership{
+    %Tugas.Entities.Membership{
       user_id: member.id,
       entity_id: admin_scope.entity.id,
       role: "member",
       accepted_at: DateTime.utc_now(:second)
     }
-    |> Argus.Entities.Membership.changeset(%{})
-    |> Argus.Repo.insert!()
+    |> Tugas.Entities.Membership.changeset(%{})
+    |> Tugas.Repo.insert!()
 
     membership = Entities.get_membership!(member, admin_scope.entity)
     Scope.put_entity(Scope.for_user(member), admin_scope.entity, membership)

@@ -1,6 +1,6 @@
-const modalKey = id => `argus:completion-modal:${id}`
-const stepKey = id => `argus:step-files:${id}`
-const errorKey = id => `argus:upload-error:${id}`
+const modalKey = id => `tugas:completion-modal:${id}`
+const stepKey = id => `tugas:step-files:${id}`
+const errorKey = id => `tugas:upload-error:${id}`
 
 // A slot error can be raised while the socket is down (the size check runs when
 // the camera returns mid-reconnect). Stash it so restore() can re-show it once

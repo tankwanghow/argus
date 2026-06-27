@@ -10,8 +10,8 @@
 
 ## Global Constraints
 
-- **binary_id (UUID) PKs everywhere** via `use Argus.Schema`.
-- Contexts take `%Argus.Accounts.Scope{}` as the first arg; unauthorized mutations return **`:not_authorise`**.
+- **binary_id (UUID) PKs everywhere** via `use Tugas.Schema`.
+- Contexts take `%Tugas.Accounts.Scope{}` as the first arg; unauthorized mutations return **`:not_authorise`**.
 - **Every state transition requires a note** — here the correction `reason` is mandatory (blank ⇒ `{:error, :note_required}`).
 - Events are **append-only, forward-only** (`open → in_progress → done | cancelled`). Do **not** add a new event status and do **not** append an event to the wrong cycle.
 - The partial unique index `obligations_one_live_cycle_per_series` enforces one live cycle (`status='active' AND completed_at IS NULL`) per `series_id`. The replacement uses a **new** `series_id`, so it never collides.
@@ -25,20 +25,20 @@
 
 **Files:**
 - Create: `priv/repo/migrations/20260618120000_add_completed_in_error_to_obligations.exs`
-- Modify: `lib/argus/obligations/obligation.ex` (schema block at lines 9-24)
-- Test: `test/argus/obligations_test.exs` (new test in an existing or new describe block)
+- Modify: `lib/tugas/obligations/obligation.ex` (schema block at lines 9-24)
+- Test: `test/tugas/obligations_test.exs` (new test in an existing or new describe block)
 
 **Interfaces:**
 - Produces: `Obligation` schema gains fields `completed_in_error_at :utc_datetime`, `completed_in_error_reason :string`, and `belongs_to` assocs `completed_in_error_by` (`completed_in_error_by_id`), `replaces` (`replaces_id`, self-ref), `replaced_by` (`replaced_by_id`, self-ref). All nullable, default nil.
 
 - [ ] **Step 1: Write the failing test**
 
-In `test/argus/obligations_test.exs`, add inside the top-level module (after the existing `describe "create_obligation/2"` block — reuse `manager_scope_fixture`, `type_fixture` already imported via `Argus.ObligationsFixtures`):
+In `test/tugas/obligations_test.exs`, add inside the top-level module (after the existing `describe "create_obligation/2"` block — reuse `manager_scope_fixture`, `type_fixture` already imported via `Tugas.ObligationsFixtures`):
 
 ```elixir
   describe "completed-in-error schema" do
     test "new correction fields default to nil on a created obligation" do
-      manager = Argus.EntitiesFixtures.manager_scope_fixture()
+      manager = Tugas.EntitiesFixtures.manager_scope_fixture()
       type = type_fixture(manager.entity)
 
       {:ok, obligation} =
@@ -60,7 +60,7 @@ In `test/argus/obligations_test.exs`, add inside the top-level module (after the
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `mix test test/argus/obligations_test.exs -k "new correction fields default"`
+Run: `mix test test/tugas/obligations_test.exs -k "new correction fields default"`
 Expected: FAIL — `KeyError`/unknown field `completed_in_error_at` (schema doesn't define it yet).
 
 - [ ] **Step 3: Write the migration**
@@ -68,7 +68,7 @@ Expected: FAIL — `KeyError`/unknown field `completed_in_error_at` (schema does
 Create `priv/repo/migrations/20260618120000_add_completed_in_error_to_obligations.exs`:
 
 ```elixir
-defmodule Argus.Repo.Migrations.AddCompletedInErrorToObligations do
+defmodule Tugas.Repo.Migrations.AddCompletedInErrorToObligations do
   use Ecto.Migration
 
   def change do
@@ -89,7 +89,7 @@ end
 
 - [ ] **Step 4: Add fields/associations to the schema**
 
-In `lib/argus/obligations/obligation.ex`, the schema currently ends:
+In `lib/tugas/obligations/obligation.ex`, the schema currently ends:
 
 ```elixir
     field :complete_documents, :string, default: ""
@@ -127,13 +127,13 @@ Note: `@cast_fields` is **unchanged** — these columns are set via `put_change`
 
 - [ ] **Step 5: Migrate the test DB and run the test**
 
-Run: `mix ecto.migrate && mix test test/argus/obligations_test.exs -k "new correction fields default"`
+Run: `mix ecto.migrate && mix test test/tugas/obligations_test.exs -k "new correction fields default"`
 Expected: PASS. (`mix test` auto-migrates, but run `ecto.migrate` so dev DB is current too.)
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add priv/repo/migrations/20260618120000_add_completed_in_error_to_obligations.exs lib/argus/obligations/obligation.ex test/argus/obligations_test.exs
+git add priv/repo/migrations/20260618120000_add_completed_in_error_to_obligations.exs lib/tugas/obligations/obligation.ex test/tugas/obligations_test.exs
 git commit -m "feat: add completed-in-error + replacement columns to obligations
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
@@ -144,34 +144,34 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ### Task 2: Authorization for `:mark_completed_in_error`
 
 **Files:**
-- Modify: `lib/argus/authorization.ex` (manager clauses, around lines 11-18)
-- Test: `test/argus/authorization_test.exs`
+- Modify: `lib/tugas/authorization.ex` (manager clauses, around lines 11-18)
+- Test: `test/tugas/authorization_test.exs`
 
 **Interfaces:**
 - Produces: `Authorization.can?(scope, :mark_completed_in_error)` ⇒ `true` for `:admin` (existing catch-all) and `:manager` (new clause), `false` for `:member`.
 
 - [ ] **Step 1: Write the failing test**
 
-In `test/argus/authorization_test.exs`, add (mirror the style of existing role tests in that file — build scopes with the role set; check the file's existing helpers for constructing `%Scope{role: ...}`):
+In `test/tugas/authorization_test.exs`, add (mirror the style of existing role tests in that file — build scopes with the role set; check the file's existing helpers for constructing `%Scope{role: ...}`):
 
 ```elixir
   describe "mark_completed_in_error" do
     test "admin and manager may, member may not" do
-      assert Argus.Authorization.can?(%Argus.Accounts.Scope{role: :admin}, :mark_completed_in_error)
-      assert Argus.Authorization.can?(%Argus.Accounts.Scope{role: :manager}, :mark_completed_in_error)
-      refute Argus.Authorization.can?(%Argus.Accounts.Scope{role: :member}, :mark_completed_in_error)
+      assert Tugas.Authorization.can?(%Tugas.Accounts.Scope{role: :admin}, :mark_completed_in_error)
+      assert Tugas.Authorization.can?(%Tugas.Accounts.Scope{role: :manager}, :mark_completed_in_error)
+      refute Tugas.Authorization.can?(%Tugas.Accounts.Scope{role: :member}, :mark_completed_in_error)
     end
   end
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `mix test test/argus/authorization_test.exs -k "admin and manager may"`
+Run: `mix test test/tugas/authorization_test.exs -k "admin and manager may"`
 Expected: FAIL — manager assertion fails (`can?/2` manager catch-all returns `false`).
 
 - [ ] **Step 3: Add the manager clause**
 
-In `lib/argus/authorization.ex`, the manager `can?/2` clauses end with `:void_document` then the catch-all:
+In `lib/tugas/authorization.ex`, the manager `can?/2` clauses end with `:void_document` then the catch-all:
 
 ```elixir
   def can?(%Scope{role: :manager}, :void_document), do: true
@@ -190,13 +190,13 @@ Insert the new clause **before** the manager catch-all:
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `mix test test/argus/authorization_test.exs -k "admin and manager may"`
+Run: `mix test test/tugas/authorization_test.exs -k "admin and manager may"`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add lib/argus/authorization.ex test/argus/authorization_test.exs
+git add lib/tugas/authorization.ex test/tugas/authorization_test.exs
 git commit -m "feat: authorize mark_completed_in_error for manager and admin
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
@@ -207,8 +207,8 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ### Task 3: Context `mark_completed_in_error/3` — flag original + create replacement (non-recurring)
 
 **Files:**
-- Modify: `lib/argus/obligations.ex` (add public fn near `cancel_obligation/3` ~line 589; add private helpers near `spawn_next_cycle` ~line 761 and `validate_*` ~line 1078)
-- Test: `test/argus/obligations_test.exs`
+- Modify: `lib/tugas/obligations.ex` (add public fn near `cancel_obligation/3` ~line 589; add private helpers near `spawn_next_cycle` ~line 761 and `validate_*` ~line 1078)
+- Test: `test/tugas/obligations_test.exs`
 
 **Interfaces:**
 - Consumes: `Authorization.can?/2` (`:mark_completed_in_error`), `validate_action_note/1`, `insert_audit_log!/6`, `Obligation.changeset/2`, `Event.changeset/2`, `Collaborator`, `Repo`.
@@ -224,12 +224,12 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 - [ ] **Step 1: Write the failing test (happy path, non-recurring)**
 
-In `test/argus/obligations_test.exs`, add a new describe block:
+In `test/tugas/obligations_test.exs`, add a new describe block:
 
 ```elixir
   describe "mark_completed_in_error/3" do
     test "flags the done cycle and spawns a standalone one-off replacement" do
-      manager = Argus.EntitiesFixtures.manager_scope_fixture()
+      manager = Tugas.EntitiesFixtures.manager_scope_fixture()
       member = member_scope_on_entity(manager.entity)
       type = type_fixture(manager.entity)
 
@@ -277,7 +277,7 @@ In `test/argus/obligations_test.exs`, add a new describe block:
     end
 
     test "replacement_due_by overrides the inherited due date" do
-      manager = Argus.EntitiesFixtures.manager_scope_fixture()
+      manager = Tugas.EntitiesFixtures.manager_scope_fixture()
       type = type_fixture(manager.entity)
 
       {:ok, obligation} =
@@ -300,7 +300,7 @@ In `test/argus/obligations_test.exs`, add a new describe block:
     end
 
     test "completing the one-off replacement does not require next_due and does not spawn" do
-      manager = Argus.EntitiesFixtures.manager_scope_fixture()
+      manager = Tugas.EntitiesFixtures.manager_scope_fixture()
       # recurring type — but the replacement must still behave as a one-off
       type = type_fixture(manager.entity, recurring_interval: "monthly")
 
@@ -329,12 +329,12 @@ In `test/argus/obligations_test.exs`, add a new describe block:
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `mix test test/argus/obligations_test.exs -k "mark_completed_in_error"`
+Run: `mix test test/tugas/obligations_test.exs -k "mark_completed_in_error"`
 Expected: FAIL — `UndefinedFunctionError` for `Obligations.mark_completed_in_error/3`.
 
 - [ ] **Step 3: Add the public function**
 
-In `lib/argus/obligations.ex`, add **after** `cancel_obligation/3` (which ends ~line 589):
+In `lib/tugas/obligations.ex`, add **after** `cancel_obligation/3` (which ends ~line 589):
 
 ```elixir
   @doc """
@@ -366,7 +366,7 @@ In `lib/argus/obligations.ex`, add **after** `cancel_obligation/3` (which ends ~
 
 - [ ] **Step 4: Add the validation + transaction helpers**
 
-In `lib/argus/obligations.ex`, add near the other `validate_*` private helpers (e.g. just above `validate_action_note/1` ~line 1078):
+In `lib/tugas/obligations.ex`, add near the other `validate_*` private helpers (e.g. just above `validate_action_note/1` ~line 1078):
 
 ```elixir
   defp validate_correctable(%Obligation{status: "cancelled"}), do: {:error, :not_correctable}
@@ -446,13 +446,13 @@ And add the transaction helper near `spawn_next_cycle/4` (~line 761):
 
 - [ ] **Step 5: Run the tests to verify they pass**
 
-Run: `mix test test/argus/obligations_test.exs -k "mark_completed_in_error"`
+Run: `mix test test/tugas/obligations_test.exs -k "mark_completed_in_error"`
 Expected: PASS (all three tests).
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add lib/argus/obligations.ex test/argus/obligations_test.exs
+git add lib/tugas/obligations.ex test/tugas/obligations_test.exs
 git commit -m "feat: mark_completed_in_error flags done cycle and spawns one-off replacement
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
@@ -464,7 +464,7 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 **Files:**
 - Modify: none (logic already in Task 3) — this task only adds tests proving the guards and the recurring isolation.
-- Test: `test/argus/obligations_test.exs` (extend the `mark_completed_in_error/3` describe block)
+- Test: `test/tugas/obligations_test.exs` (extend the `mark_completed_in_error/3` describe block)
 
 **Interfaces:**
 - Consumes: `Obligations.mark_completed_in_error/3` (from Task 3), `Obligations.list_series/1`, `Obligations.live/1`.
@@ -475,7 +475,7 @@ Append to the `describe "mark_completed_in_error/3"` block:
 
 ```elixir
     test "a recurring original's auto-spawned successor is untouched" do
-      manager = Argus.EntitiesFixtures.manager_scope_fixture()
+      manager = Tugas.EntitiesFixtures.manager_scope_fixture()
       type = type_fixture(manager.entity, recurring_interval: "monthly")
 
       {:ok, obligation} =
@@ -506,7 +506,7 @@ Append to the `describe "mark_completed_in_error/3"` block:
     end
 
     test "rejects a live (not completed) cycle" do
-      manager = Argus.EntitiesFixtures.manager_scope_fixture()
+      manager = Tugas.EntitiesFixtures.manager_scope_fixture()
       type = type_fixture(manager.entity)
 
       {:ok, obligation} =
@@ -522,7 +522,7 @@ Append to the `describe "mark_completed_in_error/3"` block:
     end
 
     test "rejects a cancelled cycle" do
-      manager = Argus.EntitiesFixtures.manager_scope_fixture()
+      manager = Tugas.EntitiesFixtures.manager_scope_fixture()
       type = type_fixture(manager.entity)
 
       {:ok, obligation} =
@@ -540,7 +540,7 @@ Append to the `describe "mark_completed_in_error/3"` block:
     end
 
     test "rejects double-correction" do
-      manager = Argus.EntitiesFixtures.manager_scope_fixture()
+      manager = Tugas.EntitiesFixtures.manager_scope_fixture()
       type = type_fixture(manager.entity)
 
       {:ok, obligation} =
@@ -560,7 +560,7 @@ Append to the `describe "mark_completed_in_error/3"` block:
     end
 
     test "requires a reason" do
-      manager = Argus.EntitiesFixtures.manager_scope_fixture()
+      manager = Tugas.EntitiesFixtures.manager_scope_fixture()
       type = type_fixture(manager.entity)
 
       {:ok, obligation} =
@@ -578,7 +578,7 @@ Append to the `describe "mark_completed_in_error/3"` block:
     end
 
     test "members may not correct" do
-      manager = Argus.EntitiesFixtures.manager_scope_fixture()
+      manager = Tugas.EntitiesFixtures.manager_scope_fixture()
       member = member_scope_on_entity(manager.entity)
       type = type_fixture(manager.entity)
 
@@ -600,13 +600,13 @@ Append to the `describe "mark_completed_in_error/3"` block:
 
 - [ ] **Step 2: Run the tests to verify they pass**
 
-Run: `mix test test/argus/obligations_test.exs -k "mark_completed_in_error"`
+Run: `mix test test/tugas/obligations_test.exs -k "mark_completed_in_error"`
 Expected: PASS (these new tests are green because Task 3 already implements the behavior). If any fail, fix Task 3's logic rather than the test.
 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add test/argus/obligations_test.exs
+git add test/tugas/obligations_test.exs
 git commit -m "test: guards and recurring-series isolation for mark_completed_in_error
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
@@ -617,12 +617,12 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ### Task 5: Desktop LiveView — action, modal, handler, banners
 
 **Files:**
-- Modify: `lib/argus_web/live/obligation_live/show.ex`
+- Modify: `lib/tugas_web/live/obligation_live/show.ex`
   - mount defaults (~line 581, alongside `assign(:show_completion_modal, false)`)
   - render: add a "Completed in error" banner + a "Mark completed in error" action for completed cycles; add the modal
   - `assign_obligation/2` (~line 1127): add `@correctable?`
   - event handlers: add near `delete_document`/`void_document` handlers
-- Test: `test/argus_web/live/obligation_live_test.exs`
+- Test: `test/tugas_web/live/obligation_live_test.exs`
 
 **Interfaces:**
 - Consumes: `Obligations.mark_completed_in_error/3`, `Authorization.can?/2`, `@cycle_status` (`:completed`), `@obligation.completed_in_error_at`, `@obligation.replaced_by_id`, `@obligation.replaces_id`.
@@ -630,11 +630,11 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 - [ ] **Step 1: Write the failing test**
 
-In `test/argus_web/live/obligation_live_test.exs`, add:
+In `test/tugas_web/live/obligation_live_test.exs`, add:
 
 ```elixir
   test "manager marks a completed cycle in error and is taken to the replacement", %{conn: conn} do
-    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     conn = log_in_user(conn, manager.user)
     type = type_fixture(manager.entity)
 
@@ -679,12 +679,12 @@ In `test/argus_web/live/obligation_live_test.exs`, add:
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `mix test test/argus_web/live/obligation_live_test.exs -k "marks a completed cycle in error"`
+Run: `mix test test/tugas_web/live/obligation_live_test.exs -k "marks a completed cycle in error"`
 Expected: FAIL — `#mark-error-btn` not found.
 
 - [ ] **Step 3: Add mount default + `@correctable?` assign**
 
-In `lib/argus_web/live/obligation_live/show.ex` mount (the chain of `assign(...)` defaults), add after `|> assign(:show_completion_modal, false)`:
+In `lib/tugas_web/live/obligation_live/show.ex` mount (the chain of `assign(...)` defaults), add after `|> assign(:show_completion_modal, false)`:
 
 ```elixir
      |> assign(:show_completion_modal, false)
@@ -791,7 +791,7 @@ Then add the modal — place it next to the other modals (e.g. after the complet
 
 - [ ] **Step 5: Add the event handlers**
 
-In `lib/argus_web/live/obligation_live/show.ex`, add near the other `handle_event/3` clauses (e.g. after the `void_document` handlers):
+In `lib/tugas_web/live/obligation_live/show.ex`, add near the other `handle_event/3` clauses (e.g. after the `void_document` handlers):
 
 ```elixir
   def handle_event("open_correct_modal", _params, socket) do
@@ -840,13 +840,13 @@ In `lib/argus_web/live/obligation_live/show.ex`, add near the other `handle_even
 
 - [ ] **Step 6: Run test to verify it passes**
 
-Run: `mix test test/argus_web/live/obligation_live_test.exs -k "marks a completed cycle in error"`
+Run: `mix test test/tugas_web/live/obligation_live_test.exs -k "marks a completed cycle in error"`
 Expected: PASS.
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add lib/argus_web/live/obligation_live/show.ex test/argus_web/live/obligation_live_test.exs
+git add lib/tugas_web/live/obligation_live/show.ex test/tugas_web/live/obligation_live_test.exs
 git commit -m "feat: desktop mark-completed-in-error action, modal, and banners
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
@@ -857,23 +857,23 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ### Task 6: Mobile LiveView — action, modal, handler, banners
 
 **Files:**
-- Modify: `lib/argus_web/live/mobile_live/obligation_show.ex`
+- Modify: `lib/tugas_web/live/mobile_live/obligation_show.ex`
   - mount defaults (~line 466, alongside `assign(:show_completion_modal, false)`)
   - `assign_obligation` (~line 947): add `@correctable?`
   - render: banners + action + modal (`modal-bottom` style)
   - event handlers
-- Test: `test/argus_web/live/mobile_live_test.exs`
+- Test: `test/tugas_web/live/mobile_live_test.exs`
 
 **Interfaces:**
 - Same context API as Task 5. DOM ids prefixed `m-`: `#m-mark-error-btn`, `#m-correct-modal`, `#m-correct-form`, `#m-completed-in-error-banner`, `#m-replaces-banner`. Redirect target uses the mobile route `~p"/m/#{slug}/obligations/#{id}"`.
 
 - [ ] **Step 1: Write the failing test**
 
-In `test/argus_web/live/mobile_live_test.exs`, add (match the file's existing setup for logging in + building a manager scope; reuse helpers already imported there):
+In `test/tugas_web/live/mobile_live_test.exs`, add (match the file's existing setup for logging in + building a manager scope; reuse helpers already imported there):
 
 ```elixir
   test "mobile: manager marks a completed cycle in error", %{conn: conn} do
-    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     conn = log_in_user(conn, manager.user)
     type = type_fixture(manager.entity)
 
@@ -909,11 +909,11 @@ In `test/argus_web/live/mobile_live_test.exs`, add (match the file's existing se
   end
 ```
 
-Confirm `Argus.Obligations` and `type_fixture` are imported/aliased at the top of `mobile_live_test.exs`; if not, add `alias Argus.Obligations` and ensure `import Argus.ObligationsFixtures` is present (mirror `obligation_live_test.exs`).
+Confirm `Tugas.Obligations` and `type_fixture` are imported/aliased at the top of `mobile_live_test.exs`; if not, add `alias Tugas.Obligations` and ensure `import Tugas.ObligationsFixtures` is present (mirror `obligation_live_test.exs`).
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `mix test test/argus_web/live/mobile_live_test.exs -k "manager marks a completed cycle in error"`
+Run: `mix test test/tugas_web/live/mobile_live_test.exs -k "manager marks a completed cycle in error"`
 Expected: FAIL — `#m-mark-error-btn` not found.
 
 - [ ] **Step 3: Add mount default + `@correctable?`**
@@ -936,7 +936,7 @@ In `assign_obligation`, add:
     )
 ```
 
-(`Index` is already aliased in this module as `ArgusWeb.ObligationLive.IndexHelpers`; confirm and use the existing alias. `scope` is the scope already in scope of `assign_obligation`.)
+(`Index` is already aliased in this module as `TugasWeb.ObligationLive.IndexHelpers`; confirm and use the existing alias. `scope` is the scope already in scope of `assign_obligation`.)
 
 - [ ] **Step 4: Add banners + action + modal**
 
@@ -1063,7 +1063,7 @@ Add near the other mobile `handle_event/3` clauses:
 
 - [ ] **Step 6: Run test to verify it passes**
 
-Run: `mix test test/argus_web/live/mobile_live_test.exs -k "manager marks a completed cycle in error"`
+Run: `mix test test/tugas_web/live/mobile_live_test.exs -k "manager marks a completed cycle in error"`
 Expected: PASS.
 
 - [ ] **Step 7: Run full precommit + commit**
@@ -1074,7 +1074,7 @@ mix precommit
 Expected: compiles clean (warnings-as-errors), formatted, all tests pass.
 
 ```bash
-git add lib/argus_web/live/mobile_live/obligation_show.ex test/argus_web/live/mobile_live_test.exs
+git add lib/tugas_web/live/mobile_live/obligation_show.ex test/tugas_web/live/mobile_live_test.exs
 git commit -m "feat: mobile mark-completed-in-error action, modal, and banners
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
@@ -1084,7 +1084,7 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 ## Notes for the implementer
 
-- **Why `series_ended_at` on the replacement:** `Series.ended?/1` returns true when *any* obligation in the series has `series_ended_at` set. Pre-setting it on the replacement makes `validate_next_due/2` and `should_spawn_next?/2` short-circuit, so completing the replacement neither requires `next_due_by` nor spawns — a true one-off, regardless of the (possibly recurring) type. (Verified against `lib/argus/obligations.ex` `validate_next_due/2` and `lib/argus/obligations/series.ex` `ended?/1`.)
+- **Why `series_ended_at` on the replacement:** `Series.ended?/1` returns true when *any* obligation in the series has `series_ended_at` set. Pre-setting it on the replacement makes `validate_next_due/2` and `should_spawn_next?/2` short-circuit, so completing the replacement neither requires `next_due_by` nor spawns — a true one-off, regardless of the (possibly recurring) type. (Verified against `lib/tugas/obligations.ex` `validate_next_due/2` and `lib/tugas/obligations/series.ex` `ended?/1`.)
 - **Why no event on the wrong cycle:** the event FSM is forward-only and the cycle is already `done`. The correction is recorded via columns + `AuditLog`, not a new event — consistent with the spec's "corrections lock after Done" rule (this is an explicit admin/manager escape hatch).
 - **`@cast_fields` unchanged:** all five new columns are set with `put_change`, never user-cast, so they can't be tampered with through the obligation form.
 - **List/dashboard behavior is unchanged:** the wrong cycle is `completed` (non-live) so it stays in completed filters; the replacement is live and surfaces in My work / Team overview automatically. No list-query changes needed.

@@ -7,16 +7,16 @@
 # General application configuration
 import Config
 
-config :argus, :scopes,
+config :tugas, :scopes,
   user: [
     default: true,
-    module: Argus.Accounts.Scope,
+    module: Tugas.Accounts.Scope,
     assign_key: :current_scope,
     access_path: [:user, :id],
     schema_key: :user_id,
     schema_type: :binary_id,
     schema_table: :users,
-    test_data_fixture: Argus.AccountsFixtures,
+    test_data_fixture: Tugas.AccountsFixtures,
     test_setup_helper: :register_and_log_in_user
   ]
 
@@ -29,30 +29,30 @@ else
   config :tailwind, version: "4.3.1"
 end
 
-config :argus,
-  ecto_repos: [Argus.Repo],
+config :tugas,
+  ecto_repos: [Tugas.Repo],
   generators: [timestamp_type: :utc_datetime, binary_id: true]
 
-config :argus, :upload_limits,
+config :tugas, :upload_limits,
   image: 5_000_000,
   video: 10_000_000,
   pdf: 20_000_000,
   other: 20_000_000
 
-config :argus, :upload_client_image_resize,
+config :tugas, :upload_client_image_resize,
   max_edge: 1920,
   quality: 85,
   min_bytes: 50_000
 
 # Configure the endpoint
-config :argus, ArgusWeb.Endpoint,
+config :tugas, TugasWeb.Endpoint,
   url: [host: "localhost"],
   adapter: Bandit.PhoenixAdapter,
   render_errors: [
-    formats: [html: ArgusWeb.ErrorHTML, json: ArgusWeb.ErrorJSON],
+    formats: [html: TugasWeb.ErrorHTML, json: TugasWeb.ErrorJSON],
     layout: false
   ],
-  pubsub_server: Argus.PubSub,
+  pubsub_server: Tugas.PubSub,
   live_view: [signing_salt: "YvNiaedN"]
 
 # Configure the mailer
@@ -62,11 +62,11 @@ config :argus, ArgusWeb.Endpoint,
 #
 # For production it's recommended to configure a different adapter
 # at the `config/runtime.exs`.
-config :argus, Argus.Mailer, adapter: Swoosh.Adapters.Local
+config :tugas, Tugas.Mailer, adapter: Swoosh.Adapters.Local
 
 # Configure esbuild
 config :esbuild,
-  argus: [
+  tugas: [
     args:
       ~w(js/app.js js/pdf.worker.js --bundle --target=es2022 --log-override:empty-import-meta=silent --outdir=../priv/static/assets/js --external:/fonts/* --external:/images/* --alias:@=.),
     cd: Path.expand("../assets", __DIR__),
@@ -75,7 +75,7 @@ config :esbuild,
 
 # Configure tailwind
 config :tailwind,
-  argus: [
+  tugas: [
     args: ~w(
       --input=assets/css/app.css
       --output=priv/static/assets/css/app.css

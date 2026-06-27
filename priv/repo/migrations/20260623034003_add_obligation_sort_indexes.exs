@@ -1,4 +1,4 @@
-defmodule Argus.Repo.Migrations.AddObligationSortIndexes do
+defmodule Tugas.Repo.Migrations.AddObligationSortIndexes do
   use Ecto.Migration
 
   def change do

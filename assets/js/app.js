@@ -22,7 +22,7 @@ import "phoenix_html"
 // Establish Phoenix Socket and LiveView configuration.
 import {Socket} from "phoenix"
 import {LiveSocket} from "phoenix_live_view"
-import {hooks as colocatedHooks} from "phoenix-colocated/argus"
+import {hooks as colocatedHooks} from "phoenix-colocated/tugas"
 import topbar from "../vendor/topbar"
 import * as pdfjsLib from "../vendor/pdfjs/pdf.min.mjs"
 import {UploadDirect} from "./upload_direct"

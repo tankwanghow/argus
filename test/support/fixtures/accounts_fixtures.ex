@@ -1,13 +1,13 @@
-defmodule Argus.AccountsFixtures do
+defmodule Tugas.AccountsFixtures do
   @moduledoc """
   This module defines test helpers for creating
-  entities via the `Argus.Accounts` context.
+  entities via the `Tugas.Accounts` context.
   """
 
   import Ecto.Query
 
-  alias Argus.Accounts
-  alias Argus.Accounts.Scope
+  alias Tugas.Accounts
+  alias Tugas.Accounts.Scope
 
   # `System.unique_integer/1` only guarantees uniqueness within a single runtime
   # instance — its counter resets every `mix test` run. The test DB persists across
@@ -32,7 +32,7 @@ defmodule Argus.AccountsFixtures do
         password: valid_user_password()
       })
 
-    {:ok, user} = Argus.Accounts.register_invited_user(attrs)
+    {:ok, user} = Tugas.Accounts.register_invited_user(attrs)
     user
   end
 
@@ -88,7 +88,7 @@ defmodule Argus.AccountsFixtures do
   end
 
   def override_token_authenticated_at(token, authenticated_at) when is_binary(token) do
-    Argus.Repo.update_all(
+    Tugas.Repo.update_all(
       from(t in Accounts.UserToken,
         where: t.token == ^token
       ),
@@ -98,14 +98,14 @@ defmodule Argus.AccountsFixtures do
 
   def generate_user_magic_link_token(user) do
     {encoded_token, user_token} = Accounts.UserToken.build_email_token(user, "login")
-    Argus.Repo.insert!(user_token)
+    Tugas.Repo.insert!(user_token)
     {encoded_token, user_token.token}
   end
 
   def offset_user_token(token, amount_to_add, unit) do
     dt = DateTime.add(DateTime.utc_now(:second), amount_to_add, unit)
 
-    Argus.Repo.update_all(
+    Tugas.Repo.update_all(
       from(ut in Accounts.UserToken, where: ut.token == ^token),
       set: [inserted_at: dt, authenticated_at: dt]
     )

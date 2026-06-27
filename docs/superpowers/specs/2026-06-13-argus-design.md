@@ -1,4 +1,4 @@
-# Argus — Multi-Tenant Obligations Tracking System
+# Tugas — Multi-Tenant Obligations Tracking System
 
 **Date:** 2026-06-13  
 **Status:** Approved for implementation planning
@@ -7,7 +7,7 @@
 > revisions win; see `CLAUDE.md` for the authoritative current description.**
 > 1. **Obligation types are per-entity only** (`entity_id` NOT NULL). The "system presets
 >    (`entity_id` NULL)" concept is removed; each entity gets a private, editable copy of the
->    sample types, seeded on entity creation (`Argus.Obligations.SampleTypes`).
+>    sample types, seeded on entity creation (`Tugas.Obligations.SampleTypes`).
 > 2. **`complete_note_required` is removed.** A Done note is now **always required**; only
 >    `complete_documents` remains as a snapshotted, type-configurable completion rule.
 > 3. **`primary_assignee_id` is nullable** — obligations may be created unassigned and assigned
@@ -19,7 +19,7 @@
 
 ## Overview
 
-Argus is a multi-tenant web application for tracking obligations — regulatory filings, operational renewals, client deliverables, and custom deadlines. Users define obligation types (with system presets), assign work to team members, track progress with notes and documents, and see what needs attention on the dashboard.
+Tugas is a multi-tenant web application for tracking obligations — regulatory filings, operational renewals, client deliverables, and custom deadlines. Users define obligation types (with system presets), assign work to team members, track progress with notes and documents, and see what needs attention on the dashboard.
 
 **Tech stack:** Phoenix LiveView monolith, PostgreSQL.
 
@@ -38,10 +38,10 @@ Argus is a multi-tenant web application for tracking obligations — regulatory 
 **magic-link-first** flow — register with email, receive an emailed login link, confirm, then
 create/select an entity. **Password is a fallback**, not the primary path: a user may optionally
 set one in settings and then log in with email+password as an alternative to the magic link
-(`hashed_password` nullable). Request state flows through an `Argus.Accounts.Scope` struct
+(`hashed_password` nullable). Request state flows through an `Tugas.Accounts.Scope` struct
 (`user`, `entity`, `membership`, `role`) exposed as `@current_scope`. The UI is a **dual
 Desktop/Mobile interface** (`/entities/:slug` and `/m/:slug`, device auto-routed). See the
-`argus-conventions` skill.
+`tugas-conventions` skill.
 
 ### Users
 

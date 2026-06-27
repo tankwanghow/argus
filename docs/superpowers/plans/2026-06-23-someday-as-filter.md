@@ -21,20 +21,20 @@
 
 ## File Structure
 
-- Modify: `lib/argus/obligations.ex` — drop `:someday`/`:my_someday` status; add `apply_date_scope/2` + `:date_scope` opt; remove `apply_page_status/2`.
-- Modify: `lib/argus_web/live/obligation_live/index_helpers.ex` — remove someday-lifecycle vocab; add `date_filters/0`, `parse_date_filter/1`, `sorts/2`, `effective_sort/3`, `empty_message/3`, `load_page/8` (+ a `load_page/7` shim defaulting `:dated`).
-- Modify: `lib/argus_web/dashboard_filter.ex` — persist `date_filter`; drop `someday` from the lifecycle whitelist.
-- Modify: `lib/argus_web/live/dashboard_live/index.ex` + `lib/argus_web/live/mobile_live/dashboard.ex` — "Due date" dropdown, `set_date_filter`, thread `@date_filter`, `sorts/2`.
-- Tests: `test/argus/obligations_test.exs`, `test/argus_web/live/index_helpers_test.exs`, `test/argus_web/dashboard_filter_test.exs`, `test/argus_web/live/dashboard_live_test.exs`, `test/argus_web/live/mobile_live_test.exs`.
+- Modify: `lib/tugas/obligations.ex` — drop `:someday`/`:my_someday` status; add `apply_date_scope/2` + `:date_scope` opt; remove `apply_page_status/2`.
+- Modify: `lib/tugas_web/live/obligation_live/index_helpers.ex` — remove someday-lifecycle vocab; add `date_filters/0`, `parse_date_filter/1`, `sorts/2`, `effective_sort/3`, `empty_message/3`, `load_page/8` (+ a `load_page/7` shim defaulting `:dated`).
+- Modify: `lib/tugas_web/dashboard_filter.ex` — persist `date_filter`; drop `someday` from the lifecycle whitelist.
+- Modify: `lib/tugas_web/live/dashboard_live/index.ex` + `lib/tugas_web/live/mobile_live/dashboard.ex` — "Due date" dropdown, `set_date_filter`, thread `@date_filter`, `sorts/2`.
+- Tests: `test/tugas/obligations_test.exs`, `test/tugas_web/live/index_helpers_test.exs`, `test/tugas_web/dashboard_filter_test.exs`, `test/tugas_web/live/dashboard_live_test.exs`, `test/tugas_web/live/mobile_live_test.exs`.
 
 ---
 
 ### Task 1: Query + IndexHelpers engine — `date_scope` replaces `:someday` lifecycle
 
 **Files:**
-- Modify: `lib/argus/obligations.ex`
-- Modify: `lib/argus_web/live/obligation_live/index_helpers.ex`
-- Test: `test/argus/obligations_test.exs`, `test/argus_web/live/index_helpers_test.exs`, `test/argus_web/live/dashboard_live_test.exs`, `test/argus_web/live/mobile_live_test.exs`
+- Modify: `lib/tugas/obligations.ex`
+- Modify: `lib/tugas_web/live/obligation_live/index_helpers.ex`
+- Test: `test/tugas/obligations_test.exs`, `test/tugas_web/live/index_helpers_test.exs`, `test/tugas_web/live/dashboard_live_test.exs`, `test/tugas_web/live/mobile_live_test.exs`
 
 **Interfaces:**
 - Produces:
@@ -43,12 +43,12 @@
 
 - [ ] **Step 1: Update the obligations query tests to the new API (RED)**
 
-In `test/argus/obligations_test.exs`, replace the `describe "list_obligations_page/2 — someday + nullable keyset"` block body so it uses `status` + `date_scope` instead of the `:someday` status. Use this exact block:
+In `test/tugas/obligations_test.exs`, replace the `describe "list_obligations_page/2 — someday + nullable keyset"` block body so it uses `status` + `date_scope` instead of the `:someday` status. Use this exact block:
 
 ```elixir
   describe "list_obligations_page/2 — date_scope" do
     setup do
-      manager = Argus.EntitiesFixtures.manager_scope_fixture()
+      manager = Tugas.EntitiesFixtures.manager_scope_fixture()
       type = type_fixture(manager.entity)
 
       dated =
@@ -105,12 +105,12 @@ In `test/argus/obligations_test.exs`, replace the `describe "list_obligations_pa
   end
 ```
 
-Run: `mix test test/argus/obligations_test.exs -k "date_scope"`
+Run: `mix test test/tugas/obligations_test.exs -k "date_scope"`
 Expected: FAIL (`:date_scope` not supported; `status: :live` currently excludes dateless via `apply_page_status`).
 
 - [ ] **Step 2: Implement the query changes**
 
-In `lib/argus/obligations.ex`:
+In `lib/tugas/obligations.ex`:
 
 Revert `@status_filters`:
 
@@ -137,12 +137,12 @@ Add the helper near `apply_status_filter/2`:
 
 - [ ] **Step 3: Run query tests (GREEN)**
 
-Run: `mix test test/argus/obligations_test.exs`
+Run: `mix test test/tugas/obligations_test.exs`
 Expected: PASS.
 
 - [ ] **Step 4: Update IndexHelpers tests to the new vocabulary (RED)**
 
-In `test/argus_web/live/index_helpers_test.exs`, replace the someday-lifecycle test(s) (the `"someday lifecycle: …"` test and the `describe "load_page urgency on live"` block's references, plus any `sorts(:someday)`/`status_atom(_, :someday)` assertions) with date_filter-based ones:
+In `test/tugas_web/live/index_helpers_test.exs`, replace the someday-lifecycle test(s) (the `"someday lifecycle: …"` test and the `describe "load_page urgency on live"` block's references, plus any `sorts(:someday)`/`status_atom(_, :someday)` assertions) with date_filter-based ones:
 
 ```elixir
   test "date_filter vocabulary + lifecycle-aware sorts" do
@@ -168,12 +168,12 @@ In `test/argus_web/live/index_helpers_test.exs`, replace the someday-lifecycle t
 
 Keep the existing non-someday `load_page` test but update its call to the new arity — change `Index.load_page(manager, today, false, :live, "", :due_asc, nil)` to `Index.load_page(manager, today, false, :live, :dated, "", :due_asc, nil)`. Also update the urgency `describe` block's `load_page(..., :live, "", :urgency, nil)` calls to `load_page(..., :live, :dated, "", :urgency, nil)`.
 
-Run: `mix test test/argus_web/live/index_helpers_test.exs`
+Run: `mix test test/tugas_web/live/index_helpers_test.exs`
 Expected: FAIL (`date_filters/0`, `sorts/2`, `effective_sort/3`, `load_page/8` undefined).
 
 - [ ] **Step 5: Implement IndexHelpers**
 
-In `lib/argus_web/live/obligation_live/index_helpers.ex`:
+In `lib/tugas_web/live/obligation_live/index_helpers.ex`:
 
 Revert `@lifecycles` and remove the someday-lifecycle clauses:
 
@@ -330,7 +330,7 @@ Update `serve_window/6` and `serve_tail/6` to pass `date_scope: :dated` to their
 
 - [ ] **Step 6: Remove the now-invalid someday-lifecycle dashboard tests**
 
-The dashboard tests that switch `lifecycle: "someday"` no longer apply (Someday isn't a lifecycle). In `test/argus_web/live/dashboard_live_test.exs` delete the test `"Someday tab lists dateless duties without urgency/due chrome"`. In `test/argus_web/live/mobile_live_test.exs` delete the test `"mobile dateless-card guards for Someday lifecycle"` (the one switching to the `someday` lifecycle). The dateless-card rendering is re-covered via the new Due-date dropdown tests in Tasks 3–4.
+The dashboard tests that switch `lifecycle: "someday"` no longer apply (Someday isn't a lifecycle). In `test/tugas_web/live/dashboard_live_test.exs` delete the test `"Someday tab lists dateless duties without urgency/due chrome"`. In `test/tugas_web/live/mobile_live_test.exs` delete the test `"mobile dateless-card guards for Someday lifecycle"` (the one switching to the `someday` lifecycle). The dateless-card rendering is re-covered via the new Due-date dropdown tests in Tasks 3–4.
 
 - [ ] **Step 7: Run the full suite (GREEN)**
 
@@ -340,7 +340,7 @@ Expected: PASS. (Dashboards still call `load_page/7` shim → `:dated` default, 
 - [ ] **Step 8: Commit**
 
 ```bash
-git add lib/argus/obligations.ex lib/argus_web/live/obligation_live/index_helpers.ex test/argus/obligations_test.exs test/argus_web/live/index_helpers_test.exs test/argus_web/live/dashboard_live_test.exs test/argus_web/live/mobile_live_test.exs
+git add lib/tugas/obligations.ex lib/tugas_web/live/obligation_live/index_helpers.ex test/tugas/obligations_test.exs test/tugas_web/live/index_helpers_test.exs test/tugas_web/live/dashboard_live_test.exs test/tugas_web/live/mobile_live_test.exs
 git commit -m "refactor: Someday becomes a date_scope filter, not a lifecycle
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
@@ -348,18 +348,18 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 ---
 
-### Task 2: Persist `date_filter` — `ArgusWeb.DashboardFilter`
+### Task 2: Persist `date_filter` — `TugasWeb.DashboardFilter`
 
 **Files:**
-- Modify: `lib/argus_web/dashboard_filter.ex`
-- Test: `test/argus_web/dashboard_filter_test.exs`
+- Modify: `lib/tugas_web/dashboard_filter.ex`
+- Test: `test/tugas_web/dashboard_filter_test.exs`
 
 **Interfaces:**
 - Produces: the per-entity entry gains `"date_filter"`; `assign_filters/2` assigns `:date_filter` (default `:dated`, bogus → `:dated`); the `store-dashboard-filter` push payload carries `date_filter`.
 
 - [ ] **Step 1: Write the failing test**
 
-Add to `test/argus_web/dashboard_filter_test.exs`:
+Add to `test/tugas_web/dashboard_filter_test.exs`:
 
 ```elixir
     test "restores a saved date_filter and defaults to dated" do
@@ -383,12 +383,12 @@ Also update the existing `merge_session/3` "stores normalized filter values" tes
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `mix test test/argus_web/dashboard_filter_test.exs`
+Run: `mix test test/tugas_web/dashboard_filter_test.exs`
 Expected: FAIL (missing `:date_filter`).
 
 - [ ] **Step 3: Implement**
 
-In `lib/argus_web/dashboard_filter.ex`:
+In `lib/tugas_web/dashboard_filter.ex`:
 
 Revert the lifecycle whitelist and add a date_filter whitelist:
 
@@ -448,13 +448,13 @@ Add `date_filter` to the `persist/1` push payload:
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `mix test test/argus_web/dashboard_filter_test.exs`
+Run: `mix test test/tugas_web/dashboard_filter_test.exs`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add lib/argus_web/dashboard_filter.ex test/argus_web/dashboard_filter_test.exs
+git add lib/tugas_web/dashboard_filter.ex test/tugas_web/dashboard_filter_test.exs
 git commit -m "feat: persist the dashboard date_filter
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
@@ -465,19 +465,19 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ### Task 3: Desktop dashboard — "Due date" dropdown
 
 **Files:**
-- Modify: `lib/argus_web/live/dashboard_live/index.ex`
-- Test: `test/argus_web/live/dashboard_live_test.exs`
+- Modify: `lib/tugas_web/live/dashboard_live/index.ex`
+- Test: `test/tugas_web/live/dashboard_live_test.exs`
 
 **Interfaces:**
 - Consumes: `IndexHelpers.date_filters/0`, `parse_date_filter/1`, `sorts/2`, `load_page/8`, `empty_message/3`; `DashboardFilter` now assigns `:date_filter`.
 
 - [ ] **Step 1: Write the failing test**
 
-Add to `test/argus_web/live/dashboard_live_test.exs`:
+Add to `test/tugas_web/live/dashboard_live_test.exs`:
 
 ```elixir
   test "Due date filter shows Someday duties within a lifecycle", %{conn: conn} do
-    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     conn = log_in_user(manager.user |> then(fn u -> conn |> log_in_user(u) end) && conn, manager.user)
     type = type_fixture(manager.entity)
 
@@ -506,12 +506,12 @@ Add to `test/argus_web/live/dashboard_live_test.exs`:
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `mix test test/argus_web/live/dashboard_live_test.exs -k "Due date filter"`
+Run: `mix test test/tugas_web/live/dashboard_live_test.exs -k "Due date filter"`
 Expected: FAIL (no `#obligation-date-filter`).
 
 - [ ] **Step 3: Implement**
 
-In `lib/argus_web/live/dashboard_live/index.ex`:
+In `lib/tugas_web/live/dashboard_live/index.ex`:
 
 Add the Due-date `<select>` right after the `#obligation-status-filter` form:
 
@@ -558,13 +558,13 @@ In both, destructure `date_filter` from `socket.assigns` alongside the others (a
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `mix test test/argus_web/live/dashboard_live_test.exs`
+Run: `mix test test/tugas_web/live/dashboard_live_test.exs`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add lib/argus_web/live/dashboard_live/index.ex test/argus_web/live/dashboard_live_test.exs
+git add lib/tugas_web/live/dashboard_live/index.ex test/tugas_web/live/dashboard_live_test.exs
 git commit -m "feat: desktop Due-date filter (dated/someday/all)
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
@@ -575,25 +575,25 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ### Task 4: Mobile dashboard — "Due date" dropdown + remove the `load_page/7` shim
 
 **Files:**
-- Modify: `lib/argus_web/live/mobile_live/dashboard.ex`
-- Modify: `lib/argus_web/live/obligation_live/index_helpers.ex` (remove the shim)
-- Test: `test/argus_web/live/mobile_live_test.exs`
+- Modify: `lib/tugas_web/live/mobile_live/dashboard.ex`
+- Modify: `lib/tugas_web/live/obligation_live/index_helpers.ex` (remove the shim)
+- Test: `test/tugas_web/live/mobile_live_test.exs`
 
 **Interfaces:**
 - Consumes: same IndexHelpers functions as Task 3. After this task, all callers use `load_page/8` and the `/7` shim is removed.
 
 - [ ] **Step 1: Write the failing test**
 
-Add to `test/argus_web/live/mobile_live_test.exs`:
+Add to `test/tugas_web/live/mobile_live_test.exs`:
 
 ```elixir
   test "mobile Due date filter shows Someday duties", %{conn: conn} do
-    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     conn = mobile_conn(conn, manager)
     type = type_fixture(manager.entity)
 
-    {:ok, _dated} = Argus.Obligations.create_obligation(manager, %{title: "Has a deadline", obligation_type_id: type.id, due_by: ~D[2026-07-01], open_note: "n"})
-    {:ok, _sd} = Argus.Obligations.create_obligation(manager, %{title: "Tidy the archive", obligation_type_id: type.id, someday: true, open_note: "n"})
+    {:ok, _dated} = Tugas.Obligations.create_obligation(manager, %{title: "Has a deadline", obligation_type_id: type.id, due_by: ~D[2026-07-01], open_note: "n"})
+    {:ok, _sd} = Tugas.Obligations.create_obligation(manager, %{title: "Tidy the archive", obligation_type_id: type.id, someday: true, open_note: "n"})
 
     {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}")
     assert view |> element("#mobile-obligations") |> render() =~ "Has a deadline"
@@ -607,12 +607,12 @@ Add to `test/argus_web/live/mobile_live_test.exs`:
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `mix test test/argus_web/live/mobile_live_test.exs -k "Due date filter"`
+Run: `mix test test/tugas_web/live/mobile_live_test.exs -k "Due date filter"`
 Expected: FAIL (no `#m-obligation-date-filter`).
 
 - [ ] **Step 3: Implement (mobile)**
 
-In `lib/argus_web/live/mobile_live/dashboard.ex`, add the Due-date `<select>` into the header control row (next to the status/sort selects):
+In `lib/tugas_web/live/mobile_live/dashboard.ex`, add the Due-date `<select>` into the header control row (next to the status/sort selects):
 
 ```heex
           <form id="m-obligation-date-filter-form" phx-change="set_date_filter">
@@ -632,7 +632,7 @@ Change the sort `<select>` source to `Index.sorts(@lifecycle, @date_filter)`; ch
 
 - [ ] **Step 4: Remove the transitional shim**
 
-Now that both dashboards call `load_page/8`, delete the `load_page/7` shim clause from `lib/argus_web/live/obligation_live/index_helpers.ex` (the two-line clause that delegates with `:dated`).
+Now that both dashboards call `load_page/8`, delete the `load_page/7` shim clause from `lib/tugas_web/live/obligation_live/index_helpers.ex` (the two-line clause that delegates with `:dated`).
 
 - [ ] **Step 5: Run the full gate**
 
@@ -642,7 +642,7 @@ Expected: PASS (compile `--warnings-as-errors` confirms no remaining `load_page/
 - [ ] **Step 6: Commit**
 
 ```bash
-git add lib/argus_web/live/mobile_live/dashboard.ex lib/argus_web/live/obligation_live/index_helpers.ex test/argus_web/live/mobile_live_test.exs
+git add lib/tugas_web/live/mobile_live/dashboard.ex lib/tugas_web/live/obligation_live/index_helpers.ex test/tugas_web/live/mobile_live_test.exs
 git commit -m "feat: mobile Due-date filter; drop the load_page/7 shim
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"

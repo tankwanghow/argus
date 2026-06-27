@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Contexts own domain logic; LiveViews call `Argus.Obligations`, never `Repo` directly.
+- Contexts own domain logic; LiveViews call `Tugas.Obligations`, never `Repo` directly.
 - Unauthorized context calls return `:not_authorise` (not relevant to read paths here, but the convention stands).
 - LiveView lists use **streams** (`phx-update="stream"`), never `:for` over a plain assign.
 - `due_by` is `NOT NULL` on `Obligation`; no null-ordering edge cases.
@@ -24,23 +24,23 @@
 
 ## File Structure
 
-- Create: `lib/argus/obligations/pagination.ex` — keyset cursor encode/decode (idempotent).
-- Modify: `lib/argus/obligations.ex` — add `list_obligations_page/2` (SQL filter + sort + keyset paging; `due_before`/`due_after`/`limit: :all` options). Leaves the existing `list_obligations/2` intact for its other callers.
+- Create: `lib/tugas/obligations/pagination.ex` — keyset cursor encode/decode (idempotent).
+- Modify: `lib/tugas/obligations.ex` — add `list_obligations_page/2` (SQL filter + sort + keyset paging; `due_before`/`due_after`/`limit: :all` options). Leaves the existing `list_obligations/2` intact for its other callers.
 - Create: `priv/repo/migrations/<ts>_add_obligation_sort_indexes.exs` — keyset support indexes.
-- Modify: `lib/argus_web/dashboard_filter.ex` — add `sort` to the persisted entry.
-- Modify: `lib/argus_web/live/obligation_live/index_helpers.ex` — `sorts/1`, `parse_sort/1`, `effective_sort/2`, `load_page/7`, `build_rows/2`, urgency window+tail; remove the lifecycle-keyed `sort_rows/2`.
-- Modify: `lib/argus_web/live/dashboard_live/index.ex` — streams, sort `<select>`, `load_more`, reset-on-change.
-- Modify: `lib/argus_web/live/mobile_live/dashboard.ex` — same as desktop, mobile markup.
-- Modify: `lib/argus_web/live/mobile_live/components.ex` — `obligation_card` gains a required `id` attr.
-- Tests: `test/argus/obligations/pagination_test.exs` (new), `test/argus/obligations_test.exs`, `test/argus_web/dashboard_filter_test.exs`, `test/argus_web/live/index_helpers_test.exs` (new), `test/argus_web/live/dashboard_live_test.exs`, `test/argus_web/live/mobile_live_test.exs`.
+- Modify: `lib/tugas_web/dashboard_filter.ex` — add `sort` to the persisted entry.
+- Modify: `lib/tugas_web/live/obligation_live/index_helpers.ex` — `sorts/1`, `parse_sort/1`, `effective_sort/2`, `load_page/7`, `build_rows/2`, urgency window+tail; remove the lifecycle-keyed `sort_rows/2`.
+- Modify: `lib/tugas_web/live/dashboard_live/index.ex` — streams, sort `<select>`, `load_more`, reset-on-change.
+- Modify: `lib/tugas_web/live/mobile_live/dashboard.ex` — same as desktop, mobile markup.
+- Modify: `lib/tugas_web/live/mobile_live/components.ex` — `obligation_card` gains a required `id` attr.
+- Tests: `test/tugas/obligations/pagination_test.exs` (new), `test/tugas/obligations_test.exs`, `test/tugas_web/dashboard_filter_test.exs`, `test/tugas_web/live/index_helpers_test.exs` (new), `test/tugas_web/live/dashboard_live_test.exs`, `test/tugas_web/live/mobile_live_test.exs`.
 
 ---
 
-### Task 1: Keyset cursor codec — `Argus.Obligations.Pagination`
+### Task 1: Keyset cursor codec — `Tugas.Obligations.Pagination`
 
 **Files:**
-- Create: `lib/argus/obligations/pagination.ex`
-- Test: `test/argus/obligations/pagination_test.exs`
+- Create: `lib/tugas/obligations/pagination.ex`
+- Test: `test/tugas/obligations/pagination_test.exs`
 
 **Interfaces:**
 - Produces:
@@ -50,11 +50,11 @@
 - [ ] **Step 1: Write the failing test**
 
 ```elixir
-# test/argus/obligations/pagination_test.exs
-defmodule Argus.Obligations.PaginationTest do
+# test/tugas/obligations/pagination_test.exs
+defmodule Tugas.Obligations.PaginationTest do
   use ExUnit.Case, async: true
 
-  alias Argus.Obligations.Pagination
+  alias Tugas.Obligations.Pagination
 
   test "round-trips a key/id cursor" do
     cursor = %{key: "2026-06-15", id: "abc-123"}
@@ -81,14 +81,14 @@ end
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `mix test test/argus/obligations/pagination_test.exs`
-Expected: FAIL with `Argus.Obligations.Pagination` undefined.
+Run: `mix test test/tugas/obligations/pagination_test.exs`
+Expected: FAIL with `Tugas.Obligations.Pagination` undefined.
 
 - [ ] **Step 3: Write minimal implementation**
 
 ```elixir
-# lib/argus/obligations/pagination.ex
-defmodule Argus.Obligations.Pagination do
+# lib/tugas/obligations/pagination.ex
+defmodule Tugas.Obligations.Pagination do
   @moduledoc false
 
   def encode(nil), do: nil
@@ -118,13 +118,13 @@ end
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `mix test test/argus/obligations/pagination_test.exs`
+Run: `mix test test/tugas/obligations/pagination_test.exs`
 Expected: PASS (4 tests).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add lib/argus/obligations/pagination.ex test/argus/obligations/pagination_test.exs
+git add lib/tugas/obligations/pagination.ex test/tugas/obligations/pagination_test.exs
 git commit -m "feat: add keyset cursor codec for obligation pagination
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
@@ -135,25 +135,25 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ### Task 2: SQL paginated query — `Obligations.list_obligations_page/2`
 
 **Files:**
-- Modify: `lib/argus/obligations.ex`
-- Test: `test/argus/obligations_test.exs`
+- Modify: `lib/tugas/obligations.ex`
+- Test: `test/tugas/obligations_test.exs`
 
 **Interfaces:**
-- Consumes: `Argus.Obligations.Pagination.decode/1`, `Pagination.encode/1` (Task 1).
+- Consumes: `Tugas.Obligations.Pagination.decode/1`, `Pagination.encode/1` (Task 1).
 - Produces:
   `list_obligations_page(%Scope{}, opts) :: %{rows: [%Obligation{}], cursor: String.t() | nil, end?: boolean}`
   where `opts` may include `:status` (default `:live`, validated against `@status_filters`), `:query`, `:sort` (`:due_asc | :due_desc | :title | :urgency`; `:urgency` is normalized to `:due_asc` here — urgency ranking happens in IndexHelpers), `:cursor` (encoded string or decoded map), `:limit` (default `@page_size`, or `:all` for no paging), `:due_before` (`%Date{}` → `due_by <= date`), `:due_after` (`%Date{}` → `due_by > date`). Rows preload `:obligation_type` and `:primary_assignee`.
 
-**Notes:** `lib/argus/obligations.ex` already `import Ecto.Query` and defines `@status_filters`, `scope_to_assignee/3`, `apply_status_filter/2`, and `live/1`. Reuse them. Add `alias Argus.Obligations.Pagination` near the other aliases.
+**Notes:** `lib/tugas/obligations.ex` already `import Ecto.Query` and defines `@status_filters`, `scope_to_assignee/3`, `apply_status_filter/2`, and `live/1`. Reuse them. Add `alias Tugas.Obligations.Pagination` near the other aliases.
 
 - [ ] **Step 1: Write the failing test**
 
-Add to `test/argus/obligations_test.exs` inside a new `describe`:
+Add to `test/tugas/obligations_test.exs` inside a new `describe`:
 
 ```elixir
   describe "list_obligations_page/2" do
     setup do
-      manager = Argus.EntitiesFixtures.manager_scope_fixture()
+      manager = Tugas.EntitiesFixtures.manager_scope_fixture()
       type = type_fixture(manager.entity)
 
       mk = fn title, due ->
@@ -216,12 +216,12 @@ Add to `test/argus/obligations_test.exs` inside a new `describe`:
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `mix test test/argus/obligations_test.exs -k "list_obligations_page"` (or run the file).
+Run: `mix test test/tugas/obligations_test.exs -k "list_obligations_page"` (or run the file).
 Expected: FAIL with `list_obligations_page/2` undefined.
 
 - [ ] **Step 3: Write minimal implementation**
 
-Add `alias Argus.Obligations.Pagination` with the other aliases, then add the function and its private helpers (place near `list_obligations/2`):
+Add `alias Tugas.Obligations.Pagination` with the other aliases, then add the function and its private helpers (place near `list_obligations/2`):
 
 ```elixir
   @page_size 25
@@ -332,13 +332,13 @@ Add `alias Argus.Obligations.Pagination` with the other aliases, then add the fu
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `mix test test/argus/obligations_test.exs`
+Run: `mix test test/tugas/obligations_test.exs`
 Expected: PASS (new describe + existing tests).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add lib/argus/obligations.ex test/argus/obligations_test.exs
+git add lib/tugas/obligations.ex test/tugas/obligations_test.exs
 git commit -m "feat: add SQL keyset-paginated list_obligations_page
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
@@ -363,7 +363,7 @@ Expected: prints the created path under `priv/repo/migrations/`.
 Replace the generated file's contents:
 
 ```elixir
-defmodule Argus.Repo.Migrations.AddObligationSortIndexes do
+defmodule Tugas.Repo.Migrations.AddObligationSortIndexes do
   use Ecto.Migration
 
   def change do
@@ -384,7 +384,7 @@ end
 
 - [ ] **Step 3: Run the migration and the suite**
 
-Run: `mix ecto.migrate && mix test test/argus/obligations_test.exs`
+Run: `mix ecto.migrate && mix test test/tugas/obligations_test.exs`
 Expected: migration applies cleanly; tests PASS.
 
 - [ ] **Step 4: Commit**
@@ -398,18 +398,18 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 ---
 
-### Task 4: Persist the `sort` filter — `ArgusWeb.DashboardFilter`
+### Task 4: Persist the `sort` filter — `TugasWeb.DashboardFilter`
 
 **Files:**
-- Modify: `lib/argus_web/dashboard_filter.ex`
-- Test: `test/argus_web/dashboard_filter_test.exs`
+- Modify: `lib/tugas_web/dashboard_filter.ex`
+- Test: `test/tugas_web/dashboard_filter_test.exs`
 
 **Interfaces:**
 - Produces: the per-entity entry gains `"sort"`; `load/2` result and `assign_filters/2` now include `sort: :due_asc | :due_desc | :title | :urgency` (default `:due_asc`). `session_entry/1` normalizes `"sort"` via `param_sort/1` (whitelist, default `"due_asc"`).
 
 - [ ] **Step 1: Write the failing test**
 
-Add to `test/argus_web/dashboard_filter_test.exs`:
+Add to `test/tugas_web/dashboard_filter_test.exs`:
 
 ```elixir
     test "restores a saved sort and defaults to due_asc" do
@@ -454,12 +454,12 @@ Also update the existing `merge_session/3` "stores normalized filter values" tes
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `mix test test/argus_web/dashboard_filter_test.exs`
+Run: `mix test test/tugas_web/dashboard_filter_test.exs`
 Expected: FAIL (missing `:sort`, and the merge_session map lacks `"sort"`).
 
 - [ ] **Step 3: Write minimal implementation**
 
-In `lib/argus_web/dashboard_filter.ex`:
+In `lib/tugas_web/dashboard_filter.ex`:
 
 Add the sorts module attr near `@lifecycles`:
 
@@ -555,13 +555,13 @@ Update the `push_event` payload in `persist/1` to include `sort`:
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `mix test test/argus_web/dashboard_filter_test.exs`
+Run: `mix test test/tugas_web/dashboard_filter_test.exs`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add lib/argus_web/dashboard_filter.ex test/argus_web/dashboard_filter_test.exs
+git add lib/tugas_web/dashboard_filter.ex test/tugas_web/dashboard_filter_test.exs
 git commit -m "feat: persist dashboard sort alongside the other filters
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
@@ -572,8 +572,8 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ### Task 5: IndexHelpers — sort options + non-urgency `load_page/7`
 
 **Files:**
-- Modify: `lib/argus_web/live/obligation_live/index_helpers.ex`
-- Test: `test/argus_web/live/index_helpers_test.exs` (new)
+- Modify: `lib/tugas_web/live/obligation_live/index_helpers.ex`
+- Test: `test/tugas_web/live/index_helpers_test.exs` (new)
 
 **Interfaces:**
 - Consumes: `Obligations.list_obligations_page/2` (Task 2), `Obligations.event_summaries_for/1`.
@@ -588,14 +588,14 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 - [ ] **Step 1: Write the failing test**
 
 ```elixir
-# test/argus_web/live/index_helpers_test.exs
-defmodule ArgusWeb.ObligationLive.IndexHelpersTest do
-  use Argus.DataCase, async: true
+# test/tugas_web/live/index_helpers_test.exs
+defmodule TugasWeb.ObligationLive.IndexHelpersTest do
+  use Tugas.DataCase, async: true
 
-  import Argus.ObligationsFixtures
+  import Tugas.ObligationsFixtures
 
-  alias ArgusWeb.ObligationLive.IndexHelpers, as: Index
-  alias Argus.Obligations.Urgency
+  alias TugasWeb.ObligationLive.IndexHelpers, as: Index
+  alias Tugas.Obligations.Urgency
 
   test "sorts/1 includes urgency only for live" do
     assert {"urgency", _} = List.keyfind(Index.sorts(:live), "urgency", 0)
@@ -614,12 +614,12 @@ defmodule ArgusWeb.ObligationLive.IndexHelpersTest do
   end
 
   test "load_page returns paged rows for a non-urgency sort" do
-    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     type = type_fixture(manager.entity)
 
     for {title, due} <- [{"a", ~D[2026-01-01]}, {"b", ~D[2026-02-01]}, {"c", ~D[2026-03-01]}] do
       {:ok, _} =
-        Argus.Obligations.create_obligation(manager, %{
+        Tugas.Obligations.create_obligation(manager, %{
           title: title,
           obligation_type_id: type.id,
           due_by: due,
@@ -639,12 +639,12 @@ end
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `mix test test/argus_web/live/index_helpers_test.exs`
+Run: `mix test test/tugas_web/live/index_helpers_test.exs`
 Expected: FAIL (`sorts/1`, `effective_sort/2`, `parse_sort/1`, `load_page/7` undefined).
 
 - [ ] **Step 3: Write minimal implementation**
 
-In `lib/argus_web/live/obligation_live/index_helpers.ex`:
+In `lib/tugas_web/live/obligation_live/index_helpers.ex`:
 
 Add the page size constant near `@urgency_rank`:
 
@@ -721,13 +721,13 @@ Delete the two `sort_rows/2` clauses (lines defining `sort_rows(rows, :live)` an
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `mix test test/argus_web/live/index_helpers_test.exs`
+Run: `mix test test/tugas_web/live/index_helpers_test.exs`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add lib/argus_web/live/obligation_live/index_helpers.ex test/argus_web/live/index_helpers_test.exs
+git add lib/tugas_web/live/obligation_live/index_helpers.ex test/tugas_web/live/index_helpers_test.exs
 git commit -m "feat: add sort options and SQL-paged load_page to IndexHelpers
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
@@ -738,8 +738,8 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ### Task 6: IndexHelpers — urgency window + tail
 
 **Files:**
-- Modify: `lib/argus_web/live/obligation_live/index_helpers.ex`
-- Test: `test/argus_web/live/index_helpers_test.exs`
+- Modify: `lib/tugas_web/live/obligation_live/index_helpers.ex`
+- Test: `test/tugas_web/live/index_helpers_test.exs`
 
 **Interfaces:**
 - Produces: `load_page/7` now also serves `effective_sort == :urgency` (live only). The first page loads the live `due_by <= today + 365d` window into memory, ranks by urgency then `due_by` (chronologically correct via ISO string), and slices `@page_size`. When the window is exhausted, paging continues into the `> today + 365d` SQL keyset tail (uniformly `:ok`). The returned `cursor` is an opaque urgency-tagged string consumed only by the next `load_page/7`.
@@ -748,19 +748,19 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 - [ ] **Step 1: Write the failing test**
 
-Add to `test/argus_web/live/index_helpers_test.exs`:
+Add to `test/tugas_web/live/index_helpers_test.exs`:
 
 ```elixir
   describe "load_page urgency on live" do
     setup do
-      manager = Argus.EntitiesFixtures.manager_scope_fixture()
+      manager = Tugas.EntitiesFixtures.manager_scope_fixture()
       # reminder offset 30 days => due within 30d is due_soon, overdue is past.
       type = type_fixture(manager.entity, reminder_offsets: "30")
       today = ~D[2026-06-01]
 
       mk = fn title, due ->
         {:ok, o} =
-          Argus.Obligations.create_obligation(manager, %{
+          Tugas.Obligations.create_obligation(manager, %{
             title: title,
             obligation_type_id: type.id,
             due_by: due,
@@ -779,11 +779,11 @@ Add to `test/argus_web/live/index_helpers_test.exs`:
 
     test "ranks overdue, then due_soon, then ok by due date; far tail loads last",
          %{manager: m, today: today, overdue: o, soon: s, ok: k, far: f} do
-      p1 = ArgusWeb.ObligationLive.IndexHelpers.load_page(m, today, false, :live, "", :urgency, nil)
+      p1 = TugasWeb.ObligationLive.IndexHelpers.load_page(m, today, false, :live, "", :urgency, nil)
       assert Enum.map(p1.rows, & &1.obligation.id) == [o.id, s.id, k.id]
       refute p1.end?
 
-      p2 = ArgusWeb.ObligationLive.IndexHelpers.load_page(m, today, false, :live, "", :urgency, p1.cursor)
+      p2 = TugasWeb.ObligationLive.IndexHelpers.load_page(m, today, false, :live, "", :urgency, p1.cursor)
       assert Enum.map(p2.rows, & &1.obligation.id) == [f.id]
       assert p2.end?
     end
@@ -794,7 +794,7 @@ Add to `test/argus_web/live/index_helpers_test.exs`:
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `mix test test/argus_web/live/index_helpers_test.exs`
+Run: `mix test test/tugas_web/live/index_helpers_test.exs`
 Expected: FAIL (urgency case raises a `FunctionClauseError` in `do_load_page/7`, which currently only matches `sort != :urgency`).
 
 - [ ] **Step 3: Write minimal implementation**
@@ -884,13 +884,13 @@ Add the urgency clause and its helpers (place after the non-urgency `do_load_pag
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `mix test test/argus_web/live/index_helpers_test.exs`
+Run: `mix test test/tugas_web/live/index_helpers_test.exs`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add lib/argus_web/live/obligation_live/index_helpers.ex test/argus_web/live/index_helpers_test.exs
+git add lib/tugas_web/live/obligation_live/index_helpers.ex test/tugas_web/live/index_helpers_test.exs
 git commit -m "feat: urgency window + tail paging for live dashboard sort
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
@@ -901,19 +901,19 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ### Task 7: Desktop dashboard — streams, sort control, infinite scroll
 
 **Files:**
-- Modify: `lib/argus_web/live/dashboard_live/index.ex`
-- Test: `test/argus_web/live/dashboard_live_test.exs`
+- Modify: `lib/tugas_web/live/dashboard_live/index.ex`
+- Test: `test/tugas_web/live/dashboard_live_test.exs`
 
 **Interfaces:**
 - Consumes: `DashboardFilter.assign_filters/2` (now assigns `:sort`), `DashboardFilter.persist/1`, `IndexHelpers.load_page/7`, `IndexHelpers.sorts/1`, `IndexHelpers.parse_sort/1`.
 
 - [ ] **Step 1: Write the failing test**
 
-Add to `test/argus_web/live/dashboard_live_test.exs`:
+Add to `test/tugas_web/live/dashboard_live_test.exs`:
 
 ```elixir
   test "sort dropdown reorders, hides urgency off-live, and infinite scroll appends", %{conn: conn} do
-    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     conn = log_in_user(conn, manager.user)
     type = type_fixture(manager.entity)
 
@@ -948,20 +948,20 @@ Add to `test/argus_web/live/dashboard_live_test.exs`:
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `mix test test/argus_web/live/dashboard_live_test.exs -k "infinite scroll"`
+Run: `mix test test/tugas_web/live/dashboard_live_test.exs -k "infinite scroll"`
 Expected: FAIL (`#obligation-sort` missing, `load_more` not handled, no 25-cap).
 
 - [ ] **Step 3: Write minimal implementation**
 
-In `lib/argus_web/live/dashboard_live/index.ex`:
+In `lib/tugas_web/live/dashboard_live/index.ex`:
 
 Replace the list markup (the `<ul id="obligations-list">` block) with a stream + sentinel + separate empty state:
 
 ```heex
-        <div class="argus-page-body">
+        <div class="tugas-page-body">
           <ul
             id="obligations-list"
-            class="argus-row-list"
+            class="tugas-row-list"
             phx-update="stream"
             phx-viewport-bottom={!@end? && "load_more"}
           >
@@ -1097,13 +1097,13 @@ Replace the four mutating handlers and `load_rows/1` with first-page reloads + a
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `mix test test/argus_web/live/dashboard_live_test.exs`
+Run: `mix test test/tugas_web/live/dashboard_live_test.exs`
 Expected: PASS (new test + the existing persistence/scope tests, which still find `#scope-mine.tab-active`, `#obligation-search`, and `#obligations-empty`).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add lib/argus_web/live/dashboard_live/index.ex test/argus_web/live/dashboard_live_test.exs
+git add lib/tugas_web/live/dashboard_live/index.ex test/tugas_web/live/dashboard_live_test.exs
 git commit -m "feat: sort control and infinite scroll on the desktop dashboard
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
@@ -1114,9 +1114,9 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ### Task 8: Mobile dashboard — streams, sort control, infinite scroll
 
 **Files:**
-- Modify: `lib/argus_web/live/mobile_live/dashboard.ex`
-- Modify: `lib/argus_web/live/mobile_live/components.ex`
-- Test: `test/argus_web/live/mobile_live_test.exs`
+- Modify: `lib/tugas_web/live/mobile_live/dashboard.ex`
+- Modify: `lib/tugas_web/live/mobile_live/components.ex`
+- Test: `test/tugas_web/live/mobile_live_test.exs`
 
 **Interfaces:**
 - Consumes: same IndexHelpers / DashboardFilter functions as Task 7.
@@ -1124,17 +1124,17 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 - [ ] **Step 1: Write the failing test**
 
-Add to `test/argus_web/live/mobile_live_test.exs`:
+Add to `test/tugas_web/live/mobile_live_test.exs`:
 
 ```elixir
   test "mobile sort dropdown reorders and infinite scroll appends", %{conn: conn} do
-    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     conn = mobile_conn(conn, manager)
     type = type_fixture(manager.entity)
 
     for i <- 1..30 do
       {:ok, _} =
-        Argus.Obligations.create_obligation(manager, %{
+        Tugas.Obligations.create_obligation(manager, %{
           title: "Duty #{String.pad_leading(Integer.to_string(i), 2, "0")}",
           obligation_type_id: type.id,
           due_by: Date.add(~D[2026-06-01], i),
@@ -1154,16 +1154,16 @@ Add to `test/argus_web/live/mobile_live_test.exs`:
   end
 ```
 
-Confirm `mobile_conn/2` and `type_fixture/1` are already imported in this test module (they are used by existing tests / fixtures). If `type_fixture` is not imported, add `import Argus.ObligationsFixtures` at the top.
+Confirm `mobile_conn/2` and `type_fixture/1` are already imported in this test module (they are used by existing tests / fixtures). If `type_fixture` is not imported, add `import Tugas.ObligationsFixtures` at the top.
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `mix test test/argus_web/live/mobile_live_test.exs -k "infinite scroll"`
+Run: `mix test test/tugas_web/live/mobile_live_test.exs -k "infinite scroll"`
 Expected: FAIL (`#m-obligation-sort` missing, `load_more` not handled).
 
 - [ ] **Step 3: Write minimal implementation**
 
-In `lib/argus_web/live/mobile_live/components.ex`, add the `id` attr and use it on the root `<li>`:
+In `lib/tugas_web/live/mobile_live/components.ex`, add the `id` attr and use it on the root `<li>`:
 
 ```elixir
   attr :id, :string, required: true
@@ -1182,7 +1182,7 @@ In `lib/argus_web/live/mobile_live/components.ex`, add the `id` attr and use it 
 
 (Leave the rest of the card unchanged.)
 
-In `lib/argus_web/live/mobile_live/dashboard.ex`, add the sort `<select>` to the header controls row (after the `#m-obligation-status-filter` form):
+In `lib/tugas_web/live/mobile_live/dashboard.ex`, add the sort `<select>` to the header controls row (after the `#m-obligation-status-filter` form):
 
 ```heex
           <form id="m-obligation-sort-filter" phx-change="set_sort">
@@ -1230,7 +1230,7 @@ Rewrite `mount/3` and the handlers exactly as in Task 7 but with the mobile `row
   @impl true
   def mount(_params, session, socket) do
     scope = socket.assigns.current_scope
-    today = Argus.Obligations.Urgency.today_for(scope.entity.timezone)
+    today = Tugas.Obligations.Urgency.today_for(scope.entity.timezone)
 
     {:ok,
      socket
@@ -1312,13 +1312,13 @@ Remove the old `load_rows/1` from this module.
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `mix test test/argus_web/live/mobile_live_test.exs`
+Run: `mix test test/tugas_web/live/mobile_live_test.exs`
 Expected: PASS (new test + existing mobile persistence/render tests).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add lib/argus_web/live/mobile_live/dashboard.ex lib/argus_web/live/mobile_live/components.ex test/argus_web/live/mobile_live_test.exs
+git add lib/tugas_web/live/mobile_live/dashboard.ex lib/tugas_web/live/mobile_live/components.ex test/tugas_web/live/mobile_live_test.exs
 git commit -m "feat: sort control and infinite scroll on the mobile dashboard
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"

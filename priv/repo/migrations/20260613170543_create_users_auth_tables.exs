@@ -1,4 +1,4 @@
-defmodule Argus.Repo.Migrations.CreateUsersAuthTables do
+defmodule Tugas.Repo.Migrations.CreateUsersAuthTables do
   use Ecto.Migration
 
   def change do

@@ -83,7 +83,7 @@ Classification is the existing `DocumentHelpers.file_kind/1` (`:image | :video |
 
 ## Testing
 
-Mobile LiveView tests (`test/argus_web/live/mobile_live_test.exs` and/or the obligation mobile
+Mobile LiveView tests (`test/tugas_web/live/mobile_live_test.exs` and/or the obligation mobile
 show test):
 
 - Tiles render for each file kind (image/video/pdf/other) in both modals.

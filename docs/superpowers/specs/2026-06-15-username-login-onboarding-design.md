@@ -20,7 +20,7 @@ without an email channel.
 1. **Admins** keep registering with **email + magic link** — unchanged.
 2. **Managers/members** are invited (email **or** QR) and, on first access, **choose a username +
    password**. They log back in with **username (or email) + password**.
-3. **Username is globally unique** across all of argus (mirrors how email is unique). Login is a
+3. **Username is globally unique** across all of tugas (mirrors how email is unique). Login is a
    single lookup with no entity context; one account spans every entity the person joins.
 4. **Returning users** (already have an account) join a second entity from the **same accept page**:
    logged-in → one-click Accept; logged-out → *Create account* **or** *Log in to accept*.
@@ -74,7 +74,7 @@ without an email channel.
 
 ## Schema/changeset changes
 
-### `Argus.Accounts.User`
+### `Tugas.Accounts.User`
 - `username_changeset/2` (or extend the registration changeset) — casts/validates `username`:
   format (e.g. `^[a-z0-9_]{3,30}$`, downcased via citext), uniqueness (`unsafe_validate_unique` +
   `unique_constraint`).
@@ -84,14 +84,14 @@ without an email channel.
   justification as magic-link confirmation).
 - Keep `email_changeset` and `password_changeset` as-is for the existing email/admin paths.
 
-### `Argus.Entities.Invitation`
+### `Tugas.Entities.Invitation`
 - `changeset/2`: drop `email` from `validate_required` (keep `role`, `token`, `expires_at`); apply
   `validate_format(:email, ...)` **only when email is present**; scope the per-email unique
   constraint to the partial index name.
 
 ## Context API changes
 
-### `Argus.Accounts`
+### `Tugas.Accounts`
 - **`get_user_by_login_and_password/2`** — resolves the typed login against `email` **then**
   `username`, then verifies the password. This is the single resolver the password login uses.
   (Existing `get_user_by_email_and_password/2` may delegate to it or be replaced.)
@@ -100,7 +100,7 @@ without an email channel.
   email-keyed auto-register for invited members (the old function may be retired once no caller
   needs silent email registration).
 
-### `Argus.Entities`
+### `Tugas.Entities`
 - `invite_member/4` — allow a **nil/blank email** (single-use, email optional); only call
   `UserNotifier` when an email is present. Signature otherwise unchanged.
 - `accept_invitation/2` — attaches the membership (seat-gated) for **both** invite shapes. For a
@@ -168,7 +168,7 @@ password. Anti-enumeration behaviour (don't disclose which identifier is registe
 
 ## Authorization, roles, scope — unchanged
 
-No change to `Argus.Authorization`, the role table, `%Scope{}`, entity-scoped `live_session`
+No change to `Tugas.Authorization`, the role table, `%Scope{}`, entity-scoped `live_session`
 on-mounts, or Desktop/Mobile routing. This is purely an identity/onboarding change.
 
 ## Testing (TDD, house convention — failing test first, one commit per task)

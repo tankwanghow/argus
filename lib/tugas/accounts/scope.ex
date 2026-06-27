@@ -1,0 +1,33 @@
+defmodule Tugas.Accounts.Scope do
+  @moduledoc """
+  Defines the scope of the caller to be used throughout the app.
+
+  Carries the current user and, when the caller is acting inside an
+  entity-scoped route, the current entity and the caller's membership/role
+  in that entity.
+  """
+
+  alias Tugas.Accounts.User
+  alias Tugas.Entities.{Entity, Membership}
+
+  defstruct user: nil, entity: nil, membership: nil, role: nil
+
+  @doc "Creates a scope for the given user."
+  def for_user(%User{} = user), do: %__MODULE__{user: user}
+  def for_user(nil), do: nil
+
+  @doc """
+  Attaches an entity + membership to the scope. Membership role becomes `role`.
+  """
+  def put_entity(%__MODULE__{} = scope, %Entity{} = entity, %Membership{} = membership) do
+    %{scope | entity: entity, membership: membership, role: role_atom!(membership.role)}
+  end
+
+  defp role_atom!("admin"), do: :admin
+  defp role_atom!("manager"), do: :manager
+  defp role_atom!("member"), do: :member
+
+  @doc "True if the scope carries an accepted membership in an entity."
+  def member?(%__MODULE__{membership: %Membership{accepted_at: %DateTime{}}}), do: true
+  def member?(_), do: false
+end

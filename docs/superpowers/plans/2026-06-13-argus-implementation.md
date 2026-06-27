@@ -1,35 +1,35 @@
-# Argus Implementation Plan
+# Tugas Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build Argus — a multi-tenant Phoenix LiveView app for tracking obligations with event-based audit trails, recurrence via `series_id`, and dashboard urgency badges.
+**Goal:** Build Tugas — a multi-tenant Phoenix LiveView app for tracking obligations with event-based audit trails, recurrence via `series_id`, and dashboard urgency badges.
 
 **Architecture:** Phoenix 1.8 LiveView monolith with PostgreSQL. Multi-tenancy via `entities`
 scoped routes — **dual interface**: Desktop `/entities/:entity_slug/...` and Mobile
 `/m/:entity_slug/...` (peggy model), auto-routed by `AutoRouteByDevice`. Domain logic in context
-modules (`Argus.Obligations`, `Argus.Entities`, `Argus.Accounts`). Request state flows through a
-`%Argus.Accounts.Scope{user, entity, membership, role}` as `@current_scope`. Dashboard computes
+modules (`Tugas.Obligations`, `Tugas.Entities`, `Tugas.Accounts`). Request state flows through a
+`%Tugas.Accounts.Scope{user, entity, membership, role}` as `@current_scope`. Dashboard computes
 overdue/due-soon from `due_by` and type `reminder_offsets` — no background jobs. Local filesystem
 uploads for v1 documents.
 
 **Conventions:** Follow the sibling Phoenix apps in `~/Projects/elixir` — **peggy** (UI,
 magic-link onboarding, scope, Desktop/Mobile) and **full_circle** (contexts, authorization). The
-authoritative guide is the **`argus-conventions` skill** (`.claude/skills/argus-conventions.md`);
+authoritative guide is the **`tugas-conventions` skill** (`.claude/skills/tugas-conventions.md`);
 peggy's `AGENTS.md` ruleset applies. Magic-link-first auth (password fallback), Tailwind v4 + daisyUI 5,
 `to_form`/`<.input>`, streams, `<.icon>`; unauthorized context calls return `:not_authorise`.
 
 **Tech Stack:** Elixir 1.19, OTP 28, Phoenix 1.8.5, LiveView 1.2.1, Ecto 3.13, PostgreSQL (citext),
 Tailwind v4 + daisyUI 5, Swoosh mailer (magic-link), Req
 
-**Spec:** `docs/superpowers/specs/2026-06-13-argus-design.md`
+**Spec:** `docs/superpowers/specs/2026-06-13-tugas-design.md`
 
 ---
 
 ## File map (created incrementally)
 
 ```text
-lib/argus/
-  schema.ex                          # use Argus.Schema — binary_id PKs
+lib/tugas/
+  schema.ex                          # use Tugas.Schema — binary_id PKs
   repo.ex
   application.ex
   accounts.ex                        # users, magic-link tokens, registration
@@ -53,10 +53,10 @@ lib/argus/
   authorization.ex                   # can?(scope, action[, obligation])
   uploads.ex                         # local file storage
 
-lib/argus_web/
+lib/tugas_web/
   router.ex
   user_auth.ex                       # phx.gen.auth: scope plugs + on_mount hooks
-  plugs/auto_route_by_device.ex      # Desktop ⇄ Mobile redirect (peggy), argus_view cookie
+  plugs/auto_route_by_device.ex      # Desktop ⇄ Mobile redirect (peggy), tugas_view cookie
   plugs/require_role.ex
   components/layouts.ex              # app/1 (desktop navbar) + mobile_app/1 (bottom nav)
   components/core_components.ex      # daisyUI-based inputs, buttons, modal, icon
@@ -80,8 +80,8 @@ lib/argus_web/
 
 priv/repo/migrations/              # one migration per table group
 priv/repo/seeds.exs                # system obligation type presets
-test/argus/                        # context tests (TDD)
-test/argus_web/live/               # LiveView tests
+test/tugas/                        # context tests (TDD)
+test/tugas_web/live/               # LiveView tests
 ```
 
 ---
@@ -95,10 +95,10 @@ test/argus_web/live/               # LiveView tests
 
 ```bash
 cd /home/tankwanghow/Projects/elixir
-mix phx.new argus --binary-id --no-dashboard
+mix phx.new tugas --binary-id --no-dashboard
 ```
 
-When prompted for `argus` directory already exists (has `docs/`), answer **Y** to continue.
+When prompted for `tugas` directory already exists (has `docs/`), answer **Y** to continue.
 
 - [ ] **Step 2: Add dependencies**
 
@@ -113,14 +113,14 @@ Run: `mix deps.get`
 
 - [ ] **Step 3: Wire the shared workspace toolchain** (match every sibling project)
 
-Argus shares the pinned asset binaries under `~/Projects/elixir/.global_assets` via
+Tugas shares the pinned asset binaries under `~/Projects/elixir/.global_assets` via
 `~/Projects/elixir/shared_config` — don't let `phx.new` install its own. **Copy peggy's wiring
-verbatim, renaming the profile `peggy` → `argus`:**
+verbatim, renaming the profile `peggy` → `tugas`:**
 
 1. `~/Projects/elixir/.global_assets/setup.sh` — once, to fetch esbuild 0.28.1 / tailwindcss
-   4.3.1 / heroicons v2.2.0. Add `argus` to that script's `link_heroicons` project list.
+   4.3.1 / heroicons v2.2.0. Add `tugas` to that script's `link_heroicons` project list.
 2. `config/config.exs` — prepend the shared-asset import block, name the esbuild/tailwind profiles
-   `argus`, and add the time-zone DB (urgency needs real zones):
+   `tugas`, and add the time-zone DB (urgency needs real zones):
 
    ```elixir
    workspace_assets_config = Path.expand("../../shared_config/assets.exs", __DIR__)
@@ -136,7 +136,7 @@ verbatim, renaming the profile `peggy` → `argus`:**
 3. `mix.exs` — replace the generated heroicons dep with `heroicons_dep()`; add peggy's
    `workspace_assets?/0`, `load_workspace_assets!/0`, `heroicons_dep/0`, `assets_setup_tasks/0`
    (all with the github/hex fallbacks); aliases `"assets.setup": assets_setup_tasks()`,
-   `"assets.build": ["compile", "tailwind argus", "esbuild argus"]`, matching `assets.deploy`,
+   `"assets.build": ["compile", "tailwind tugas", "esbuild tugas"]`, matching `assets.deploy`,
    plus `precommit`.
 4. `assets/css/app.css` — keep the stock Phoenix 1.8 daisyUI 5 setup (`@import "tailwindcss"` +
    `@source` + `@plugin "../vendor/{heroicons,daisyui,daisyui-theme}"`); copy peggy's light/dark
@@ -161,14 +161,14 @@ git commit -m "chore: bootstrap Phoenix app (shared toolchain, daisyUI, mailer f
 ## Task 2: Base schema and citext extension
 
 **Files:**
-- Create: `lib/argus/schema.ex`
+- Create: `lib/tugas/schema.ex`
 - Create: `priv/repo/migrations/20260613000001_enable_extensions.exs`
 
 - [ ] **Step 1: Write Schema module**
 
 ```elixir
-# lib/argus/schema.ex
-defmodule Argus.Schema do
+# lib/tugas/schema.ex
+defmodule Tugas.Schema do
   defmacro __using__(_) do
     quote do
       use Ecto.Schema
@@ -184,7 +184,7 @@ end
 
 ```elixir
 # priv/repo/migrations/20260613000001_enable_extensions.exs
-defmodule Argus.Repo.Migrations.EnableExtensions do
+defmodule Tugas.Repo.Migrations.EnableExtensions do
   use Ecto.Migration
 
   def change do
@@ -201,26 +201,26 @@ Expected: `enable_extensions` migrated
 - [ ] **Step 4: Commit**
 
 ```bash
-git add lib/argus/schema.ex priv/repo/migrations/
-git commit -m "chore: add Argus.Schema and citext extension"
+git add lib/tugas/schema.ex priv/repo/migrations/
+git commit -m "chore: add Tugas.Schema and citext extension"
 ```
 
 ---
 
 ## Task 3: Users, magic-link auth, and Scope (peggy onboarding)
 
-Argus uses Phoenix 1.8 **`phx.gen.auth` magic-link-first** auth, exactly like peggy — register
+Tugas uses Phoenix 1.8 **`phx.gen.auth` magic-link-first** auth, exactly like peggy — register
 with email, get an emailed login link, confirm, sign in — **with email+password as a fallback
 login** for users who opt to set one. Generate it rather than hand-rolling; then customize. Mirror
 `peggy/lib/peggy_web/live/user_live/*` and `peggy/lib/peggy/accounts/scope.ex`.
 
 **Files:**
 - Generate: `mix phx.gen.auth Accounts User users` (creates `accounts.ex`, `accounts/user.ex`,
-  `accounts/user_token.ex`, `accounts/scope.ex`, `argus_web/user_auth.ex`,
+  `accounts/user_token.ex`, `accounts/scope.ex`, `tugas_web/user_auth.ex`,
   `live/user_live/{registration,login,confirmation,settings}.ex`, migration, fixtures)
-- Customize: `lib/argus/accounts/user.ex` (add `locale`, citext email), `lib/argus/accounts/scope.ex`
+- Customize: `lib/tugas/accounts/user.ex` (add `locale`, citext email), `lib/tugas/accounts/scope.ex`
   (add `entity`, `membership`, `role` + `put_entity/3`, `member?/1`)
-- Edit: `test/argus/accounts_test.exs`, `test/support/fixtures/accounts_fixtures.ex`
+- Edit: `test/tugas/accounts_test.exs`, `test/support/fixtures/accounts_fixtures.ex`
 
 - [ ] **Step 1: Generate auth, accept the magic-link flow**
 
@@ -230,17 +230,17 @@ password login form on `UserLive.Login` and password set/change in `UserLive.Set
 **both**: magic-link is the primary/registration path (don't add a password field to
 registration), email+password is the fallback. `hashed_password` stays nullable.
 
-- [ ] **Step 2: Write failing tests** for the Argus-specific bits
+- [ ] **Step 2: Write failing tests** for the Tugas-specific bits
 
 ```elixir
-# test/argus/accounts_test.exs (additions)
+# test/tugas/accounts_test.exs (additions)
 test "register_user/1 registers with email and defaults locale to en" do
   {:ok, user} = Accounts.register_user(%{email: "a@b.com"})
   assert user.email == "a@b.com"
   assert user.locale == "en"
 end
 
-# test/argus/accounts/scope_test.exs
+# test/tugas/accounts/scope_test.exs
 test "put_entity/3 sets entity, membership and role" do
   scope = Scope.for_user(user_fixture())
   scope = Scope.put_entity(scope, entity, %Membership{role: "admin"})
@@ -289,11 +289,11 @@ git commit -am "feat: magic-link auth (phx.gen.auth) + Scope with locale"
 
 **Files:**
 - Create: `priv/repo/migrations/20260613000003_create_entities.exs`
-- Create: `lib/argus/entities/entity.ex`
-- Create: `lib/argus/entities/membership.ex`
-- Create: `lib/argus/entities/invitation.ex`
-- Create: `lib/argus/entities.ex`
-- Create: `test/argus/entities_test.exs`
+- Create: `lib/tugas/entities/entity.ex`
+- Create: `lib/tugas/entities/membership.ex`
+- Create: `lib/tugas/entities/invitation.ex`
+- Create: `lib/tugas/entities.ex`
+- Create: `test/tugas/entities_test.exs`
 
 - [ ] **Step 1: Write failing test**
 
@@ -343,11 +343,11 @@ Replace the standalone "set active entity" plug with peggy's **scope `on_mount`*
 LiveView. Mirror `peggy/lib/peggy_web/router.ex` and `auto_route_by_device.ex`.
 
 **Files:**
-- Modify: `lib/argus_web/user_auth.ex` (add `on_mount(:require_entity, ...)`)
-- Modify: `lib/argus_web/router.ex`
-- Create: `lib/argus_web/plugs/auto_route_by_device.ex`
-- Create: `lib/argus_web/device.ex` (UA sniff helper)
-- Create: `test/argus_web/user_auth_test.exs` (entity on_mount), `.../auto_route_by_device_test.exs`
+- Modify: `lib/tugas_web/user_auth.ex` (add `on_mount(:require_entity, ...)`)
+- Modify: `lib/tugas_web/router.ex`
+- Create: `lib/tugas_web/plugs/auto_route_by_device.ex`
+- Create: `lib/tugas_web/device.ex` (UA sniff helper)
+- Create: `test/tugas_web/user_auth_test.exs` (entity on_mount), `.../auto_route_by_device_test.exs`
 
 - [ ] **Step 1: `on_mount(:require_entity, ...)`** in `UserAuth`
 
@@ -359,7 +359,7 @@ Reads `params["entity_slug"]`, loads the entity scoped to the user's memberships
 - [ ] **Step 2: `AutoRouteByDevice` plug** (peggy) in the authed browser pipeline
 
 Redirects `/entities/<slug>/…` → `/m/<slug>/…` for mobile UAs and back for desktop, honoring an
-`argus_view=mobile|desktop` cookie set by explicit toggle links. Only redirects when the
+`tugas_view=mobile|desktop` cookie set by explicit toggle links. Only redirects when the
 counterpart route exists (whitelist of mobile-capable tails) so single-UI pages never 404.
 
 **Mobile scope is decided (not full parity):** mobile covers the field-work surface only —
@@ -376,20 +376,20 @@ redirected for a mobile UA.
 
 ```elixir
 # with-or-without auth (registration, login, confirmation) — peggy phx.gen.auth blocks
-live_session :current_user, on_mount: [{ArgusWeb.UserAuth, :mount_current_scope}] do
+live_session :current_user, on_mount: [{TugasWeb.UserAuth, :mount_current_scope}] do
   # users/register, users/log-in, users/log-in/:token
 end
 
-scope "/", ArgusWeb do
-  pipe_through [:browser, :require_authenticated_user, ArgusWeb.Plugs.AutoRouteByDevice]
+scope "/", TugasWeb do
+  pipe_through [:browser, :require_authenticated_user, TugasWeb.Plugs.AutoRouteByDevice]
 
   live_session :require_authenticated_user,
-    on_mount: [{ArgusWeb.UserAuth, :require_authenticated}] do
+    on_mount: [{TugasWeb.UserAuth, :require_authenticated}] do
     live "/entities", EntityLive.Select, :index            # pick/create entity
   end
 
   live_session :entity_scoped,
-    on_mount: [{ArgusWeb.UserAuth, :require_authenticated}, {ArgusWeb.UserAuth, :require_entity}] do
+    on_mount: [{TugasWeb.UserAuth, :require_authenticated}, {TugasWeb.UserAuth, :require_entity}] do
     # Desktop UI
     live "/entities/:entity_slug", DashboardLive.Index, :index
     live "/entities/:entity_slug/obligations", ObligationLive.Index, :index
@@ -421,8 +421,8 @@ git commit -am "feat: scope on_mount, dual-UI routing, device auto-route"
 ## Task 6: Authorization module
 
 **Files:**
-- Create: `lib/argus/authorization.ex`
-- Create: `test/argus/authorization_test.exs`
+- Create: `lib/tugas/authorization.ex`
+- Create: `test/tugas/authorization_test.exs`
 
 - [ ] **Step 1: Write failing tests**
 
@@ -443,7 +443,7 @@ test "collaborator cannot mark done" do
 end
 ```
 
-- [ ] **Step 2: Implement `can?/2` and `can?/3`** (scope-first, per `argus-conventions`)
+- [ ] **Step 2: Implement `can?/2` and `can?/3`** (scope-first, per `tugas-conventions`)
 
 Signatures: `can?(%Scope{}, action)` for entity-level actions and `can?(%Scope{}, action,
 %Obligation{})` for obligation-scoped ones. The scope already carries `entity`, `role`, and
@@ -469,17 +469,17 @@ Rules per spec (keyed off `scope.role`):
 
 **Files:**
 - Create: `priv/repo/migrations/20260613000004_create_obligation_types.exs`
-- Create: `lib/argus/obligations/type.ex`
-- Create: `lib/argus/obligations/recurrence.ex`
-- Create: `test/argus/obligations/recurrence_test.exs`
+- Create: `lib/tugas/obligations/type.ex`
+- Create: `lib/tugas/obligations/recurrence.ex`
+- Create: `test/tugas/obligations/recurrence_test.exs`
 
 - [ ] **Step 1: Write failing recurrence tests**
 
 ```elixir
-defmodule Argus.Obligations.RecurrenceTest do
+defmodule Tugas.Obligations.RecurrenceTest do
   use ExUnit.Case, async: true
-  alias Argus.Obligations.Recurrence
-  alias Argus.Obligations.Type
+  alias Tugas.Obligations.Recurrence
+  alias Tugas.Obligations.Type
 
   test "next_due_suggestion monthly adds one month" do
     type = %Type{recurring_interval: "monthly"}
@@ -506,8 +506,8 @@ end
 - [ ] **Step 2: Implement Recurrence**
 
 ```elixir
-defmodule Argus.Obligations.Recurrence do
-  alias Argus.Obligations.Type
+defmodule Tugas.Obligations.Recurrence do
+  alias Tugas.Obligations.Type
 
   @intervals ~w(none weekly every_two_weeks monthly quarterly semiannual annual custom)
 
@@ -568,10 +568,10 @@ Add a failing changeset test for each before implementing.
 
 **Files:**
 - Create: `priv/repo/migrations/20260613000005_create_obligations.exs`
-- Create: `lib/argus/obligations/obligation.ex`
-- Create: `lib/argus/obligations/event.ex`
-- Create: `lib/argus/obligations.ex` (partial — create only)
-- Create: `test/argus/obligations_test.exs`
+- Create: `lib/tugas/obligations/obligation.ex`
+- Create: `lib/tugas/obligations/event.ex`
+- Create: `lib/tugas/obligations.ex` (partial — create only)
+- Create: `test/tugas/obligations_test.exs`
 - Create: `test/support/fixtures/obligations_fixtures.ex`
 
 > **Fixture caveat (carries through Tasks 9–12, 14):** `obligation_fixture/*` and
@@ -676,9 +676,9 @@ def live(query \\ Obligation), do: from(o in query, where: o.status == "active" 
 ## Task 9: Workflow transitions (in_progress, done, spawn next)
 
 **Files:**
-- Create: `lib/argus/obligations/completion.ex`
-- Modify: `lib/argus/obligations.ex`
-- Modify: `test/argus/obligations_test.exs`
+- Create: `lib/tugas/obligations/completion.ex`
+- Modify: `lib/tugas/obligations.ex`
+- Modify: `test/tugas/obligations_test.exs`
 
 - [ ] **Step 1: Write failing tests**
 
@@ -742,8 +742,8 @@ change this cycle's bar (fix #13). `cycle_documents` is **every non-voided
 Done-event uploads — so incremental uploads count (fix #6).
 
 ```elixir
-defmodule Argus.Obligations.Completion do
-  alias Argus.Obligations.Obligation
+defmodule Tugas.Obligations.Completion do
+  alias Tugas.Obligations.Obligation
 
   # `obligation` carries the snapshot; `cycle_documents` spans all events in the cycle.
   def validate_done_requirements(%Obligation{} = obligation, done_attrs, cycle_documents) do
@@ -825,8 +825,8 @@ Return `{:ok, completed, new_obligation | nil}`
 ## Task 10: Cancel and end series
 
 **Files:**
-- Modify: `lib/argus/obligations.ex`
-- Modify: `test/argus/obligations_test.exs`
+- Modify: `lib/tugas/obligations.ex`
+- Modify: `test/tugas/obligations_test.exs`
 
 - [ ] **Step 1: Tests**
 
@@ -861,9 +861,9 @@ end
 
 **Files:**
 - Create: `priv/repo/migrations/20260613000006_create_obligation_event_documents.exs`
-- Create: `lib/argus/obligations/event_document.ex`
-- Create: `lib/argus/uploads.ex`
-- Modify: `lib/argus/obligations.ex`
+- Create: `lib/tugas/obligations/event_document.ex`
+- Create: `lib/tugas/uploads.ex`
+- Modify: `lib/tugas/obligations.ex`
 
 - [ ] **Step 1: Migration** for `obligation_event_documents` per spec (void fields included). The
   per-file column is **`file`** (a map `%{filename, original, path}`), **not `documents`** — one
@@ -871,11 +871,11 @@ end
 
 - [ ] **Step 2: Uploads module** — store under a **configurable base dir**, not a hardcoded
   `priv/` path. `:code.priv_dir` is not writable/persistent inside a release, so the destination
-  comes from `config :argus, :uploads_dir` (defaults to the priv path in dev; a persistent volume
+  comes from `config :tugas, :uploads_dir` (defaults to the priv path in dev; a persistent volume
   in prod). Save the file map in the DB `file` column.
 
 ```elixir
-defp base_dir, do: Application.get_env(:argus, :uploads_dir, Path.join(:code.priv_dir(:argus), "uploads"))
+defp base_dir, do: Application.get_env(:tugas, :uploads_dir, Path.join(:code.priv_dir(:tugas), "uploads"))
 
 def store(%Plug.Upload{} = upload, entity_id, obligation_id) do
   dest_dir = Path.join([base_dir(), entity_id, obligation_id])
@@ -906,9 +906,9 @@ end
 
 **Files:**
 - Create: `priv/repo/migrations/20260613000007_create_obligation_audit_logs.exs`
-- Create: `lib/argus/obligations/audit_log.ex`
-- Modify: `lib/argus/obligations.ex`
-- Create: `test/argus/obligations/audit_test.exs`
+- Create: `lib/tugas/obligations/audit_log.ex`
+- Modify: `lib/tugas/obligations.ex`
+- Create: `test/tugas/obligations/audit_test.exs`
 
 - [ ] **Step 1: Tests**
 
@@ -993,17 +993,17 @@ Examples:
 ## Task 14: Urgency badges (replaces notifications)
 
 **Files:**
-- Create: `lib/argus/obligations/urgency.ex`
-- Create: `lib/argus_web/components/urgency_badge.ex`
-- Create: `test/argus/obligations/urgency_test.exs`
+- Create: `lib/tugas/obligations/urgency.ex`
+- Create: `lib/tugas_web/components/urgency_badge.ex`
+- Create: `test/tugas/obligations/urgency_test.exs`
 
 - [ ] **Step 1: Write failing tests**
 
 ```elixir
-defmodule Argus.Obligations.UrgencyTest do
+defmodule Tugas.Obligations.UrgencyTest do
   use ExUnit.Case, async: true
-  alias Argus.Obligations.Urgency
-  alias Argus.Obligations.Type
+  alias Tugas.Obligations.Urgency
+  alias Tugas.Obligations.Type
 
   @today ~D[2026-06-13]
 
@@ -1034,8 +1034,8 @@ end
 - [ ] **Step 2: Implement Urgency**
 
 ```elixir
-defmodule Argus.Obligations.Urgency do
-  alias Argus.Obligations.Type
+defmodule Tugas.Obligations.Urgency do
+  alias Tugas.Obligations.Type
 
   @type urgency :: :overdue | :due_soon | :ok
 
@@ -1098,8 +1098,8 @@ end
 ## Task 15: Dashboard LiveView (split view)
 
 **Files:**
-- Create: `lib/argus_web/live/dashboard_live/index.ex`
-- Create: `test/argus_web/live/dashboard_live_test.exs`
+- Create: `lib/tugas_web/live/dashboard_live/index.ex`
+- Create: `test/tugas_web/live/dashboard_live_test.exs`
 
 - [ ] **Step 1: Test renders My work and Team overview tabs**
 
@@ -1142,10 +1142,10 @@ end
 ## Task 16: Obligation LiveViews (form, show, workflow)
 
 **Files:**
-- Create: `lib/argus_web/live/obligation_live/form.ex`
-- Create: `lib/argus_web/live/obligation_live/show.ex`
-- Create: `lib/argus_web/live/obligation_live/index.ex`
-- Create: `test/argus_web/live/obligation_live_test.exs`
+- Create: `lib/tugas_web/live/obligation_live/form.ex`
+- Create: `lib/tugas_web/live/obligation_live/show.ex`
+- Create: `lib/tugas_web/live/obligation_live/index.ex`
+- Create: `test/tugas_web/live/obligation_live_test.exs`
 
 - [ ] **Step 1: Form** — manager-only; fields: title, type, primary assignee, collaborators (multi-select), due_by, open_note.
 
@@ -1183,8 +1183,8 @@ end
 ## Task 17: Obligation types management UI
 
 **Files:**
-- Create: `lib/argus_web/live/obligation_type_live/index.ex`
-- Create: `lib/argus_web/live/obligation_type_live/form.ex`
+- Create: `lib/tugas_web/live/obligation_type_live/index.ex`
+- Create: `lib/tugas_web/live/obligation_type_live/form.ex`
 
 - [ ] **Step 1: Index** — list system presets (read-only) + entity custom types
 
@@ -1203,7 +1203,7 @@ end
 ## Task 18: Membership management UI
 
 **Files:**
-- Create: `lib/argus_web/live/membership_live/index.ex`
+- Create: `lib/tugas_web/live/membership_live/index.ex`
 
 - [ ] **Step 1: List members, invite form (email + role), pending invitations**
 
@@ -1219,7 +1219,7 @@ end
 ## Task 19: Series history on obligation show
 
 **Files:**
-- Modify: `lib/argus_web/live/obligation_live/show.ex`
+- Modify: `lib/tugas_web/live/obligation_live/show.ex`
 
 - [ ] **Step 1: Sidebar or tab "Series history"** — `Obligations.list_series(series_id)` ordered by `due_by`
 
@@ -1237,11 +1237,11 @@ end
 > daisyUI classes; never `@apply`. Mirror `peggy/lib/peggy_web/components/layouts.ex`.
 
 **Files:**
-- Modify: `lib/argus_web/components/layouts.ex`
-- Modify: `lib/argus_web/components/core_components.ex` (daisyUI inputs/buttons/modal/icon — generated)
+- Modify: `lib/tugas_web/components/layouts.ex`
+- Modify: `lib/tugas_web/components/core_components.ex` (daisyUI inputs/buttons/modal/icon — generated)
 
 - [ ] **Step 1: `Layouts.app/1`** — top `navbar`: app logo, active entity name + slug, entity
-  switcher, locale switcher, **Mobile** toggle link (sets `argus_view=mobile`), settings, log out.
+  switcher, locale switcher, **Mobile** toggle link (sets `tugas_view=mobile`), settings, log out.
   `<.flash_group>` lives only here. Content wrapper `mx-auto max-w-5xl space-y-4`, responsive
   padding `px-4 sm:px-6 lg:px-8`.
 - [ ] **Step 2: `Layouts.mobile_app/1`** — `min-h-screen bg-base-100 pb-20`, fixed
@@ -1255,8 +1255,8 @@ end
 ## Task 21: Mobile UI LiveViews (/m/:entity_slug)
 
 **Files:**
-- Create: `lib/argus_web/live/mobile_live/{dashboard,obligations,obligation_show}.ex`
-- Create: `test/argus_web/live/mobile_live_test.exs`
+- Create: `lib/tugas_web/live/mobile_live/{dashboard,obligations,obligation_show}.ex`
+- Create: `test/tugas_web/live/mobile_live_test.exs`
 
 - [ ] **Step 1: `MobileLive.Dashboard`** — same `Obligations.list_my_work/list_team_overview`
   queries and `today_for(entity.timezone)` urgency as the desktop dashboard, rendered in
@@ -1326,7 +1326,7 @@ end
 - [ ] Manual smoke (Desktop): register (email) → click magic link in mailbox → create entity →
   create type → create obligation → progress → done → verify spawn → verify dashboard urgency badges
 - [ ] Manual smoke (Mobile): visit `/m/:entity_slug` (or load on a phone UA) → bottom-nav dashboard,
-  obligation workflow, Desktop toggle round-trips via `argus_view` cookie
+  obligation workflow, Desktop toggle round-trips via `tugas_view` cookie
 
 ```bash
 mix phx.server

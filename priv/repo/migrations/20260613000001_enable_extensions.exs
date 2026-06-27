@@ -1,4 +1,4 @@
-defmodule Argus.Repo.Migrations.EnableExtensions do
+defmodule Tugas.Repo.Migrations.EnableExtensions do
   use Ecto.Migration
 
   def change do

@@ -1,4 +1,4 @@
-defmodule Argus.Repo.Migrations.CreateEntitiesTables do
+defmodule Tugas.Repo.Migrations.CreateEntitiesTables do
   use Ecto.Migration
 
   def change do

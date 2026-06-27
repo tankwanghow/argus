@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-Argus is **built**: the Phoenix app is generated and the full 21-task implementation plan has
+Tugas is **built**: the Phoenix app is generated and the full 21-task implementation plan has
 been executed (contexts, schemas, auth/scope, dual Desktop+Mobile LiveViews, dashboard urgency,
 obligation workflow/recurrence, types & membership management, audit, uploads). A post-v1
 **Quick Todos** feature (entity-scoped team todos with audit trail, 48h delete window, cancel,
@@ -12,18 +12,18 @@ escalate-to-duty, and paginated Desktop+Mobile UIs) has also shipped — see the
 below. `mix precommit` passes. What remains is the plan's two **manual smoke tests** (Desktop and
 Mobile happy-paths via `mix phx.server`) and any future enhancements beyond v1 scope.
 
-- **Spec:** `docs/superpowers/specs/2026-06-13-argus-design.md` — authoritative for data model, roles, and workflows.
-- **Plan:** `docs/superpowers/plans/2026-06-13-argus-implementation.md` — 21 phased, TDD, commit-per-task steps (all complete).
+- **Spec:** `docs/superpowers/specs/2026-06-13-tugas-design.md` — authoritative for data model, roles, and workflows.
+- **Plan:** `docs/superpowers/plans/2026-06-13-tugas-implementation.md` — 21 phased, TDD, commit-per-task steps (all complete).
 
-When extending the app, follow the `argus-conventions` skill and keep the TDD/commit-per-change
+When extending the app, follow the `tugas-conventions` skill and keep the TDD/commit-per-change
 rhythm; run `mix precommit` before declaring work done.
 
 ## House conventions (read first)
 
-Argus follows the conventions of the sibling Phoenix apps in `~/Projects/elixir` — primarily
+Tugas follows the conventions of the sibling Phoenix apps in `~/Projects/elixir` — primarily
 **peggy** (UI, magic-link onboarding, request scope, Desktop/Mobile dual interface) and
 **full_circle** (context & authorization shape). The authoritative, detailed convention guide is
-the **`argus-conventions` skill** (`.claude/skills/argus-conventions.md`) — consult it before
+the **`tugas-conventions` skill** (`.claude/skills/tugas-conventions.md`) — consult it before
 writing non-trivial code. Peggy's full Phoenix 1.8 ruleset (`~/Projects/elixir/peggy/AGENTS.md`)
 applies here too. Headlines:
 
@@ -37,12 +37,12 @@ applies here too. Headlines:
   via `User.username_changeset/3` — a direct change, validated for format/length/uniqueness;
   blank clears it, but only while the user still has an email, since username is a login handle
   and a DB constraint requires email-or-username). A
-  `%Argus.Accounts.Scope{user, entity, membership, role}` struct flows as
+  `%Tugas.Accounts.Scope{user, entity, membership, role}` struct flows as
   `@current_scope`; never `@current_user`/`@current_role` in templates.
 - **Dual UI:** Desktop `/entities/:entity_slug/...`, Mobile `/m/:entity_slug/...`, with an
   `AutoRouteByDevice` plug (mobile-capable tails: `""`, `/obligations/new`, `/obligation-types`,
   `/todos`, `/todos/new`, plus the `/obligations/:id` show + `/invite-session/:role` regexes) + a
-  `argus_view` cookie override. Separate LiveViews + layouts (`Layouts.app/1` navbar — desktop nav is
+  `tugas_view` cookie override. Separate LiveViews + layouts (`Layouts.app/1` navbar — desktop nav is
   **💼 Duties · 📑 Todos · 🏷️ Types**; `Layouts.mobile_app/1` bottom-nav shell — five-tab bottom nav is
   **✚ Todo · 📑 Todos · ✚ Duty · 💼 Duties · ☰ More** (the ✚ Duty tab routes to obligation
   create; everything past the five tabs lives in the More sheet). New-obligation has both Desktop
@@ -54,10 +54,10 @@ applies here too. Headlines:
   view; both render rows as LiveView **streams** built by `ObligationLive.IndexHelpers.load_page/7`
   (role-based default, urgency, tier, event meta), keyset-paged via a `phx-viewport-bottom` sentinel
   (see the dashboard filter/sort section below). Each card shows the **current (latest) event** via the shared
-  `ArgusWeb.EventMeta.event_meta/1` component (status badge, count, actor, note). The card's urgency
+  `TugasWeb.EventMeta.event_meta/1` component (status badge, count, actor, note). The card's urgency
   **countdown badge** is the only relative-due indicator — there is no separate "due in N days" text.
   After create/complete/skip/end-series, forms and show redirect back to the dashboard.
-- **Shell-Escape contract:** both layout shells (`#argus-shell`) bind
+- **Shell-Escape contract:** both layout shells (`#tugas-shell`) bind
   `phx-window-keydown="close_modal_on_escape"`, so **every** LiveView rendered in them must define a
   `handle_event("close_modal_on_escape", …)` clause (no-op if the page has no modals) or it crashes
   on Escape. `ModalEscape.close_obligation_modals/2` is the shared closer for obligation pages
@@ -76,8 +76,8 @@ applies here too. Headlines:
 mix setup                             # deps.get + ecto.setup + assets.setup + assets.build
 mix phx.server                        # run app (localhost:4000)
 mix test                              # full suite (auto creates/migrates test DB)
-mix test test/argus/obligations_test.exs            # single file
-mix test test/argus/obligations_test.exs:42         # single test by line
+mix test test/tugas/obligations_test.exs            # single file
+mix test test/tugas/obligations_test.exs:42         # single test by line
 mix precommit                         # compile --warnings-as-errors, deps.unlock --unused, format, test
 ```
 
@@ -92,23 +92,23 @@ Tech stack: Elixir 1.19 / OTP 28, Phoenix 1.8.5, LiveView 1.2.1, Ecto 3.13, Post
 ## Architecture
 
 Phoenix LiveView monolith, PostgreSQL, **binary_id (UUID) primary keys everywhere** via the
-`Argus.Schema` macro (`use Argus.Schema`). No background jobs, no REST API, no notification
+`Tugas.Schema` macro (`use Tugas.Schema`). No background jobs, no REST API, no notification
 system in v1.
 
 ### Multi-tenancy & scope
 
 Tenants are **entities**. Desktop routes are scoped `/entities/:entity_slug/...`, mobile
 `/m/:entity_slug/...`. An entity-scoped `live_session` `on_mount` resolves the slug, verifies the
-user's membership, and builds a `%Argus.Accounts.Scope{user, entity, membership, role}` exposed as
+user's membership, and builds a `%Tugas.Accounts.Scope{user, entity, membership, role}` exposed as
 `@current_scope` (peggy pattern — replaces a standalone plug + ad-hoc `active_entity`/`membership`
 assigns). Contexts take `scope`/`current_scope` as their first argument; authorization keys off
 `scope.role`, never a global user attribute.
 
-- `Argus.Accounts` — users (email + **magic-link login tokens**; optional password; locale;
+- `Tugas.Accounts` — users (email + **magic-link login tokens**; optional password; locale;
   **no timezone on users**), `Scope` struct, `register_user/1`, `deliver_login_instructions/2`.
-- `Argus.Entities` — entities (soft-deleted via `deleted_at`; all lookups filter `deleted_at IS NULL`), memberships `(user_id, entity_id, role, accepted_at, disabled_at)`, invitations. One default entity per user (partial unique index). `create_entity/2` also inserts the creator's `admin` membership. **"Active member" is one composable predicate — `Membership.active/1` (`accepted_at IS NOT NULL AND disabled_at IS NULL`)** — and is the single source of truth for who counts: `seats_available?/1`, `list_entity_members/1` (the assignable-member list feeding assignee dropdowns), and the obligations assignee/collaborator eligibility guard all compose it. `seat_limit` is enforced via the `seats_available?/1` gate on invite **and** accept **and** direct add (disabled members **don't consume a seat**). **Disable/enable** (`disable_member/2`, `enable_member/2`, admin-only `:manage_entity`): disabling stamps `disabled_at`/`disabled_by_id` and, in one `Ecto.Multi`, **auto-detaches the member from live work** via `Obligations.purge_member_assignments/2` — nulling `primary_assignee_id` on their live cycles (each writing a `"primary_assignee"` `AuditLog` row) and deleting their live collaborator rows. Guards: can't disable yourself, can't disable the last active admin; a foreign-entity membership returns `:not_found`. A disabled member is **locked out** of all entity routes (`on_mount :require_entity` halts + redirects with a flash) and the entity disappears from their picker (`list_entity_memberships/1` filters `disabled_at`). **Enable re-checks `seats_available?/1`** (the freed seat may be taken) → `{:error, :seat_limit_reached}`. The members-admin UI uses `list_member_administration/1` (all accepted incl. disabled, each with `%{primary, collaborations}` live-assignment counts) and warns before disabling via a confirm modal quoting those counts; `Obligations.count_member_assignments/2` (single) and `member_assignment_counts/1` (batch) back it.
-- `Argus.Authorization` — **scope-first**: `can?(scope, action)` / `can?(scope, action, obligation)`. Keys off the pre-resolved `scope.role` (no per-call DB lookup). Single source of truth for role rules; see the role table below. Unauthorized mutations return `:not_authorise`.
-- `Argus.Todos` — **quick todos**: lightweight, entity-scoped, team-visible tasks separate from obligations (see the Quick Todos section below). Scope-first like every other context; unauthorized calls return `:not_authorise`.
+- `Tugas.Entities` — entities (soft-deleted via `deleted_at`; all lookups filter `deleted_at IS NULL`), memberships `(user_id, entity_id, role, accepted_at, disabled_at)`, invitations. One default entity per user (partial unique index). `create_entity/2` also inserts the creator's `admin` membership. **"Active member" is one composable predicate — `Membership.active/1` (`accepted_at IS NOT NULL AND disabled_at IS NULL`)** — and is the single source of truth for who counts: `seats_available?/1`, `list_entity_members/1` (the assignable-member list feeding assignee dropdowns), and the obligations assignee/collaborator eligibility guard all compose it. `seat_limit` is enforced via the `seats_available?/1` gate on invite **and** accept **and** direct add (disabled members **don't consume a seat**). **Disable/enable** (`disable_member/2`, `enable_member/2`, admin-only `:manage_entity`): disabling stamps `disabled_at`/`disabled_by_id` and, in one `Ecto.Multi`, **auto-detaches the member from live work** via `Obligations.purge_member_assignments/2` — nulling `primary_assignee_id` on their live cycles (each writing a `"primary_assignee"` `AuditLog` row) and deleting their live collaborator rows. Guards: can't disable yourself, can't disable the last active admin; a foreign-entity membership returns `:not_found`. A disabled member is **locked out** of all entity routes (`on_mount :require_entity` halts + redirects with a flash) and the entity disappears from their picker (`list_entity_memberships/1` filters `disabled_at`). **Enable re-checks `seats_available?/1`** (the freed seat may be taken) → `{:error, :seat_limit_reached}`. The members-admin UI uses `list_member_administration/1` (all accepted incl. disabled, each with `%{primary, collaborations}` live-assignment counts) and warns before disabling via a confirm modal quoting those counts; `Obligations.count_member_assignments/2` (single) and `member_assignment_counts/1` (batch) back it.
+- `Tugas.Authorization` — **scope-first**: `can?(scope, action)` / `can?(scope, action, obligation)`. Keys off the pre-resolved `scope.role` (no per-call DB lookup). Single source of truth for role rules; see the role table below. Unauthorized mutations return `:not_authorise`.
+- `Tugas.Todos` — **quick todos**: lightweight, entity-scoped, team-visible tasks separate from obligations (see the Quick Todos section below). Scope-first like every other context; unauthorized calls return `:not_authorise`.
 
 ### Roles
 
@@ -123,7 +123,7 @@ Collaborators (join table) can move an obligation to `in_progress` and add notes
 
 The role table above governs **obligations**. **Todos are flat:** every role (member/manager/admin)
 can view, create, edit, complete/reopen, delete, and cancel todos (`@todo_actions` in
-`Argus.Authorization`). The one gated todo action is **escalate-to-duty**, which requires
+`Tugas.Authorization`). The one gated todo action is **escalate-to-duty**, which requires
 `can?(scope, :create_obligation)` (manager/admin) since it creates an obligation.
 
 **Obligations may be unassigned.** `primary_assignee_id` is **nullable** — an obligation can be
@@ -149,12 +149,12 @@ successor. This action replaced the former `cancel_obligation/3` and `skip_cycle
 The single most important design decision: **one `Obligation` row per cycle**, not a standing
 series with a rolling `due_by`. A recurrence chain is linked by a shared `series_id` (UUID).
 
-- `Argus.Obligations.Obligation` — one cycle. There is **no `status` string column**; terminal state is expressed via timestamps. A cycle is **live** while `completed_at IS NULL AND closed_at IS NULL` — that's the set dashboards show and that can be worked/completed/skipped. Done stamps `completed_at`; Skip stamps `closed_at` (writes a `skipped` event); End series stamps `closed_at` + `series_ended_at` (writes a `series_ended` event). "Who performed" each terminal action is on the terminal event's `status_by_id` — there are no `done_by`/`skipped_by` columns. This liveness predicate is defined **once** as `Obligations.live/1` (a composable query builder) and every list/dashboard/report composes it — never hand-write it. A partial unique index on `series_id` (where live) enforces **one live cycle per series**. `series_ended_at` (when set) blocks future spawning. The row also **snapshots** `complete_documents` from the type at creation (see rule 1). `primary_assignee_id` is **nullable** (unassigned obligations). **Title is capped at 60 chars** (`validate_length` on the changeset; the UI uses the `char_count_input` component with a live "characters left" counter). The completed-in-error columns — `completed_in_error_at`/`_by_id`/`_reason`, plus self-referential `replaces_id`/`replaced_by_id` FKs — link a wrongly-completed cycle to its replacement (see rule 4).
-- `Argus.Obligations.Event` (`obligation_events`) — **append-only** status steps shaped `open → in_progress* → done | skipped | series_ended`. New status = new row; rows are never deleted and status is never rewritten. The step `note` lives here (open context, each progress note, done comment, skip/end-series reason). **`open` is singular** (one per cycle, created at creation) and the terminal event singular (created at completion/skip/end-series), but **`in_progress` may repeat** — every *Update progress* appends another logged `in_progress` event. `start_progress`'s guard (`ensure_progressable`) only rejects a cycle whose terminal event exists — i.e. `event.status in Event.terminal_statuses/0` (= `["done","skipped","series_ended"]`) — with `{:error, :not_live}`; it no longer blocks an already-in-progress cycle.
-- `Argus.Obligations.EventDocument` — file uploads attached to an event; the per-file column is **`file`** (a `%{filename, original, path}` map), not `documents`. A live file may be hard-**deleted within 48h** (`document_deletable?`); after that (or for admin-on-locked-cycle) it is **voided** (`voided_at`/`voided_by_id`/`void_reason`) — voided files are kept for audit and **remain downloadable**. `document_slot` matches a name in the obligation's snapshotted `complete_documents` for Done validation, and is **immutable after upload** — there is no Replace and no slot-editing; to change a slot's file, delete/void it and re-upload (uploading is only offered for an unsatisfied slot). A document is classified **required** when its `document_slot` is in the obligation's current snapshot `complete_documents`, otherwise **supporting** (no slot, or a slot no longer in the set).
-- `Argus.Obligations.AuditLog` — field-level before/after for **corrections** (title, due_by, assignee, note edits).
-- `Argus.Obligations.Type` — **per-entity only** (`entity_id` is **NOT NULL**). There are no
-  global system presets; instead, when an entity is created, `Argus.Obligations.SampleTypes`
+- `Tugas.Obligations.Obligation` — one cycle. There is **no `status` string column**; terminal state is expressed via timestamps. A cycle is **live** while `completed_at IS NULL AND closed_at IS NULL` — that's the set dashboards show and that can be worked/completed/skipped. Done stamps `completed_at`; Skip stamps `closed_at` (writes a `skipped` event); End series stamps `closed_at` + `series_ended_at` (writes a `series_ended` event). "Who performed" each terminal action is on the terminal event's `status_by_id` — there are no `done_by`/`skipped_by` columns. This liveness predicate is defined **once** as `Obligations.live/1` (a composable query builder) and every list/dashboard/report composes it — never hand-write it. A partial unique index on `series_id` (where live) enforces **one live cycle per series**. `series_ended_at` (when set) blocks future spawning. The row also **snapshots** `complete_documents` from the type at creation (see rule 1). `primary_assignee_id` is **nullable** (unassigned obligations). **Title is capped at 60 chars** (`validate_length` on the changeset; the UI uses the `char_count_input` component with a live "characters left" counter). The completed-in-error columns — `completed_in_error_at`/`_by_id`/`_reason`, plus self-referential `replaces_id`/`replaced_by_id` FKs — link a wrongly-completed cycle to its replacement (see rule 4).
+- `Tugas.Obligations.Event` (`obligation_events`) — **append-only** status steps shaped `open → in_progress* → done | skipped | series_ended`. New status = new row; rows are never deleted and status is never rewritten. The step `note` lives here (open context, each progress note, done comment, skip/end-series reason). **`open` is singular** (one per cycle, created at creation) and the terminal event singular (created at completion/skip/end-series), but **`in_progress` may repeat** — every *Update progress* appends another logged `in_progress` event. `start_progress`'s guard (`ensure_progressable`) only rejects a cycle whose terminal event exists — i.e. `event.status in Event.terminal_statuses/0` (= `["done","skipped","series_ended"]`) — with `{:error, :not_live}`; it no longer blocks an already-in-progress cycle.
+- `Tugas.Obligations.EventDocument` — file uploads attached to an event; the per-file column is **`file`** (a `%{filename, original, path}` map), not `documents`. A live file may be hard-**deleted within 48h** (`document_deletable?`); after that (or for admin-on-locked-cycle) it is **voided** (`voided_at`/`voided_by_id`/`void_reason`) — voided files are kept for audit and **remain downloadable**. `document_slot` matches a name in the obligation's snapshotted `complete_documents` for Done validation, and is **immutable after upload** — there is no Replace and no slot-editing; to change a slot's file, delete/void it and re-upload (uploading is only offered for an unsatisfied slot). A document is classified **required** when its `document_slot` is in the obligation's current snapshot `complete_documents`, otherwise **supporting** (no slot, or a slot no longer in the set).
+- `Tugas.Obligations.AuditLog` — field-level before/after for **corrections** (title, due_by, assignee, note edits).
+- `Tugas.Obligations.Type` — **per-entity only** (`entity_id` is **NOT NULL**). There are no
+  global system presets; instead, when an entity is created, `Tugas.Obligations.SampleTypes`
   seeds a private copy of the sample types into that entity (`seed_for_entity/1`, run inside the
   `create_entity` `Ecto.Multi`). Every entity therefore owns and can edit its full type set —
   `list_types`/`get_type!` filter strictly by `entity_id`, and there is no "immutable preset"
@@ -177,7 +177,7 @@ in exactly one place (no duplication):
   that step's supporting (no-slot/stale-slot) files + a voided-other section + an
   additional-file uploader.
 
-Classification and partitioning live in `ArgusWeb.ObligationLive.DocumentHelpers`
+Classification and partitioning live in `TugasWeb.ObligationLive.DocumentHelpers`
 (`completion_view/2`, `step_files/2`, `parse_slots/1`). When an admin edits a type's
 `complete_documents`, `propagate_complete_documents_to_live/3` updates **live**
 obligations' snapshot only (completed/closed cycles stay frozen); a file whose slot was
@@ -191,22 +191,22 @@ components were removed.
 **not** uploaded over the LiveView channel (no `allow_upload`/`live_file_input`).
 A long mobile camera/file pick backgrounds the page, times out the socket, and
 remounts on return — which discarded any in-flight socket upload, regardless of
-size. Instead, each "Choose file" button (`ArgusWeb.UploadSlotControls`) runs the
+size. Instead, each "Choose file" button (`TugasWeb.UploadSlotControls`) runs the
 **`UploadDirect`** client hook (`assets/js/upload_direct.js`): it opens a
 **transient `<input type=file>` created in `document.body`** (outside LiveView's
 managed DOM, so a remount can't destroy the selection), validates size + downscales
 images **client-side** (resize *before* the limit check; image detected by
 extension **or** MIME type), then `XHR`-POSTs the file to
-`ArgusWeb.DocumentController.create/2`
+`TugasWeb.DocumentController.create/2`
 (`POST /entities/:entity_slug/obligations/:obligation_id/documents`, device-agnostic
 — mobile pages post the same `/entities/...` path). The controller rebuilds the full
 `Scope` and is **server-authoritative** on per-kind size limits
-(`Argus.Uploads.Limits`); a plain HTTP request survives backgrounding. On success
+(`Tugas.Uploads.Limits`); a plain HTTP request survives backgrounding. On success
 the hook pushes `document_uploaded` (both show LiveViews `reload`) or reloads if the
 socket is down. The endpoint's `Plug.Parsers` multipart `:length` is raised to 30 MB
 (above the 20 MB max). Per-slot errors are shown client-side (inline error row), and
 modal + slot-error state survive a reconnect via `UploadUiPersist` (sessionStorage).
-`Argus.Obligations.add_document/5` remains the context entry point.
+`Tugas.Obligations.add_document/5` remains the context entry point.
 
 ### Three rules that are easy to get wrong
 
@@ -263,7 +263,7 @@ dashboard is where overdue/due-soon work surfaces, computed at render time:
   between the smallest and largest `reminder_offset` into three equal bands (critical → due_soon →
   approaching); `:overdue` (past due) and `:ok` (beyond the largest offset) are fixed endpoints. A
   **single offset** is widened by 7 days so it still yields three bands. Only `min`/`max` drive the
-  bands — intermediate offsets are decorative. Rendered by `ArgusWeb.UrgencyBadge`: `tier_border/1`
+  bands — intermediate offsets are decorative. Rendered by `TugasWeb.UrgencyBadge`: `tier_border/1`
   (the shared left-accent class `error → error/60 → warning → warning/40 → transparent`, used by
   the desktop dashboard rows and the mobile card so they don't drift) and `urgency_badge/1` (a
   **tier-coloured countdown badge** — "Nd overdue" / "Due today" / "Nd left", nothing when `:ok`).
@@ -277,7 +277,7 @@ dashboard is where overdue/due-soon work surfaces, computed at render time:
   `IndexHelpers` keeps `mine?` + `lifecycle` + `sort`; `status_atom/2` maps mine → `my_*`, and
   `effective_sort/2` coerces a sort not offered for the current lifecycle to `:due_asc` (so `urgency`,
   offered only on Live, can't leak to other lifecycles). The controls + search **persist per-entity**
-  (`ArgusWeb.DashboardFilter`: ETS store + session snapshot + `POST /session/dashboard-filter`, cleared
+  (`TugasWeb.DashboardFilter`: ETS store + session snapshot + `POST /session/dashboard-filter`, cleared
   on logout) and survive remounts. The **Skipped** lifecycle selects `closed_at IS NOT NULL` (covers
   both skipped and series-ended cycles; their badges differentiate). Defaults are role-based via
   `default_mine?/1` — members land on **Mine + Live**, managers/admins on **Team + Live**; sort
@@ -312,11 +312,11 @@ dashboard is where overdue/due-soon work surfaces, computed at render time:
 
 Todos are a deliberately **simpler, parallel domain** to obligations: an entity-scoped, team-visible
 checklist for quick tasks that don't warrant a full duty (no type, no assignee, no recurrence, no
-documents, no due date / urgency). They live in `Argus.Todos` (`Todo`, `AuditLog`, `Pagination`),
+documents, no due date / urgency). They live in `Tugas.Todos` (`Todo`, `AuditLog`, `Pagination`),
 mirror the obligation conventions (scope-first, `Ecto.Multi` writes, `:not_authorise`/`:not_found`
 returns, keyset pagination, LiveView streams), and **escalate into** a real obligation when needed.
 
-- **`Argus.Todos.Todo`** — one row per todo (`title` capped at **200** chars). Like obligations,
+- **`Tugas.Todos.Todo`** — one row per todo (`title` capped at **200** chars). Like obligations,
   **no `status` column** — state is expressed via timestamps and read by predicates:
   `display_status/1` → `:open | :completed | :escalated | :canceled` (priority: escalated → canceled
   → completed → open). `active?/1` is `deleted_at` **and** `canceled_at` **and** `escalated_at` all
@@ -339,11 +339,11 @@ returns, keyset pagination, LiveView streams), and **escalate into** a real obli
   `reopened`/`deleted`/`canceled`/`escalated`, with field/old/new for title edits, the cancel note,
   and the obligation id). Per-todo history is inline-expandable on each row; the **team log** pages
   (`TodoLive.TeamLog` desktop, `MobileLive.TodoTeamLog`) show the entity-wide feed via
-  `Todos.list_entity_audit_logs/2` rendered by the shared `ArgusWeb.TodoTeamActivity` component.
+  `Todos.list_entity_audit_logs/2` rendered by the shared `TugasWeb.TodoTeamActivity` component.
 - **Routes & UI.** Desktop `/entities/:slug/todos` (`TodoLive.Index`) + `/todos/team-log`; mobile
   `/m/:slug/todos` and `/m/:slug/todos/new` (both `MobileLive.Todos`, the `:new` action just patches
   open the create modal) + `/todos/team-log`. **Desktop and mobile share all non-render logic** via
-  `ArgusWeb.TodoLive.IndexHelpers` (mount assigns, load/paginate, the modal + action + status
+  `TugasWeb.TodoLive.IndexHelpers` (mount assigns, load/paginate, the modal + action + status
   handlers) and `ActivityFormat`; each LiveView only owns its `render/1` and thin `handle_event`
   delegation — the same Desktop+Mobile split used for obligations. **There is no status filter** —
   the index always renders a single **unified list** (`@list_status = :all` in `IndexHelpers`) so
@@ -358,7 +358,7 @@ returns, keyset pagination, LiveView streams), and **escalate into** a real obli
 - **Row animations.** Create/update/delete flash a CSS animation on the row via the `TodoRowEffect`
   colocated hook + `row_effects` assign (cleared on `animationend` → `finish_row_effect`); the
   per-row action `<select>` is driven by the `TodoActionSelect` hook (pushes `todo_action`).
-- **Seeding.** `mix argus.seed_todos` seeds sample todos for local/demo use (dev task, not run in
+- **Seeding.** `mix tugas.seed_todos` seeds sample todos for local/demo use (dev task, not run in
   tests or prod).
 
 ### Out of scope for v1
@@ -371,7 +371,7 @@ Oban reminder jobs, REST API/mobile, billing beyond `plan`/`seat_limit` fields.
 - **TDD per the plan:** write the failing test, watch it fail, implement, watch it pass, commit. One commit per task.
 - **Datetimes display in the entity timezone.** Stored `DateTime`s are UTC; every rendered
   datetime is shifted to `@current_scope.entity.timezone` via
-  `ArgusWeb.CoreComponents.format_datetime/3` (`(dt, timezone, format)`; `format` is `:default`
+  `TugasWeb.CoreComponents.format_datetime/3` (`(dt, timezone, format)`; `format` is `:default`
   or `:short`). A stored datetime shown as a *day* (invite expiry, completion date) uses
   `format_zoned_date/3` (shift **then** `to_date`, so it lands on the right local day near
   midnight); the shared `in_zone/2` does the shift with a UTC fallback for a blank/invalid zone.
@@ -380,11 +380,11 @@ Oban reminder jobs, REST API/mobile, billing beyond `plan`/`seat_limit` fields.
   render datetimes (`cycle_badge`, `todo_team_activity`, document rows, mobile cards, dashboard
   rows) take a `timezone` attr threaded from the caller's scope. This pairs with the render-time
   `Urgency.today_for(entity.timezone)` rule above.
-- **User display = username-first.** A user is represented in the UI by their **username when set, else email** — the single source of truth is `Argus.Accounts.User.display_name/1`, exposed to templates as `ArgusWeb.CoreComponents.user_label/1` (`user_label(user)`). **Never render a user's raw `user.email`** as their representation (assignee/actor/collaborator/audit-actor/navbar/select-option labels all go through `user_label`); the members list is the one place that additionally shows the email as muted secondary text. `EventMeta` (bare `Phoenix.Component`) imports `user_label/1` explicitly. The Todos `ActivityFormat.display_name/1` independently implements the same username-first rule.
-- **Context modules own domain logic.** LiveViews call `Argus.Obligations`, `Argus.Entities`, `Argus.Accounts` — not Repo directly.
+- **User display = username-first.** A user is represented in the UI by their **username when set, else email** — the single source of truth is `Tugas.Accounts.User.display_name/1`, exposed to templates as `TugasWeb.CoreComponents.user_label/1` (`user_label(user)`). **Never render a user's raw `user.email`** as their representation (assignee/actor/collaborator/audit-actor/navbar/select-option labels all go through `user_label`); the members list is the one place that additionally shows the email as muted secondary text. `EventMeta` (bare `Phoenix.Component`) imports `user_label/1` explicitly. The Todos `ActivityFormat.display_name/1` independently implements the same username-first rule.
+- **Context modules own domain logic.** LiveViews call `Tugas.Obligations`, `Tugas.Entities`, `Tugas.Accounts` — not Repo directly.
 - **Multi-step writes use `Ecto.Multi`/transactions** (create obligation + open event; Done + spawn next; skip + event).
 - File uploads (v1) go to the local filesystem under a **configurable** `:uploads_dir`
-  (`config :argus, :uploads_dir`), laid out `:entity_id/:obligation_id/`; it defaults to the priv
+  (`config :tugas, :uploads_dir`), laid out `:entity_id/:obligation_id/`; it defaults to the priv
   path in dev but must point at a persistent volume in prod (`:code.priv_dir` is not writable in a
   release). Both **writes and reads** go through the scope-gated `DocumentController`
   (`create/2` for multipart upload, `show/2` for download), never a static route or the LiveView
@@ -398,10 +398,10 @@ Monorepo asset tooling: `~/Projects/elixir/.global_assets/setup.sh` (once), then
 `~/Projects/elixir/shared_config/WORKSPACE_ASSETS.md`. Deploy scripts build from the
 **monorepo root** with local esbuild/tailwind/heroicons — no download during `mix assets.deploy`.
 
-Argus ships the **same self-hosted Docker-on-Debian/Linode flow as peggy** (no Fly/Gigalixir).
+Tugas ships the **same self-hosted Docker-on-Debian/Linode flow as peggy** (no Fly/Gigalixir).
 A two-stage `Dockerfile` builds a Mix release; `mix release` picks up `rel/overlays/bin/server`
-(boots with `PHX_SERVER=true`) and `rel/overlays/bin/migrate` (`./argus eval
-Argus.Release.migrate`, which runs migrations without Mix inside the container). All
+(boots with `PHX_SERVER=true`) and `rel/overlays/bin/migrate` (`./tugas eval
+Tugas.Release.migrate`, which runs migrations without Mix inside the container). All
 target-specific values live in **`deploy.conf`** (gitignored secrets stay out — `secret.txt`).
 
 ```bash
@@ -414,14 +414,14 @@ cd deploy_to_linode && ./launch.sh ../deploy.conf
 ```
 
 - **`deploy.conf`** keys: `LINODE_IP`, `DB_NAME`/`DB_USER`, `DOCKER_HUB_USERNAME`, `IMAGE_NAME`,
-  `DOCKER_CONTAINER_NAME`, `DOMAIN_NAME`, `PORT` (argus uses **8083** to avoid peggy's 8082 if
+  `DOCKER_CONTAINER_NAME`, `DOMAIN_NAME`, `PORT` (tugas uses **8083** to avoid peggy's 8082 if
   co-located), `MAIL_HOST`/`MAIL_PORT`/`MAIL_USERNAME`/`MAIL_FROM`. Passwords + `SECRET_KEY_BASE`
   are prompted/generated at deploy time, never committed.
 - **Prod runtime env** (baked into the container by the deploy scripts, read in `runtime.exs`):
   `DATABASE_URL`, `SECRET_KEY_BASE`, `PHX_HOST`, `PORT`, and the SMTP `MAIL_*` vars — **all
   fail-loud** if missing. `:uploads_dir` is set to **`/uploads`**, the host volume
-  (`/home/argus/uploads`) mounted into the container by `generate_files_at_server.sh`.
+  (`/home/tugas/uploads`) mounted into the container by `generate_files_at_server.sh`.
 - **Mailer:** prod uses `Swoosh.Adapters.SMTP` (needs `gen_smtp`); the from-address comes from
-  `config :argus, :mail_from` (Gmail wants an App Password, not the account password).
+  `config :tugas, :mail_from` (Gmail wants an App Password, not the account password).
 - `deploy_to_linode/` scripts are app-agnostic (parameterized by `deploy.conf`) and mirror
   peggy's — keep them in sync when peggy's deploy flow changes.

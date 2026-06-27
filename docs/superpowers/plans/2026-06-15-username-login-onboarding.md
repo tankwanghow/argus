@@ -15,17 +15,17 @@
 ## File Structure
 
 - **Migration** `priv/repo/migrations/<ts>_add_username_relax_identity.exs` — schema changes.
-- **`lib/argus/accounts/user.ex`** — add `username` field + `registration_changeset/3` and helpers.
-- **`lib/argus/accounts.ex`** — `register_invited_user/1`, `get_user_by_username/1`, `get_user_by_login_and_password/2`; remove `get_or_register_invited_user/1`.
-- **`lib/argus/entities/invitation.ex`** — relax `changeset/2` (email optional).
-- **`lib/argus/entities.ex`** — `invite_member/4` allows nil/blank email.
-- **`lib/argus_web/controllers/invitation_controller.ex`** — rewrite `accept/2` (three paths).
-- **`lib/argus_web/live/invitation_live/show.ex`** — render branches + forms (plain action POST, no phx-submit).
-- **`lib/argus_web/live/user_live/login.ex`** + **`lib/argus_web/controllers/user_session_controller.ex`** — password login accepts username-or-email.
+- **`lib/tugas/accounts/user.ex`** — add `username` field + `registration_changeset/3` and helpers.
+- **`lib/tugas/accounts.ex`** — `register_invited_user/1`, `get_user_by_username/1`, `get_user_by_login_and_password/2`; remove `get_or_register_invited_user/1`.
+- **`lib/tugas/entities/invitation.ex`** — relax `changeset/2` (email optional).
+- **`lib/tugas/entities.ex`** — `invite_member/4` allows nil/blank email.
+- **`lib/tugas_web/controllers/invitation_controller.ex`** — rewrite `accept/2` (three paths).
+- **`lib/tugas_web/live/invitation_live/show.ex`** — render branches + forms (plain action POST, no phx-submit).
+- **`lib/tugas_web/live/user_live/login.ex`** + **`lib/tugas_web/controllers/user_session_controller.ex`** — password login accepts username-or-email.
 - **`test/support/fixtures/accounts_fixtures.ex`** — `unique_username/0`, `username_user_fixture/1`.
-- **`lib/argus/entities/invitation.ex` / `entities.ex`** — `reusable`/`closed_at` + `open_invite_session/2`, `close_invite_session/2`; non-consuming reusable accept + `{:member_joined, _}` PubSub.
-- **`lib/argus_web/qr.ex`** — inline SVG QR helper (`eqrcode` dep).
-- **`lib/argus_web/live/membership_live/invite_session.ex`** — admin QR session view (QR + live roster + Close).
+- **`lib/tugas/entities/invitation.ex` / `entities.ex`** — `reusable`/`closed_at` + `open_invite_session/2`, `close_invite_session/2`; non-consuming reusable accept + `{:member_joined, _}` PubSub.
+- **`lib/tugas_web/qr.ex`** — inline SVG QR helper (`eqrcode` dep).
+- **`lib/tugas_web/live/membership_live/invite_session.ex`** — admin QR session view (QR + live roster + Close).
 - Test files mirror each module.
 
 > **Note for the worker:** this branch already carries uncommitted invitation work (the email-auto-register version). Several tasks **rewrite** those existing files rather than create them.
@@ -36,7 +36,7 @@
 
 **Files:**
 - Create: `priv/repo/migrations/<ts>_add_username_relax_identity.exs` (generate the timestamp)
-- Test: `test/argus/accounts_test.exs` (add cases)
+- Test: `test/tugas/accounts_test.exs` (add cases)
 
 - [ ] **Step 1: Generate the migration file**
 
@@ -44,7 +44,7 @@ Run: `mix ecto.gen.migration add_username_relax_identity`
 Then replace its body with:
 
 ```elixir
-defmodule Argus.Repo.Migrations.AddUsernameRelaxIdentity do
+defmodule Tugas.Repo.Migrations.AddUsernameRelaxIdentity do
   use Ecto.Migration
 
   def change do
@@ -79,7 +79,7 @@ end
 
 - [ ] **Step 2: Add the `username` field to the schema (so migrate + tests compile)**
 
-In `lib/argus/accounts/user.ex`, inside `schema "users" do`, add after the `:email` line:
+In `lib/tugas/accounts/user.ex`, inside `schema "users" do`, add after the `:email` line:
 
 ```elixir
     field :username, :string
@@ -92,15 +92,15 @@ Expected: migrates cleanly; `username` column + unique index + check constraint 
 
 - [ ] **Step 4: Write the failing test for the check constraint**
 
-Add to `test/argus/accounts_test.exs` (inside the module, new describe block):
+Add to `test/tugas/accounts_test.exs` (inside the module, new describe block):
 
 ```elixir
   describe "identity constraints" do
     test "rejects a user with neither email nor username" do
       assert_raise Ecto.ConstraintError, ~r/users_email_or_username_required/, fn ->
-        %Argus.Accounts.User{}
+        %Tugas.Accounts.User{}
         |> Ecto.Changeset.change(%{locale: "en"})
-        |> Argus.Repo.insert!()
+        |> Tugas.Repo.insert!()
       end
     end
   end
@@ -108,13 +108,13 @@ Add to `test/argus/accounts_test.exs` (inside the module, new describe block):
 
 - [ ] **Step 5: Run it**
 
-Run: `mix test test/argus/accounts_test.exs -o "identity constraints"` (or run the file)
+Run: `mix test test/tugas/accounts_test.exs -o "identity constraints"` (or run the file)
 Expected: PASS (constraint already exists from the migration).
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add priv/repo/migrations lib/argus/accounts/user.ex test/argus/accounts_test.exs priv/repo/structure.sql
+git add priv/repo/migrations lib/tugas/accounts/user.ex test/tugas/accounts_test.exs priv/repo/structure.sql
 git commit -m "feat: add username identifier and relax email to nullable
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
@@ -125,16 +125,16 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ## Task 2: User.registration_changeset (username + password, optional email)
 
 **Files:**
-- Modify: `lib/argus/accounts/user.ex`
-- Test: `test/argus/accounts_test.exs`
+- Modify: `lib/tugas/accounts/user.ex`
+- Test: `test/tugas/accounts_test.exs`
 
 - [ ] **Step 1: Write the failing test**
 
-Add to `test/argus/accounts_test.exs`:
+Add to `test/tugas/accounts_test.exs`:
 
 ```elixir
   describe "registration_changeset/3" do
-    alias Argus.Accounts.User
+    alias Tugas.Accounts.User
 
     test "is valid with username + password and no email" do
       cs = User.registration_changeset(%User{}, %{username: "newbie", password: "supersecret12"})
@@ -167,12 +167,12 @@ Add `import Ecto.Changeset` at the top of `accounts_test.exs` if not already pre
 
 - [ ] **Step 2: Run it to verify it fails**
 
-Run: `mix test test/argus/accounts_test.exs`
+Run: `mix test test/tugas/accounts_test.exs`
 Expected: FAIL with "function User.registration_changeset/3 is undefined".
 
 - [ ] **Step 3: Implement the changeset and helpers**
 
-In `lib/argus/accounts/user.ex`, add after `email_changeset/3`:
+In `lib/tugas/accounts/user.ex`, add after `email_changeset/3`:
 
 ```elixir
   @doc """
@@ -199,7 +199,7 @@ In `lib/argus/accounts/user.ex`, add after `email_changeset/3`:
 
     if Keyword.get(opts, :validate_unique, true) do
       changeset
-      |> unsafe_validate_unique(:username, Argus.Repo)
+      |> unsafe_validate_unique(:username, Tugas.Repo)
       |> unique_constraint(:username)
     else
       changeset
@@ -216,7 +216,7 @@ In `lib/argus/accounts/user.ex`, add after `email_changeset/3`:
         |> validate_length(:email, max: 160)
 
       if Keyword.get(opts, :validate_unique, true) do
-        changeset |> unsafe_validate_unique(:email, Argus.Repo) |> unique_constraint(:email)
+        changeset |> unsafe_validate_unique(:email, Tugas.Repo) |> unique_constraint(:email)
       else
         changeset
       end
@@ -228,13 +228,13 @@ In `lib/argus/accounts/user.ex`, add after `email_changeset/3`:
 
 - [ ] **Step 4: Run it to verify it passes**
 
-Run: `mix test test/argus/accounts_test.exs`
+Run: `mix test test/tugas/accounts_test.exs`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add lib/argus/accounts/user.ex test/argus/accounts_test.exs
+git add lib/tugas/accounts/user.ex test/tugas/accounts_test.exs
 git commit -m "feat: User.registration_changeset for username+password members
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
@@ -245,9 +245,9 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ## Task 3: Accounts — register_invited_user + login resolvers
 
 **Files:**
-- Modify: `lib/argus/accounts.ex` (add 3 functions, remove `get_or_register_invited_user/1`)
+- Modify: `lib/tugas/accounts.ex` (add 3 functions, remove `get_or_register_invited_user/1`)
 - Modify: `test/support/fixtures/accounts_fixtures.ex`
-- Test: `test/argus/accounts_test.exs`
+- Test: `test/tugas/accounts_test.exs`
 
 - [ ] **Step 1: Add fixture helpers**
 
@@ -263,14 +263,14 @@ In `test/support/fixtures/accounts_fixtures.ex`, add:
         password: valid_user_password()
       })
 
-    {:ok, user} = Argus.Accounts.register_invited_user(attrs)
+    {:ok, user} = Tugas.Accounts.register_invited_user(attrs)
     user
   end
 ```
 
 - [ ] **Step 2: Write the failing test**
 
-Add to `test/argus/accounts_test.exs`:
+Add to `test/tugas/accounts_test.exs`:
 
 ```elixir
   describe "register_invited_user/1" do
@@ -314,14 +314,14 @@ Add to `test/argus/accounts_test.exs`:
   end
 ```
 
-Add `import Argus.AccountsFixtures` to `accounts_test.exs` if absent. Reference `Accounts.User` is the alias `alias Argus.Accounts.User` — add it to the test module if absent, or use the full name.
+Add `import Tugas.AccountsFixtures` to `accounts_test.exs` if absent. Reference `Accounts.User` is the alias `alias Tugas.Accounts.User` — add it to the test module if absent, or use the full name.
 
 - [ ] **Step 3: Run it to verify it fails**
 
-Run: `mix test test/argus/accounts_test.exs`
+Run: `mix test test/tugas/accounts_test.exs`
 Expected: FAIL with undefined `register_invited_user/1` and `get_user_by_login_and_password/2`.
 
-- [ ] **Step 4: Implement in `lib/argus/accounts.ex`**
+- [ ] **Step 4: Implement in `lib/tugas/accounts.ex`**
 
 Replace the existing `get_or_register_invited_user/1` doc+function (around line 88-96) with:
 
@@ -365,13 +365,13 @@ Keep the existing private `confirm_user/1`.
 
 - [ ] **Step 5: Run it to verify it passes**
 
-Run: `mix test test/argus/accounts_test.exs`
+Run: `mix test test/tugas/accounts_test.exs`
 Expected: PASS.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add lib/argus/accounts.ex test/argus/accounts_test.exs test/support/fixtures/accounts_fixtures.ex
+git add lib/tugas/accounts.ex test/tugas/accounts_test.exs test/support/fixtures/accounts_fixtures.ex
 git commit -m "feat: register_invited_user and username-or-email login resolver
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
@@ -382,18 +382,18 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ## Task 4: Invitations — optional email
 
 **Files:**
-- Modify: `lib/argus/entities/invitation.ex`
-- Modify: `lib/argus/entities.ex` (`invite_member/4`)
-- Test: `test/argus/entities_test.exs`
+- Modify: `lib/tugas/entities/invitation.ex`
+- Modify: `lib/tugas/entities.ex` (`invite_member/4`)
+- Test: `test/tugas/entities_test.exs`
 
 - [ ] **Step 1: Write the failing test**
 
-Add to `test/argus/entities_test.exs` (inside an appropriate describe, e.g. a new one):
+Add to `test/tugas/entities_test.exs` (inside an appropriate describe, e.g. a new one):
 
 ```elixir
   describe "invite_member/4 without an email (QR invite)" do
     test "creates a pending invitation with no email and sends nothing" do
-      scope = Argus.EntitiesFixtures.entity_scope_fixture()
+      scope = Tugas.EntitiesFixtures.entity_scope_fixture()
 
       assert {:ok, invitation} =
                Entities.invite_member(scope, nil, "member", fn _enc -> "http://x/" end)
@@ -403,7 +403,7 @@ Add to `test/argus/entities_test.exs` (inside an appropriate describe, e.g. a ne
     end
 
     test "treats a blank email as no email" do
-      scope = Argus.EntitiesFixtures.entity_scope_fixture()
+      scope = Tugas.EntitiesFixtures.entity_scope_fixture()
       assert {:ok, invitation} = Entities.invite_member(scope, "", "member")
       assert is_nil(invitation.email)
     end
@@ -412,12 +412,12 @@ Add to `test/argus/entities_test.exs` (inside an appropriate describe, e.g. a ne
 
 - [ ] **Step 2: Run it to verify it fails**
 
-Run: `mix test test/argus/entities_test.exs`
+Run: `mix test test/tugas/entities_test.exs`
 Expected: FAIL — the invitation changeset still requires `email`.
 
 - [ ] **Step 3: Add the new fields to the schema, then relax the changeset**
 
-In `lib/argus/entities/invitation.ex`, add these two fields to `schema "entity_invitations" do` (after `:accepted_at`):
+In `lib/tugas/entities/invitation.ex`, add these two fields to `schema "entity_invitations" do` (after `:accepted_at`):
 
 ```elixir
     field :reusable, :boolean, default: false
@@ -449,7 +449,7 @@ Then replace `changeset/2` with:
 
 - [ ] **Step 4: Normalize blank email + guard the notifier in `invite_member/4`**
 
-In `lib/argus/entities.ex`, change the body of `invite_member/4` so the `true ->` branch reads:
+In `lib/tugas/entities.ex`, change the body of `invite_member/4` so the `true ->` branch reads:
 
 ```elixir
       true ->
@@ -471,13 +471,13 @@ In `lib/argus/entities.ex`, change the body of `invite_member/4` so the `true ->
 
 - [ ] **Step 5: Run it to verify it passes**
 
-Run: `mix test test/argus/entities_test.exs`
+Run: `mix test test/tugas/entities_test.exs`
 Expected: PASS (and the existing "email delivery" tests still pass).
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add lib/argus/entities/invitation.ex lib/argus/entities.ex test/argus/entities_test.exs
+git add lib/tugas/entities/invitation.ex lib/tugas/entities.ex test/tugas/entities_test.exs
 git commit -m "feat: allow email-less (QR) invitations
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
@@ -488,25 +488,25 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ## Task 5: InvitationController — three accept paths
 
 **Files:**
-- Modify (rewrite): `lib/argus_web/controllers/invitation_controller.ex`
-- Modify (rewrite): `test/argus_web/controllers/invitation_controller_test.exs`
+- Modify (rewrite): `lib/tugas_web/controllers/invitation_controller.ex`
+- Modify (rewrite): `test/tugas_web/controllers/invitation_controller_test.exs`
 
 - [ ] **Step 1: Rewrite the controller test**
 
-Replace the entire contents of `test/argus_web/controllers/invitation_controller_test.exs` with:
+Replace the entire contents of `test/tugas_web/controllers/invitation_controller_test.exs` with:
 
 ```elixir
-defmodule ArgusWeb.InvitationControllerTest do
-  use ArgusWeb.ConnCase, async: true
+defmodule TugasWeb.InvitationControllerTest do
+  use TugasWeb.ConnCase, async: true
 
-  import Argus.AccountsFixtures
+  import Tugas.AccountsFixtures
 
-  alias Argus.Accounts
-  alias Argus.Entities
-  alias Argus.Entities.Invitation
+  alias Tugas.Accounts
+  alias Tugas.Entities
+  alias Tugas.Entities.Invitation
 
   defp pending_invitation(email \\ nil) do
-    admin = Argus.EntitiesFixtures.entity_scope_fixture()
+    admin = Tugas.EntitiesFixtures.entity_scope_fixture()
     {:ok, invitation} = Entities.invite_member(admin, email, "member")
     %{admin: admin, invitation: invitation, encoded: Invitation.encode_token(invitation.token)}
   end
@@ -577,19 +577,19 @@ end
 
 - [ ] **Step 2: Run it to verify it fails**
 
-Run: `mix test test/argus_web/controllers/invitation_controller_test.exs`
+Run: `mix test test/tugas_web/controllers/invitation_controller_test.exs`
 Expected: FAIL (controller still does email auto-register; new param shapes unhandled).
 
 - [ ] **Step 3: Rewrite the controller**
 
-Replace the entire contents of `lib/argus_web/controllers/invitation_controller.ex` with:
+Replace the entire contents of `lib/tugas_web/controllers/invitation_controller.ex` with:
 
 ```elixir
-defmodule ArgusWeb.InvitationController do
-  use ArgusWeb, :controller
+defmodule TugasWeb.InvitationController do
+  use TugasWeb, :controller
 
-  alias Argus.Accounts
-  alias Argus.Entities
+  alias Tugas.Accounts
+  alias Tugas.Entities
 
   @doc """
   Accepts an invitation. GET-rendered accept page POSTs here with one of:
@@ -605,7 +605,7 @@ defmodule ArgusWeb.InvitationController do
       conn
       |> put_session(:user_return_to, ~p"/entities/#{invitation.entity.slug}")
       |> put_flash(:info, "Welcome to #{invitation.entity.name}!")
-      |> ArgusWeb.UserAuth.log_in_user(user)
+      |> TugasWeb.UserAuth.log_in_user(user)
     else
       {:error, :invalid_credentials} ->
         conn
@@ -659,13 +659,13 @@ end
 
 - [ ] **Step 4: Run it to verify it passes**
 
-Run: `mix test test/argus_web/controllers/invitation_controller_test.exs`
+Run: `mix test test/tugas_web/controllers/invitation_controller_test.exs`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add lib/argus_web/controllers/invitation_controller.ex test/argus_web/controllers/invitation_controller_test.exs
+git add lib/tugas_web/controllers/invitation_controller.ex test/tugas_web/controllers/invitation_controller_test.exs
 git commit -m "feat: invitation accept controller with three onboarding paths
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
@@ -676,26 +676,26 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ## Task 6: InvitationLive.Show — render branches + forms
 
 **Files:**
-- Modify (rewrite): `lib/argus_web/live/invitation_live/show.ex`
-- Modify (rewrite): `test/argus_web/live/invitation_live_test.exs`
+- Modify (rewrite): `lib/tugas_web/live/invitation_live/show.ex`
+- Modify (rewrite): `test/tugas_web/live/invitation_live_test.exs`
 
 - [ ] **Step 1: Rewrite the LiveView test**
 
-Replace the entire contents of `test/argus_web/live/invitation_live_test.exs` with:
+Replace the entire contents of `test/tugas_web/live/invitation_live_test.exs` with:
 
 ```elixir
-defmodule ArgusWeb.InvitationLiveTest do
-  use ArgusWeb.ConnCase, async: true
+defmodule TugasWeb.InvitationLiveTest do
+  use TugasWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
-  import Argus.AccountsFixtures
+  import Tugas.AccountsFixtures
 
-  alias Argus.Accounts
-  alias Argus.Entities
-  alias Argus.Entities.Invitation
+  alias Tugas.Accounts
+  alias Tugas.Entities
+  alias Tugas.Entities.Invitation
 
   defp pending_invitation do
-    admin = Argus.EntitiesFixtures.entity_scope_fixture()
+    admin = Tugas.EntitiesFixtures.entity_scope_fixture()
     {:ok, invitation} = Entities.invite_member(admin, nil, "member")
     %{admin: admin, encoded: Invitation.encode_token(invitation.token)}
   end
@@ -734,18 +734,18 @@ end
 
 - [ ] **Step 2: Run it to verify it fails**
 
-Run: `mix test test/argus_web/live/invitation_live_test.exs`
+Run: `mix test test/tugas_web/live/invitation_live_test.exs`
 Expected: FAIL (current Show renders a single accept form, not create/login branches).
 
 - [ ] **Step 3: Rewrite the LiveView**
 
-Replace the entire contents of `lib/argus_web/live/invitation_live/show.ex` with:
+Replace the entire contents of `lib/tugas_web/live/invitation_live/show.ex` with:
 
 ```elixir
-defmodule ArgusWeb.InvitationLive.Show do
-  use ArgusWeb, :live_view
+defmodule TugasWeb.InvitationLive.Show do
+  use TugasWeb, :live_view
 
-  alias Argus.Entities
+  alias Tugas.Entities
 
   @impl true
   def render(assigns) do
@@ -821,13 +821,13 @@ end
 
 - [ ] **Step 4: Run it to verify it passes**
 
-Run: `mix test test/argus_web/live/invitation_live_test.exs`
+Run: `mix test test/tugas_web/live/invitation_live_test.exs`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add lib/argus_web/live/invitation_live/show.ex test/argus_web/live/invitation_live_test.exs
+git add lib/tugas_web/live/invitation_live/show.ex test/tugas_web/live/invitation_live_test.exs
 git commit -m "feat: invitation accept page with create/login/one-click branches
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
@@ -838,17 +838,17 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ## Task 7: Login accepts username-or-email
 
 **Files:**
-- Modify: `lib/argus_web/controllers/user_session_controller.ex`
-- Modify: `lib/argus_web/live/user_live/login.ex`
-- Test: `test/argus_web/controllers/user_session_controller_test.exs` (or the existing login test file)
+- Modify: `lib/tugas_web/controllers/user_session_controller.ex`
+- Modify: `lib/tugas_web/live/user_live/login.ex`
+- Test: `test/tugas_web/controllers/user_session_controller_test.exs` (or the existing login test file)
 
 - [ ] **Step 1: Write the failing test**
 
-Add to `test/argus_web/controllers/user_session_controller_test.exs` (create the describe if needed):
+Add to `test/tugas_web/controllers/user_session_controller_test.exs` (create the describe if needed):
 
 ```elixir
   describe "POST /users/log-in with username" do
-    import Argus.AccountsFixtures
+    import Tugas.AccountsFixtures
 
     test "logs in a username+password user", %{conn: conn} do
       user = username_user_fixture(%{username: "loginbox"})
@@ -864,16 +864,16 @@ Add to `test/argus_web/controllers/user_session_controller_test.exs` (create the
   end
 ```
 
-If `test/argus_web/controllers/user_session_controller_test.exs` does not exist, add the `describe` block inside the existing login test module instead (find it with `grep -rl "log-in" test/argus_web`).
+If `test/tugas_web/controllers/user_session_controller_test.exs` does not exist, add the `describe` block inside the existing login test module instead (find it with `grep -rl "log-in" test/tugas_web`).
 
 - [ ] **Step 2: Run it to verify it fails**
 
-Run: `mix test test/argus_web/controllers/user_session_controller_test.exs`
+Run: `mix test test/tugas_web/controllers/user_session_controller_test.exs`
 Expected: FAIL — the create clause expects `"email"`, not `"identifier"`.
 
 - [ ] **Step 3: Update the session controller**
 
-In `lib/argus_web/controllers/user_session_controller.ex`, replace the `# email + password login` clause with:
+In `lib/tugas_web/controllers/user_session_controller.ex`, replace the `# email + password login` clause with:
 
 ```elixir
   # username-or-email + password login
@@ -896,7 +896,7 @@ In `lib/argus_web/controllers/user_session_controller.ex`, replace the `# email 
 
 - [ ] **Step 4: Update the login form field**
 
-In `lib/argus_web/live/user_live/login.ex`:
+In `lib/tugas_web/live/user_live/login.ex`:
 
 (a) In the password form (`id="login_form_password"`), replace the email `<.input>` with:
 
@@ -926,18 +926,18 @@ In `lib/argus_web/live/user_live/login.ex`:
 
 - [ ] **Step 5: Run it to verify it passes**
 
-Run: `mix test test/argus_web/controllers/user_session_controller_test.exs`
+Run: `mix test test/tugas_web/controllers/user_session_controller_test.exs`
 Expected: PASS.
 
 - [ ] **Step 6: Run the existing auth tests to catch regressions**
 
-Run: `mix test test/argus_web`
+Run: `mix test test/tugas_web`
 Expected: PASS. If a magic-link or email+password test asserted the old `"email"` param or `:email` flash, update it to `"identifier"`/`:identifier`.
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add lib/argus_web/controllers/user_session_controller.ex lib/argus_web/live/user_live/login.ex test/argus_web/controllers/user_session_controller_test.exs
+git add lib/tugas_web/controllers/user_session_controller.ex lib/tugas_web/live/user_live/login.ex test/tugas_web/controllers/user_session_controller_test.exs
 git commit -m "feat: password login accepts username or email
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
@@ -948,18 +948,18 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ## Task 8: Membership invite UI — allow QR / email-optional invite
 
 **Files:**
-- Modify: `lib/argus_web/live/membership_live/index.ex`
-- Test: `test/argus_web/live/membership_live_test.exs`
+- Modify: `lib/tugas_web/live/membership_live/index.ex`
+- Test: `test/tugas_web/live/membership_live_test.exs`
 
 > The invite form currently requires an email. This task makes email optional and surfaces the shareable invite link/QR for email-less invites. Inspect the current form first (`mix test` + read the file); the steps below assume the existing `invite` handler shape.
 
 - [ ] **Step 1: Write the failing test**
 
-Add to `test/argus_web/live/membership_live_test.exs`, in the admin describe:
+Add to `test/tugas_web/live/membership_live_test.exs`, in the admin describe:
 
 ```elixir
     test "admin can create an email-less invite and see the shareable link", %{conn: conn} do
-      scope = Argus.EntitiesFixtures.entity_scope_fixture()
+      scope = Tugas.EntitiesFixtures.entity_scope_fixture()
       conn = log_in_user(conn, scope.user)
 
       {:ok, view, _html} = live(conn, ~p"/entities/#{scope.entity.slug}/members")
@@ -977,18 +977,18 @@ Adjust the form id / param keys to match the actual template if they differ.
 
 - [ ] **Step 2: Run it to verify it fails**
 
-Run: `mix test test/argus_web/live/membership_live_test.exs`
+Run: `mix test test/tugas_web/live/membership_live_test.exs`
 Expected: FAIL — blank email rejected or link not shown.
 
 - [ ] **Step 3: Update the invite handler**
 
-In `lib/argus_web/live/membership_live/index.ex`, in the `handle_event("invite", ...)` (or equivalently named) clause, ensure it:
+In `lib/tugas_web/live/membership_live/index.ex`, in the `handle_event("invite", ...)` (or equivalently named) clause, ensure it:
 - passes the email through (`invite_member/4` already normalizes blank → nil), and
 - on `{:ok, invitation}` builds and assigns the shareable URL so the template can show it (and a QR if desired):
 
 ```elixir
         {:ok, invitation} ->
-          link = url(~p"/invitations/#{Argus.Entities.Invitation.encode_token(invitation.token)}")
+          link = url(~p"/invitations/#{Tugas.Entities.Invitation.encode_token(invitation.token)}")
 
           {:noreply,
            socket
@@ -1016,13 +1016,13 @@ Initialize `:last_invite_link` to `nil` in `mount/3` (add `|> assign(:last_invit
 
 - [ ] **Step 4: Run it to verify it passes**
 
-Run: `mix test test/argus_web/live/membership_live_test.exs`
+Run: `mix test test/tugas_web/live/membership_live_test.exs`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add lib/argus_web/live/membership_live/index.ex test/argus_web/live/membership_live_test.exs
+git add lib/tugas_web/live/membership_live/index.ex test/tugas_web/live/membership_live_test.exs
 git commit -m "feat: email-optional member invites with shareable link
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
@@ -1033,23 +1033,23 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ## Task 9: Reusable-session validity + non-consuming accept
 
 **Files:**
-- Modify: `lib/argus/entities.ex` (`fetch_pending_invitation`, `accept_invitation_multi`)
-- Modify: `lib/argus/entities/membership.ex` (add unique_constraint)
-- Test: `test/argus/entities_test.exs`
+- Modify: `lib/tugas/entities.ex` (`fetch_pending_invitation`, `accept_invitation_multi`)
+- Modify: `lib/tugas/entities/membership.ex` (add unique_constraint)
+- Test: `test/tugas/entities_test.exs`
 
-> Confirm the PubSub name first: `grep -n "PubSub" lib/argus/application.ex` (used in Task 10). Likely `Argus.PubSub`.
+> Confirm the PubSub name first: `grep -n "PubSub" lib/tugas/application.ex` (used in Task 10). Likely `Tugas.PubSub`.
 
 - [ ] **Step 1: Write the failing test**
 
-Add to `test/argus/entities_test.exs`:
+Add to `test/tugas/entities_test.exs`:
 
 ```elixir
   describe "reusable invite sessions" do
-    alias Argus.Accounts
-    import Argus.AccountsFixtures
+    alias Tugas.Accounts
+    import Tugas.AccountsFixtures
 
     defp open_session(role \\ "member") do
-      admin = Argus.EntitiesFixtures.entity_scope_fixture()
+      admin = Tugas.EntitiesFixtures.entity_scope_fixture()
       {:ok, inv} = Entities.open_invite_session(admin, role)
       %{admin: admin, inv: inv}
     end
@@ -1064,7 +1064,7 @@ Add to `test/argus/entities_test.exs`:
       assert {:ok, _m2} = Entities.accept_invitation(u2, inv.token)
 
       # token is still live (not consumed)
-      assert {:ok, _} = Entities.get_invitation_by_encoded_token(Argus.Entities.Invitation.encode_token(inv.token))
+      assert {:ok, _} = Entities.get_invitation_by_encoded_token(Tugas.Entities.Invitation.encode_token(inv.token))
       assert Entities.list_entity_members(admin.entity) |> length() == 3
     end
 
@@ -1086,12 +1086,12 @@ Add to `test/argus/entities_test.exs`:
 
 - [ ] **Step 2: Run it to verify it fails**
 
-Run: `mix test test/argus/entities_test.exs`
+Run: `mix test test/tugas/entities_test.exs`
 Expected: FAIL — `open_invite_session/2`, `close_invite_session/2` undefined; second accept consumes/duplicates.
 
 - [ ] **Step 3: Add a unique_constraint to the membership changeset**
 
-In `lib/argus/entities/membership.ex`, in `changeset/2`, after the existing validations add:
+In `lib/tugas/entities/membership.ex`, in `changeset/2`, after the existing validations add:
 
 ```elixir
     |> unique_constraint([:user_id, :entity_id])
@@ -1099,7 +1099,7 @@ In `lib/argus/entities/membership.ex`, in `changeset/2`, after the existing vali
 
 - [ ] **Step 4: Branch `fetch_pending_invitation` and `accept_invitation_multi` on `reusable`**
 
-In `lib/argus/entities.ex`, replace `fetch_pending_invitation/1` with:
+In `lib/tugas/entities.ex`, replace `fetch_pending_invitation/1` with:
 
 ```elixir
   defp fetch_pending_invitation(token) do
@@ -1164,7 +1164,7 @@ Then replace `accept_invitation_multi/2` with:
         membership = Repo.preload(membership, :user)
 
         Phoenix.PubSub.broadcast(
-          Argus.PubSub,
+          Tugas.PubSub,
           "entity:#{invitation.entity_id}:members",
           {:member_joined, membership}
         )
@@ -1186,7 +1186,7 @@ Then replace `accept_invitation_multi/2` with:
 
 - [ ] **Step 5: Add `open_invite_session/2` and `close_invite_session/2`**
 
-In `lib/argus/entities.ex`, add (near `invite_member/4`):
+In `lib/tugas/entities.ex`, add (near `invite_member/4`):
 
 ```elixir
   @doc """
@@ -1239,13 +1239,13 @@ In `lib/argus/entities.ex`, add (near `invite_member/4`):
 
 - [ ] **Step 6: Run it to verify it passes**
 
-Run: `mix test test/argus/entities_test.exs`
+Run: `mix test test/tugas/entities_test.exs`
 Expected: PASS.
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add lib/argus/entities.ex lib/argus/entities/membership.ex test/argus/entities_test.exs
+git add lib/tugas/entities.ex lib/tugas/entities/membership.ex test/tugas/entities_test.exs
 git commit -m "feat: reusable invite sessions (open/close, non-consuming accept)
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
@@ -1257,8 +1257,8 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 **Files:**
 - Modify: `mix.exs` (add `eqrcode`)
-- Create: `lib/argus_web/qr.ex`
-- Test: `test/argus_web/qr_test.exs`
+- Create: `lib/tugas_web/qr.ex`
+- Test: `test/tugas_web/qr_test.exs`
 
 - [ ] **Step 1: Add the dependency**
 
@@ -1273,14 +1273,14 @@ Expected: fetches `eqrcode`.
 
 - [ ] **Step 2: Write the failing test**
 
-Create `test/argus_web/qr_test.exs`:
+Create `test/tugas_web/qr_test.exs`:
 
 ```elixir
-defmodule ArgusWeb.QRTest do
+defmodule TugasWeb.QRTest do
   use ExUnit.Case, async: true
 
   test "svg/1 returns an inline SVG string for a URL" do
-    svg = ArgusWeb.QR.svg("https://example.com/invitations/abc")
+    svg = TugasWeb.QR.svg("https://example.com/invitations/abc")
     assert is_binary(svg)
     assert svg =~ "<svg"
   end
@@ -1289,15 +1289,15 @@ end
 
 - [ ] **Step 3: Run it to verify it fails**
 
-Run: `mix test test/argus_web/qr_test.exs`
-Expected: FAIL — `ArgusWeb.QR` undefined.
+Run: `mix test test/tugas_web/qr_test.exs`
+Expected: FAIL — `TugasWeb.QR` undefined.
 
 - [ ] **Step 4: Implement the helper**
 
-Create `lib/argus_web/qr.ex`:
+Create `lib/tugas_web/qr.ex`:
 
 ```elixir
-defmodule ArgusWeb.QR do
+defmodule TugasWeb.QR do
   @moduledoc "Renders a URL as an inline SVG QR code."
 
   @doc "Returns an SVG string (no XML declaration) for embedding with `raw/1`."
@@ -1313,13 +1313,13 @@ end
 
 - [ ] **Step 5: Run it to verify it passes**
 
-Run: `mix test test/argus_web/qr_test.exs`
+Run: `mix test test/tugas_web/qr_test.exs`
 Expected: PASS.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add mix.exs mix.lock lib/argus_web/qr.ex test/argus_web/qr_test.exs
+git add mix.exs mix.lock lib/tugas_web/qr.ex test/tugas_web/qr_test.exs
 git commit -m "feat: inline SVG QR code helper
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
@@ -1330,13 +1330,13 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ## Task 11: Admin invite-session LiveView (QR + live roster + close)
 
 **Files:**
-- Create: `lib/argus_web/live/membership_live/invite_session.ex`
-- Modify: `lib/argus_web/router.ex` (add route in the `:entity_scoped` live_session)
-- Test: `test/argus_web/live/invite_session_live_test.exs`
+- Create: `lib/tugas_web/live/membership_live/invite_session.ex`
+- Modify: `lib/tugas_web/router.ex` (add route in the `:entity_scoped` live_session)
+- Test: `test/tugas_web/live/invite_session_live_test.exs`
 
 - [ ] **Step 1: Add the route**
 
-In `lib/argus_web/router.ex`, inside `live_session :entity_scoped ... do`, after the `members` line add:
+In `lib/tugas_web/router.ex`, inside `live_session :entity_scoped ... do`, after the `members` line add:
 
 ```elixir
       live "/entities/:entity_slug/invite-session/:role", MembershipLive.InviteSession, :show
@@ -1344,19 +1344,19 @@ In `lib/argus_web/router.ex`, inside `live_session :entity_scoped ... do`, after
 
 - [ ] **Step 2: Write the failing test**
 
-Create `test/argus_web/live/invite_session_live_test.exs`:
+Create `test/tugas_web/live/invite_session_live_test.exs`:
 
 ```elixir
-defmodule ArgusWeb.InviteSessionLiveTest do
-  use ArgusWeb.ConnCase, async: true
+defmodule TugasWeb.InviteSessionLiveTest do
+  use TugasWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
-  import Argus.AccountsFixtures
+  import Tugas.AccountsFixtures
 
-  alias Argus.Entities
+  alias Tugas.Entities
 
   test "admin opens a member session: sees QR and a live roster updates", %{conn: conn} do
-    scope = Argus.EntitiesFixtures.entity_scope_fixture()
+    scope = Tugas.EntitiesFixtures.entity_scope_fixture()
     conn = log_in_user(conn, scope.user)
 
     {:ok, view, html} = live(conn, ~p"/entities/#{scope.entity.slug}/invite-session/member")
@@ -1366,7 +1366,7 @@ defmodule ArgusWeb.InviteSessionLiveTest do
 
     # Simulate a scanner finishing registration in another process.
     joiner = username_user_fixture(%{username: "scannerjoe"})
-    inv = Argus.Repo.get_by!(Entities.Invitation, entity_id: scope.entity.id, reusable: true)
+    inv = Tugas.Repo.get_by!(Entities.Invitation, entity_id: scope.entity.id, reusable: true)
     {:ok, _} = Entities.accept_invitation(joiner, inv.token)
 
     assert render(view) =~ "scannerjoe"
@@ -1384,18 +1384,18 @@ end
 
 - [ ] **Step 3: Run it to verify it fails**
 
-Run: `mix test test/argus_web/live/invite_session_live_test.exs`
+Run: `mix test test/tugas_web/live/invite_session_live_test.exs`
 Expected: FAIL — `MembershipLive.InviteSession` undefined.
 
 - [ ] **Step 4: Implement the LiveView**
 
-Create `lib/argus_web/live/membership_live/invite_session.ex`:
+Create `lib/tugas_web/live/membership_live/invite_session.ex`:
 
 ```elixir
-defmodule ArgusWeb.MembershipLive.InviteSession do
-  use ArgusWeb, :live_view
+defmodule TugasWeb.MembershipLive.InviteSession do
+  use TugasWeb, :live_view
 
-  alias Argus.Entities
+  alias Tugas.Entities
 
   @impl true
   def render(assigns) do
@@ -1441,14 +1441,14 @@ defmodule ArgusWeb.MembershipLive.InviteSession do
     case Entities.open_invite_session(scope, role) do
       {:ok, invitation} ->
         if connected?(socket) do
-          Phoenix.PubSub.subscribe(Argus.PubSub, "entity:#{scope.entity.id}:members")
+          Phoenix.PubSub.subscribe(Tugas.PubSub, "entity:#{scope.entity.id}:members")
         end
 
         link = url(~p"/invitations/#{Entities.Invitation.encode_token(invitation.token)}")
 
         {:ok,
          socket
-         |> assign(role: role, invitation: invitation, link: link, qr: ArgusWeb.QR.svg(link),
+         |> assign(role: role, invitation: invitation, link: link, qr: TugasWeb.QR.svg(link),
            closed: false, count: 0)
          |> stream(:roster, [])}
 
@@ -1480,13 +1480,13 @@ end
 
 - [ ] **Step 5: Run it to verify it passes**
 
-Run: `mix test test/argus_web/live/invite_session_live_test.exs`
+Run: `mix test test/tugas_web/live/invite_session_live_test.exs`
 Expected: PASS.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add lib/argus_web/live/membership_live/invite_session.ex lib/argus_web/router.ex test/argus_web/live/invite_session_live_test.exs
+git add lib/tugas_web/live/membership_live/invite_session.ex lib/tugas_web/router.ex test/tugas_web/live/invite_session_live_test.exs
 git commit -m "feat: admin invite-session LiveView with QR and live roster
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
@@ -1497,16 +1497,16 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ## Task 12: Members screen — Start QR invite buttons
 
 **Files:**
-- Modify: `lib/argus_web/live/membership_live/index.ex` (template)
-- Test: `test/argus_web/live/membership_live_test.exs`
+- Modify: `lib/tugas_web/live/membership_live/index.ex` (template)
+- Test: `test/tugas_web/live/membership_live_test.exs`
 
 - [ ] **Step 1: Write the failing test**
 
-Add to `test/argus_web/live/membership_live_test.exs` (admin describe):
+Add to `test/tugas_web/live/membership_live_test.exs` (admin describe):
 
 ```elixir
     test "admin sees Start manager/member QR invite links", %{conn: conn} do
-      scope = Argus.EntitiesFixtures.entity_scope_fixture()
+      scope = Tugas.EntitiesFixtures.entity_scope_fixture()
       conn = log_in_user(conn, scope.user)
       {:ok, _view, html} = live(conn, ~p"/entities/#{scope.entity.slug}/members")
 
@@ -1517,12 +1517,12 @@ Add to `test/argus_web/live/membership_live_test.exs` (admin describe):
 
 - [ ] **Step 2: Run it to verify it fails**
 
-Run: `mix test test/argus_web/live/membership_live_test.exs`
+Run: `mix test test/tugas_web/live/membership_live_test.exs`
 Expected: FAIL — links absent.
 
 - [ ] **Step 3: Add the buttons to the Members template**
 
-In `lib/argus_web/live/membership_live/index.ex`, in the render template near the invite form, add (admin-only — wrap in the existing manage check if there is one):
+In `lib/tugas_web/live/membership_live/index.ex`, in the render template near the invite form, add (admin-only — wrap in the existing manage check if there is one):
 
 ```heex
       <div class="mt-4 flex gap-2">
@@ -1543,13 +1543,13 @@ In `lib/argus_web/live/membership_live/index.ex`, in the render template near th
 
 - [ ] **Step 4: Run it to verify it passes**
 
-Run: `mix test test/argus_web/live/membership_live_test.exs`
+Run: `mix test test/tugas_web/live/membership_live_test.exs`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add lib/argus_web/live/membership_live/index.ex test/argus_web/live/membership_live_test.exs
+git add lib/tugas_web/live/membership_live/index.ex test/tugas_web/live/membership_live_test.exs
 git commit -m "feat: Start manager/member QR invite from Members screen
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
@@ -1586,5 +1586,5 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 - **Spec coverage:** username + nullable email + check constraint + session columns (T1); registration_changeset (T2); register_invited_user + login resolver (T3); optional invitation email + invitation fields (T4); three accept paths + `{:ok, :already_member}` success (T5); accept-page branches (T6); username-or-email login (T7); email-optional single-use invite UI (T8); reusable-session validity/open/close + non-consuming accept + PubSub (T9); QR helper (T10); admin invite-session LiveView with live roster (T11); Members-screen QR buttons for manager/member (T12); suite+precommit (T13). All spec sections map to a task.
 - **Type consistency:** controller reads `params["create"]` / `params["login"]`; Show forms use `as: "create"` / `as: "login"` / `as: "accept"`; login uses `user_params["identifier"]` with form field `f[:identifier]` (T5–T7). `accept_invitation/2` returns `{:ok, membership}` **or** `{:ok, :already_member}` — both matched by the controller's `{:ok, _}` success clause (T5/T9). Session role is `"manager"`/`"member"` only across T9/T11/T12.
-- **PubSub name:** the plan assumes `Argus.PubSub` — confirm against `lib/argus/application.ex` before T9/T11 and adjust if different.
+- **PubSub name:** the plan assumes `Tugas.PubSub` — confirm against `lib/tugas/application.ex` before T9/T11 and adjust if different.
 - **Out of scope (do not build):** phone, OTP, self-service reset, passkeys, per-user approval gating (sessions are passive), admin-role QR sessions.

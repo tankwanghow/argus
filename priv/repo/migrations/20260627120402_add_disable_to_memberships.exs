@@ -1,4 +1,4 @@
-defmodule Argus.Repo.Migrations.AddDisableToMemberships do
+defmodule Tugas.Repo.Migrations.AddDisableToMemberships do
   use Ecto.Migration
 
   def change do

@@ -26,15 +26,15 @@
 ## File Structure
 
 - Create: `priv/repo/migrations/<ts>_make_obligation_due_by_nullable.exs`.
-- Modify: `lib/argus/obligations/obligation.ex` — nullable-aware changeset + `:someday` virtual field.
-- Modify: `lib/argus/obligations.ex` — `validate_next_due/2` + `should_spawn_next?/2` date guard; `list_obligations_page/2` someday status + nullable keyset + `recent` sort.
-- Modify: `lib/argus/obligations/urgency.ex` — nil `due_by` → `:none`.
-- Modify: `lib/argus_web/components/urgency_badge.ex` — defensive nil/`:none` clause.
-- Modify: `lib/argus_web/live/obligation_live/index_helpers.ex` — `:someday` lifecycle, `recent` sort, `sorts/1`, `effective_sort/2`, labels, empty message.
-- Modify: `lib/argus_web/dashboard_filter.ex` — `@sorts`/`@lifecycles` whitelists.
-- Modify: `lib/argus_web/live/dashboard_live/index.ex` + `lib/argus_web/live/mobile_live/components.ex` — hide date/urgency chrome for dateless rows.
-- Modify: `lib/argus_web/live/obligation_live/create_form.ex`, `.../obligation_live/form.ex`, `.../mobile_live/obligation_form.ex` — "No due date" toggle.
-- Modify: `lib/argus_web/live/obligation_live/show.ex` + `.../mobile_live/obligation_show.ex` — date/urgency guards + edit-form Someday toggle (promote/demote).
+- Modify: `lib/tugas/obligations/obligation.ex` — nullable-aware changeset + `:someday` virtual field.
+- Modify: `lib/tugas/obligations.ex` — `validate_next_due/2` + `should_spawn_next?/2` date guard; `list_obligations_page/2` someday status + nullable keyset + `recent` sort.
+- Modify: `lib/tugas/obligations/urgency.ex` — nil `due_by` → `:none`.
+- Modify: `lib/tugas_web/components/urgency_badge.ex` — defensive nil/`:none` clause.
+- Modify: `lib/tugas_web/live/obligation_live/index_helpers.ex` — `:someday` lifecycle, `recent` sort, `sorts/1`, `effective_sort/2`, labels, empty message.
+- Modify: `lib/tugas_web/dashboard_filter.ex` — `@sorts`/`@lifecycles` whitelists.
+- Modify: `lib/tugas_web/live/dashboard_live/index.ex` + `lib/tugas_web/live/mobile_live/components.ex` — hide date/urgency chrome for dateless rows.
+- Modify: `lib/tugas_web/live/obligation_live/create_form.ex`, `.../obligation_live/form.ex`, `.../mobile_live/obligation_form.ex` — "No due date" toggle.
+- Modify: `lib/tugas_web/live/obligation_live/show.ex` + `.../mobile_live/obligation_show.ex` — date/urgency guards + edit-form Someday toggle (promote/demote).
 - Tests alongside each.
 
 ---
@@ -43,8 +43,8 @@
 
 **Files:**
 - Create: `priv/repo/migrations/<ts>_make_obligation_due_by_nullable.exs`
-- Modify: `lib/argus/obligations/obligation.ex`
-- Test: `test/argus/obligations_test.exs`
+- Modify: `lib/tugas/obligations/obligation.ex`
+- Test: `test/tugas/obligations_test.exs`
 
 **Interfaces:**
 - Produces: `Obligation` gains a virtual `field :someday, :boolean`. `Obligation.changeset/2` requires `due_by` **unless** `someday` is truthy, and force-nils `due_by` when `someday` is truthy. `due_by` column is nullable.
@@ -56,7 +56,7 @@ Run: `mix ecto.gen.migration make_obligation_due_by_nullable`
 - [ ] **Step 2: Write the migration body**
 
 ```elixir
-defmodule Argus.Repo.Migrations.MakeObligationDueByNullable do
+defmodule Tugas.Repo.Migrations.MakeObligationDueByNullable do
   use Ecto.Migration
 
   def change do
@@ -74,7 +74,7 @@ Expected: applies cleanly.
 
 - [ ] **Step 4: Write the failing test**
 
-Add to `test/argus/obligations_test.exs` inside `describe "Obligation.changeset/2"`:
+Add to `test/tugas/obligations_test.exs` inside `describe "Obligation.changeset/2"`:
 
 ```elixir
     test "requires due_by normally" do
@@ -99,12 +99,12 @@ Add to `test/argus/obligations_test.exs` inside `describe "Obligation.changeset/
 
 - [ ] **Step 5: Run test to verify it fails**
 
-Run: `mix test test/argus/obligations_test.exs -k "someday"`
+Run: `mix test test/tugas/obligations_test.exs -k "someday"`
 Expected: FAIL (no `:someday` field; due_by still required).
 
 - [ ] **Step 6: Implement the changeset**
 
-In `lib/argus/obligations/obligation.ex`, add the virtual field (near the other fields):
+In `lib/tugas/obligations/obligation.ex`, add the virtual field (near the other fields):
 
 ```elixir
     field :someday, :boolean, virtual: true
@@ -149,13 +149,13 @@ Rewrite `changeset/2`:
 
 - [ ] **Step 7: Run test to verify it passes**
 
-Run: `mix test test/argus/obligations_test.exs`
+Run: `mix test test/tugas/obligations_test.exs`
 Expected: PASS (existing changeset tests + the two new ones).
 
 - [ ] **Step 8: Commit**
 
 ```bash
-git add priv/repo/migrations/*_make_obligation_due_by_nullable.exs lib/argus/obligations/obligation.ex test/argus/obligations_test.exs
+git add priv/repo/migrations/*_make_obligation_due_by_nullable.exs lib/tugas/obligations/obligation.ex test/tugas/obligations_test.exs
 git commit -m "feat: allow obligations with no due date (Someday)
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
@@ -166,8 +166,8 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ### Task 2: Recurrence guard — dateless cycles never require/spawn next
 
 **Files:**
-- Modify: `lib/argus/obligations.ex`
-- Test: `test/argus/obligations_test.exs`
+- Modify: `lib/tugas/obligations.ex`
+- Test: `test/tugas/obligations_test.exs`
 
 **Interfaces:**
 - Consumes: Task 1 (a duty may have `due_by == nil`).
@@ -175,12 +175,12 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 - [ ] **Step 1: Write the failing test**
 
-Add to `test/argus/obligations_test.exs`:
+Add to `test/tugas/obligations_test.exs`:
 
 ```elixir
   describe "complete/skip on a dateless cycle" do
     test "completing a dateless recurring duty needs no next_due and spawns nothing" do
-      manager = Argus.EntitiesFixtures.manager_scope_fixture()
+      manager = Tugas.EntitiesFixtures.manager_scope_fixture()
       type = type_fixture(manager.entity, recurring_interval: "monthly")
 
       {:ok, ob} =
@@ -199,12 +199,12 @@ Add to `test/argus/obligations_test.exs`:
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `mix test test/argus/obligations_test.exs -k "dateless"`
+Run: `mix test test/tugas/obligations_test.exs -k "dateless"`
 Expected: FAIL with `{:error, :next_due_required}` (recurring + no next_due).
 
 - [ ] **Step 3: Add the date guard**
 
-In `lib/argus/obligations.ex`, add `not is_nil(obligation.due_by)` to both guards.
+In `lib/tugas/obligations.ex`, add `not is_nil(obligation.due_by)` to both guards.
 
 `validate_next_due/2`:
 
@@ -233,13 +233,13 @@ In `lib/argus/obligations.ex`, add `not is_nil(obligation.due_by)` to both guard
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `mix test test/argus/obligations_test.exs`
+Run: `mix test test/tugas/obligations_test.exs`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add lib/argus/obligations.ex test/argus/obligations_test.exs
+git add lib/tugas/obligations.ex test/tugas/obligations_test.exs
 git commit -m "feat: dateless duties complete/skip as one-offs (no recurrence)
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
@@ -250,35 +250,35 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ### Task 3: Urgency nil-guards
 
 **Files:**
-- Modify: `lib/argus/obligations/urgency.ex`
-- Modify: `lib/argus_web/components/urgency_badge.ex`
-- Test: `test/argus/obligations/urgency_test.exs`
+- Modify: `lib/tugas/obligations/urgency.ex`
+- Modify: `lib/tugas_web/components/urgency_badge.ex`
+- Test: `test/tugas/obligations/urgency_test.exs`
 
 **Interfaces:**
 - Produces: `Urgency.classify(type, nil, today) :: :none`; `Urgency.tier(type, nil, today) :: :none`. `UrgencyBadge.badge_text/3` returns `nil` for a nil `due_by` (defensive; templates also guard).
 
 - [ ] **Step 1: Write the failing test**
 
-Add to `test/argus/obligations/urgency_test.exs` (create the file if missing; use the existing test module name if present):
+Add to `test/tugas/obligations/urgency_test.exs` (create the file if missing; use the existing test module name if present):
 
 ```elixir
   test "classify and tier return :none when due_by is nil" do
-    type = %Argus.Obligations.Type{reminder_offsets: "30,7,1"}
-    assert Argus.Obligations.Urgency.classify(type, nil, ~D[2026-06-23]) == :none
-    assert Argus.Obligations.Urgency.tier(type, nil, ~D[2026-06-23]) == :none
+    type = %Tugas.Obligations.Type{reminder_offsets: "30,7,1"}
+    assert Tugas.Obligations.Urgency.classify(type, nil, ~D[2026-06-23]) == :none
+    assert Tugas.Obligations.Urgency.tier(type, nil, ~D[2026-06-23]) == :none
   end
 ```
 
-(If `urgency_test.exs` does not exist, create it with `defmodule Argus.Obligations.UrgencyTest do use ExUnit.Case, async: true` … `end`.)
+(If `urgency_test.exs` does not exist, create it with `defmodule Tugas.Obligations.UrgencyTest do use ExUnit.Case, async: true` … `end`.)
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `mix test test/argus/obligations/urgency_test.exs`
+Run: `mix test test/tugas/obligations/urgency_test.exs`
 Expected: FAIL (`Date.compare(nil, …)`/`Date.diff(nil, …)` raises).
 
 - [ ] **Step 3: Add the nil guards**
 
-In `lib/argus/obligations/urgency.ex`, add a nil clause **before** each existing head:
+In `lib/tugas/obligations/urgency.ex`, add a nil clause **before** each existing head:
 
 ```elixir
   def classify(%Type{}, nil, _today), do: :none
@@ -286,7 +286,7 @@ In `lib/argus/obligations/urgency.ex`, add a nil clause **before** each existing
   def tier(%Type{}, nil, _today), do: :none
 ```
 
-In `lib/argus_web/components/urgency_badge.ex`, add a nil clause **before** the catch-all `badge_text/3`:
+In `lib/tugas_web/components/urgency_badge.ex`, add a nil clause **before** the catch-all `badge_text/3`:
 
 ```elixir
   def badge_text(_tier, nil, _today), do: nil
@@ -296,13 +296,13 @@ In `lib/argus_web/components/urgency_badge.ex`, add a nil clause **before** the 
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `mix test test/argus/obligations/urgency_test.exs`
+Run: `mix test test/tugas/obligations/urgency_test.exs`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add lib/argus/obligations/urgency.ex lib/argus_web/components/urgency_badge.ex test/argus/obligations/urgency_test.exs
+git add lib/tugas/obligations/urgency.ex lib/tugas_web/components/urgency_badge.ex test/tugas/obligations/urgency_test.exs
 git commit -m "feat: urgency is :none for dateless duties
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
@@ -313,8 +313,8 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ### Task 4: `list_obligations_page/2` — Someday status, `recent` sort, nullable keyset
 
 **Files:**
-- Modify: `lib/argus/obligations.ex`
-- Test: `test/argus/obligations_test.exs`
+- Modify: `lib/tugas/obligations.ex`
+- Test: `test/tugas/obligations_test.exs`
 
 **Interfaces:**
 - Consumes: Task 1 (nullable `due_by`).
@@ -322,12 +322,12 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 - [ ] **Step 1: Write the failing test**
 
-Add to `test/argus/obligations_test.exs`:
+Add to `test/tugas/obligations_test.exs`:
 
 ```elixir
   describe "list_obligations_page/2 — someday + nullable keyset" do
     setup do
-      manager = Argus.EntitiesFixtures.manager_scope_fixture()
+      manager = Tugas.EntitiesFixtures.manager_scope_fixture()
       type = type_fixture(manager.entity)
 
       dated =
@@ -376,12 +376,12 @@ Add to `test/argus/obligations_test.exs`:
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `mix test test/argus/obligations_test.exs -k "someday + nullable"`
+Run: `mix test test/tugas/obligations_test.exs -k "someday + nullable"`
 Expected: FAIL (`:someday` invalid status; `:recent` unknown; nil `due_by` cursor crash).
 
 - [ ] **Step 3: Implement**
 
-In `lib/argus/obligations.ex`:
+In `lib/tugas/obligations.ex`:
 
 Extend `@status_filters`:
 
@@ -481,13 +481,13 @@ Add the `:recent` cursor clause and null-aware date cursor clauses (replace the 
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `mix test test/argus/obligations_test.exs`
+Run: `mix test test/tugas/obligations_test.exs`
 Expected: PASS (new describe + all existing list_obligations_page tests).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add lib/argus/obligations.ex test/argus/obligations_test.exs
+git add lib/tugas/obligations.ex test/tugas/obligations_test.exs
 git commit -m "feat: Someday status, recent sort, nullable-due_by keyset paging
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
@@ -498,16 +498,16 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ### Task 5: Filter vocabulary — IndexHelpers + DashboardFilter
 
 **Files:**
-- Modify: `lib/argus_web/live/obligation_live/index_helpers.ex`
-- Modify: `lib/argus_web/dashboard_filter.ex`
-- Test: `test/argus_web/live/index_helpers_test.exs`
+- Modify: `lib/tugas_web/live/obligation_live/index_helpers.ex`
+- Modify: `lib/tugas_web/dashboard_filter.ex`
+- Test: `test/tugas_web/live/index_helpers_test.exs`
 
 **Interfaces:**
 - Produces: `IndexHelpers` recognises the `:someday` lifecycle and `:recent` sort. `sorts(:someday) -> [{"recent","Recently added"},{"title","Title A–Z"}]`; `effective_sort` coerces `recent` → `due_asc` off-Someday and any date/urgency sort → `recent` on Someday. `DashboardFilter` persists `recent`/`someday`.
 
 - [ ] **Step 1: Write the failing test**
 
-Add to `test/argus_web/live/index_helpers_test.exs`:
+Add to `test/tugas_web/live/index_helpers_test.exs`:
 
 ```elixir
   test "someday lifecycle: status atom, label, sorts, effective_sort" do
@@ -529,12 +529,12 @@ Add to `test/argus_web/live/index_helpers_test.exs`:
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `mix test test/argus_web/live/index_helpers_test.exs`
+Run: `mix test test/tugas_web/live/index_helpers_test.exs`
 Expected: FAIL (`:someday`/`:recent` unknown).
 
 - [ ] **Step 3: Implement**
 
-In `lib/argus_web/live/obligation_live/index_helpers.ex`:
+In `lib/tugas_web/live/obligation_live/index_helpers.ex`:
 
 Add `:someday` to `@lifecycles`:
 
@@ -588,7 +588,7 @@ Replace `sorts/1`, `parse_sort/1`, `effective_sort/2`:
   defp default_sort(_), do: :due_asc
 ```
 
-In `lib/argus_web/dashboard_filter.ex`, extend the whitelists:
+In `lib/tugas_web/dashboard_filter.ex`, extend the whitelists:
 
 ```elixir
   @lifecycles ~w(live someday completed skipped all)
@@ -597,13 +597,13 @@ In `lib/argus_web/dashboard_filter.ex`, extend the whitelists:
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `mix test test/argus_web/live/index_helpers_test.exs test/argus_web/dashboard_filter_test.exs`
+Run: `mix test test/tugas_web/live/index_helpers_test.exs test/tugas_web/dashboard_filter_test.exs`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add lib/argus_web/live/obligation_live/index_helpers.ex lib/argus_web/dashboard_filter.ex test/argus_web/live/index_helpers_test.exs
+git add lib/tugas_web/live/obligation_live/index_helpers.ex lib/tugas_web/dashboard_filter.ex test/tugas_web/live/index_helpers_test.exs
 git commit -m "feat: Someday lifecycle + Recently-added sort in dashboard filters
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
@@ -614,9 +614,9 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ### Task 6: Dashboard rows hide date/urgency chrome for dateless duties
 
 **Files:**
-- Modify: `lib/argus_web/live/dashboard_live/index.ex`
-- Modify: `lib/argus_web/live/mobile_live/components.ex`
-- Test: `test/argus_web/live/dashboard_live_test.exs`, `test/argus_web/live/mobile_live_test.exs`
+- Modify: `lib/tugas_web/live/dashboard_live/index.ex`
+- Modify: `lib/tugas_web/live/mobile_live/components.ex`
+- Test: `test/tugas_web/live/dashboard_live_test.exs`, `test/tugas_web/live/mobile_live_test.exs`
 
 **Interfaces:**
 - Consumes: Tasks 4/5 (Someday tab returns dateless rows; `urgency`/`tier` are `:none`).
@@ -624,11 +624,11 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 - [ ] **Step 1: Write the failing test**
 
-Add to `test/argus_web/live/dashboard_live_test.exs`:
+Add to `test/tugas_web/live/dashboard_live_test.exs`:
 
 ```elixir
   test "Someday tab lists dateless duties without urgency/due chrome", %{conn: conn} do
-    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     conn = log_in_user(conn, manager.user)
     type = type_fixture(manager.entity)
 
@@ -649,12 +649,12 @@ Add to `test/argus_web/live/dashboard_live_test.exs`:
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `mix test test/argus_web/live/dashboard_live_test.exs -k "Someday tab"`
+Run: `mix test test/tugas_web/live/dashboard_live_test.exs -k "Someday tab"`
 Expected: FAIL (the "due —" line and/or urgency badge render for the dateless row).
 
 - [ ] **Step 3: Implement the guards**
 
-In `lib/argus_web/live/dashboard_live/index.ex` `obligation_row_link/1`, tighten the three date-dependent spots to require `due_by`:
+In `lib/tugas_web/live/dashboard_live/index.ex` `obligation_row_link/1`, tighten the three date-dependent spots to require `due_by`:
 
 - The left-accent border:
 
@@ -682,7 +682,7 @@ In `lib/argus_web/live/dashboard_live/index.ex` `obligation_row_link/1`, tighten
         </div>
 ```
 
-In `lib/argus_web/live/mobile_live/components.ex` `obligation_card/1`, apply the same guards: the `accent/1` left-border, the `urgency_badge` `:if`, and the `card_meta/1` due text. Update `card_meta/1` (and/or its template usage) so a nil `due_by` omits the due fragment; gate the urgency badge with `:if={@row.cycle_status == :live and @row.obligation.due_by}` and the accent via a nil-due_by → transparent branch in `accent/1`:
+In `lib/tugas_web/live/mobile_live/components.ex` `obligation_card/1`, apply the same guards: the `accent/1` left-border, the `urgency_badge` `:if`, and the `card_meta/1` due text. Update `card_meta/1` (and/or its template usage) so a nil `due_by` omits the due fragment; gate the urgency badge with `:if={@row.cycle_status == :live and @row.obligation.due_by}` and the accent via a nil-due_by → transparent branch in `accent/1`:
 
 ```elixir
   defp accent(%{cycle_status: status}) when status in [:skipped, :series_ended], do: "border-base-300"
@@ -695,13 +695,13 @@ In `lib/argus_web/live/mobile_live/components.ex` `obligation_card/1`, apply the
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `mix test test/argus_web/live/dashboard_live_test.exs test/argus_web/live/mobile_live_test.exs`
+Run: `mix test test/tugas_web/live/dashboard_live_test.exs test/tugas_web/live/mobile_live_test.exs`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add lib/argus_web/live/dashboard_live/index.ex lib/argus_web/live/mobile_live/components.ex test/argus_web/live/dashboard_live_test.exs test/argus_web/live/mobile_live_test.exs
+git add lib/tugas_web/live/dashboard_live/index.ex lib/tugas_web/live/mobile_live/components.ex test/tugas_web/live/dashboard_live_test.exs test/tugas_web/live/mobile_live_test.exs
 git commit -m "feat: dateless dashboard rows omit due/urgency chrome
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
@@ -712,10 +712,10 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ### Task 7: Create-form "No due date" toggle
 
 **Files:**
-- Modify: `lib/argus_web/live/obligation_live/create_form.ex`
-- Modify: `lib/argus_web/live/obligation_live/form.ex`
-- Modify: `lib/argus_web/live/mobile_live/obligation_form.ex`
-- Test: `test/argus_web/live/obligation_live_test.exs`
+- Modify: `lib/tugas_web/live/obligation_live/create_form.ex`
+- Modify: `lib/tugas_web/live/obligation_live/form.ex`
+- Modify: `lib/tugas_web/live/mobile_live/obligation_form.ex`
+- Test: `test/tugas_web/live/obligation_live_test.exs`
 
 **Interfaces:**
 - Consumes: Task 1 (`:someday` changeset field).
@@ -723,11 +723,11 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 - [ ] **Step 1: Write the failing test**
 
-Add to `test/argus_web/live/obligation_live_test.exs`:
+Add to `test/tugas_web/live/obligation_live_test.exs`:
 
 ```elixir
   test "create form can make a Someday (no due date) duty", %{conn: conn} do
-    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     conn = log_in_user(conn, manager.user)
     type = type_fixture(manager.entity)
 
@@ -743,7 +743,7 @@ Add to `test/argus_web/live/obligation_live_test.exs`:
     })
     |> render_submit()
 
-    ob = Argus.Obligations.list_obligations_page(manager, status: :someday, limit: :all).rows |> List.first()
+    ob = Tugas.Obligations.list_obligations_page(manager, status: :someday, limit: :all).rows |> List.first()
     assert ob.title == "Improve onboarding docs"
     assert ob.due_by == nil
   end
@@ -753,12 +753,12 @@ Add to `test/argus_web/live/obligation_live_test.exs`:
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `mix test test/argus_web/live/obligation_live_test.exs -k "Someday"`
+Run: `mix test test/tugas_web/live/obligation_live_test.exs -k "Someday"`
 Expected: FAIL (`someday` not passed through; due_by required).
 
 - [ ] **Step 3: Pass `someday` through CreateForm**
 
-In `lib/argus_web/live/obligation_live/create_form.ex`, add `"someday"` to the kept keys in `map_create_params/1`:
+In `lib/tugas_web/live/obligation_live/create_form.ex`, add `"someday"` to the kept keys in `map_create_params/1`:
 
 ```elixir
     |> Map.take([
@@ -776,7 +776,7 @@ In `lib/argus_web/live/obligation_live/create_form.ex`, add `"someday"` to the k
 
 - [ ] **Step 4: Add the toggle to both form templates**
 
-In `lib/argus_web/live/obligation_live/form.ex`, replace the due_by input with a Someday checkbox + a conditionally-shown date input:
+In `lib/tugas_web/live/obligation_live/form.ex`, replace the due_by input with a Someday checkbox + a conditionally-shown date input:
 
 ```heex
           <.input
@@ -799,17 +799,17 @@ Add a private helper to the same LiveView module:
   defp someday?(form), do: Phoenix.HTML.Form.normalize_value("checkbox", form[:someday].value)
 ```
 
-Apply the identical change to `lib/argus_web/live/mobile_live/obligation_form.ex` (its due_by input + the same `someday?/1` helper).
+Apply the identical change to `lib/tugas_web/live/mobile_live/obligation_form.ex` (its due_by input + the same `someday?/1` helper).
 
 - [ ] **Step 5: Run test to verify it passes**
 
-Run: `mix test test/argus_web/live/obligation_live_test.exs`
+Run: `mix test test/tugas_web/live/obligation_live_test.exs`
 Expected: PASS.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add lib/argus_web/live/obligation_live/create_form.ex lib/argus_web/live/obligation_live/form.ex lib/argus_web/live/mobile_live/obligation_form.ex test/argus_web/live/obligation_live_test.exs
+git add lib/tugas_web/live/obligation_live/create_form.ex lib/tugas_web/live/obligation_live/form.ex lib/tugas_web/live/mobile_live/obligation_form.ex test/tugas_web/live/obligation_live_test.exs
 git commit -m "feat: create-form No-due-date (Someday) toggle
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
@@ -820,9 +820,9 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ### Task 8: Show page — date guards + promote/demote toggle
 
 **Files:**
-- Modify: `lib/argus_web/live/obligation_live/show.ex`
-- Modify: `lib/argus_web/live/mobile_live/obligation_show.ex`
-- Test: `test/argus_web/live/obligation_live_test.exs`
+- Modify: `lib/tugas_web/live/obligation_live/show.ex`
+- Modify: `lib/tugas_web/live/mobile_live/obligation_show.ex`
+- Test: `test/tugas_web/live/obligation_live_test.exs`
 
 **Interfaces:**
 - Consumes: Tasks 1/3 (nullable `due_by`, `:none` urgency); `update_obligation/3` already runs `Obligation.changeset/2`, so clearing `due_by` (demote) and setting it (promote) work through the same conditional rule.
@@ -830,11 +830,11 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 - [ ] **Step 1: Write the failing test**
 
-Add to `test/argus_web/live/obligation_live_test.exs`:
+Add to `test/tugas_web/live/obligation_live_test.exs`:
 
 ```elixir
   test "show page renders a Someday duty and can promote it to a due date", %{conn: conn} do
-    manager = Argus.EntitiesFixtures.manager_scope_fixture()
+    manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     conn = log_in_user(conn, manager.user)
     type = type_fixture(manager.entity)
 
@@ -853,18 +853,18 @@ Add to `test/argus_web/live/obligation_live_test.exs`:
     })
     |> render_submit()
 
-    assert Argus.Repo.reload(ob).due_by == ~D[2026-09-01]
+    assert Tugas.Repo.reload(ob).due_by == ~D[2026-09-01]
   end
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `mix test test/argus_web/live/obligation_live_test.exs -k "promote"`
+Run: `mix test test/tugas_web/live/obligation_live_test.exs -k "promote"`
 Expected: FAIL (show crashes on nil `due_by`, and/or the edit form has no someday toggle).
 
 - [ ] **Step 3: Guard the show templates**
 
-In `lib/argus_web/live/obligation_live/show.ex`:
+In `lib/tugas_web/live/obligation_live/show.ex`:
 
 - The due-date summary line (currently `{format_date(@obligation.due_by)}`) is safe (`format_date(nil)` → "—"), but wrap the urgency badge:
 
@@ -900,7 +900,7 @@ When building `@edit_form`, seed the `someday` virtual from the current state so
 
 (Use `edit_changeset/1` wherever `@edit_form` is currently built from `change_obligation/1`.)
 
-Apply the same three guards (urgency badge `:if`, any `Date.to_iso8601(due_by)` default, edit-form toggle + `someday?/1` + seeded `someday`) to `lib/argus_web/live/mobile_live/obligation_show.ex`. The mobile "Due …" line at the top should also hide when `due_by` is nil:
+Apply the same three guards (urgency badge `:if`, any `Date.to_iso8601(due_by)` default, edit-form toggle + `someday?/1` + seeded `someday`) to `lib/tugas_web/live/mobile_live/obligation_show.ex`. The mobile "Due …" line at the top should also hide when `due_by` is nil:
 
 ```heex
             <span :if={@obligation.due_by}><span class="text-warning">Due </span>{format_date(@obligation.due_by, :short)}</span>
@@ -908,7 +908,7 @@ Apply the same three guards (urgency badge `:if`, any `Date.to_iso8601(due_by)` 
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `mix test test/argus_web/live/obligation_live_test.exs`
+Run: `mix test test/tugas_web/live/obligation_live_test.exs`
 Expected: PASS.
 
 - [ ] **Step 5: Run the full gate**
@@ -919,7 +919,7 @@ Expected: PASS (compile `--warnings-as-errors`, format, full suite).
 - [ ] **Step 6: Commit**
 
 ```bash
-git add lib/argus_web/live/obligation_live/show.ex lib/argus_web/live/mobile_live/obligation_show.ex test/argus_web/live/obligation_live_test.exs
+git add lib/tugas_web/live/obligation_live/show.ex lib/tugas_web/live/mobile_live/obligation_show.ex test/tugas_web/live/obligation_live_test.exs
 git commit -m "feat: show page renders Someday duties; edit toggles due date
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"

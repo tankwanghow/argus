@@ -31,7 +31,7 @@ expressible.
 
 ## Architecture
 
-### 1. Query — `Argus.Obligations.list_obligations_page/2`
+### 1. Query — `Tugas.Obligations.list_obligations_page/2`
 
 **Revert** the Someday-as-lifecycle pieces added previously:
 - `@status_filters` → back to `~w(my_live my_completed my_skipped my_all live completed skipped all)a`
@@ -88,7 +88,7 @@ Signature gains `date_filter`:
   window+tail path, calling `list_obligations_page` with `date_scope: :dated` (the window's
   `due_before` already excludes nulls). No change to the window/tail logic itself.
 
-### 4. Persistence — `ArgusWeb.DashboardFilter`
+### 4. Persistence — `TugasWeb.DashboardFilter`
 
 - `@lifecycles` → `~w(live completed skipped all)` (drop `someday`).
 - Add `@date_filters ~w(dated someday all_dates)`.

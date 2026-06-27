@@ -1,4 +1,4 @@
-defmodule Argus.Repo.Migrations.AddLocaleToUsers do
+defmodule Tugas.Repo.Migrations.AddLocaleToUsers do
   use Ecto.Migration
 
   def change do
