@@ -79,7 +79,7 @@ defmodule TugasWeb.DashboardLive.Index do
             />
           </div>
 
-          <div class="w-full lg:w-80 shrink-0 flex">
+          <div class="w-full lg:w-[15%] shrink-0 flex">
             <.dashboard_todos_panel
               todos={@todos}
               slug={@current_scope.entity.slug}
