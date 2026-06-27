@@ -46,7 +46,7 @@ defmodule TugasWeb.Plugs.AutoRouteByDeviceTest do
         |> Map.put(:query_string, "")
         |> AutoRouteByDevice.call([])
 
-      assert redirected_to(conn) == "/m/acme"
+      assert redirected_to(conn) == "/m/acme/duties"
       assert conn.halted
     end
 
@@ -191,7 +191,7 @@ defmodule TugasWeb.Plugs.AutoRouteByDeviceTest do
         |> Map.put(:query_string, "")
         |> AutoRouteByDevice.call([])
 
-      assert redirected_to(conn) == "/m/acme"
+      assert redirected_to(conn) == "/m/acme/duties"
       assert conn.halted
     end
 

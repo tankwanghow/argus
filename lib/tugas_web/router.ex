@@ -68,7 +68,8 @@ defmodule TugasWeb.Router do
       live "/entities/:entity_slug/todos/team-log", TodoLive.TeamLog, :index
       live "/entities/:entity_slug/todos", TodoLive.Index, :index
 
-      live "/m/:entity_slug", MobileLive.Dashboard, :show
+      live "/m/:entity_slug", MobileLive.Dashboard, :index
+      live "/m/:entity_slug/duties", MobileLive.DutyIndex, :index
       live "/m/:entity_slug/duties/new", MobileLive.DutyForm, :new
       live "/m/:entity_slug/duties/:id", MobileLive.DutyShow, :show
       live "/m/:entity_slug/duty-types", MobileLive.DutyTypes, :index

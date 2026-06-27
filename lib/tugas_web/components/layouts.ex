@@ -356,7 +356,13 @@ defmodule TugasWeb.Layouts do
   """
   attr :flash, :map, required: true
   attr :current_scope, :map, default: nil
-  attr :active, :atom, default: :home, doc: "the active bottom-nav tab"
+
+  attr :nav_context, :atom,
+    default: :calendar,
+    doc: "bottom-nav tab set: :calendar, :todos, or :duties"
+
+  attr :nav_highlight, :atom, default: nil, doc: "optional active tab within the nav set"
+
   slot :inner_block, required: true
 
   def mobile_app(assigns) do
@@ -371,93 +377,114 @@ defmodule TugasWeb.Layouts do
       {render_slot(@inner_block)}
     </div>
 
-    <.mobile_bottom_nav active={@active} current_scope={@current_scope} />
+    <.mobile_bottom_nav
+      nav_context={@nav_context}
+      nav_highlight={@nav_highlight}
+      current_scope={@current_scope}
+    />
     <.mobile_more_sheet current_scope={@current_scope} />
     <.flash_group flash={@flash} />
     """
   end
 
-  attr :active, :atom, required: true
+  @mobile_nav_sets %{
+    calendar: [:new_todo, :todos, :new_duty, :duties, :more],
+    todos: [:new_todo, :duties, :calendar, :more],
+    duties: [:todos, :new_duty, :calendar, :more]
+  }
+
+  attr :nav_context, :atom, required: true
+  attr :nav_highlight, :atom, default: nil
   attr :current_scope, :map, required: true
 
   defp mobile_bottom_nav(assigns) do
+    slug = assigns.current_scope.entity.slug
+    tabs = Map.fetch!(@mobile_nav_sets, assigns.nav_context)
+    highlight = assigns.nav_highlight
+    cols = length(tabs)
+
+    assigns =
+      assigns
+      |> assign(:slug, slug)
+      |> assign(:tabs, tabs)
+      |> assign(:highlight, highlight)
+      |> assign(:cols, cols)
+
     ~H"""
     <nav class="fixed bottom-0 inset-x-0 z-30 bg-base-100 border-t border-base-300 pb-[env(safe-area-inset-bottom)]">
-      <ul class="grid grid-cols-5">
-        <li>
-          <.link
-            id="m-new-todo-nav-link"
-            navigate={~p"/m/#{@current_scope.entity.slug}/todos/new"}
-            class={[
-              "flex flex-col items-center gap-1 py-3 active:bg-base-200",
-              @active == :new_todo && "text-primary",
-              @active != :new_todo && "text-base-content/60"
-            ]}
-          >
-            <span class="text-2xl">✚</span>
-            <span class="text-sm leading-tight text-center">Todo</span>
-          </.link>
-        </li>
-        <li>
-          <.link
-            id="m-todos-nav-link"
-            navigate={~p"/m/#{@current_scope.entity.slug}/todos"}
-            class={[
-              "flex flex-col items-center gap-1 py-3 active:bg-base-200",
-              @active == :todos && "text-primary",
-              @active != :todos && "text-base-content/60"
-            ]}
-          >
-            <span class="text-2xl">📑</span>
-            <span class="text-sm leading-tight text-center">Todos</span>
-          </.link>
-        </li>
-        <li>
-          <.link
-            id="m-new-duties-nav-link"
-            navigate={~p"/m/#{@current_scope.entity.slug}/duties/new"}
-            class={[
-              "flex flex-col items-center gap-1 py-3 active:bg-base-200",
-              @active == :new_duty && "text-primary",
-              @active != :new_duty && "text-base-content/60"
-            ]}
-          >
-            <span class="text-2xl">✚</span>
-            <span class="text-sm leading-tight text-center">Duty</span>
-          </.link>
-        </li>
-        <li>
-          <.link
-            id="m-duties-nav-link"
-            navigate={~p"/m/#{@current_scope.entity.slug}"}
-            class={[
-              "flex flex-col items-center gap-1 py-3 active:bg-base-200",
-              @active == :duties && "text-primary",
-              @active != :duties && "text-base-content/60"
-            ]}
-          >
-            <span class="text-2xl">💼</span>
-            <span class="text-sm leading-tight text-center">Duties</span>
-          </.link>
-        </li>
-        <li>
-          <button
-            type="button"
-            phx-click={JS.show(to: "#mobile-more-sheet", display: "flex")}
-            class={[
-              "w-full flex flex-col items-center gap-1 py-3 active:bg-base-200",
-              @active == :more && "text-primary",
-              @active != :more && "text-base-content/60"
-            ]}
-          >
-            <span class="text-2xl">☰</span>
-            <span class="text-sm leading-tight text-center">More</span>
-          </button>
+      <ul class={["grid", nav_grid_class(@cols)]}>
+        <li :for={tab <- @tabs}>
+          <.mobile_nav_item tab={tab} slug={@slug} highlight={@highlight} />
         </li>
       </ul>
     </nav>
     """
   end
+
+  attr :tab, :atom, required: true
+  attr :slug, :string, required: true
+  attr :highlight, :atom, default: nil
+
+  defp mobile_nav_item(%{tab: :more} = assigns) do
+    ~H"""
+    <button
+      type="button"
+      id="m-nav-more"
+      phx-click={JS.show(to: "#mobile-more-sheet", display: "flex")}
+      class={mobile_nav_class(@tab, @highlight)}
+    >
+      <span class="text-2xl">☰</span>
+      <span class="text-sm leading-tight text-center">More</span>
+    </button>
+    """
+  end
+
+  defp mobile_nav_item(assigns) do
+    meta = mobile_nav_meta(assigns.tab)
+
+    assigns =
+      assigns
+      |> assign(:meta, meta)
+      |> assign(:href, mobile_nav_href(assigns.slug, assigns.tab))
+      |> assign(:current?, assigns.tab == assigns.highlight)
+
+    ~H"""
+    <%= if @current? do %>
+      <div id={@meta.id} class={mobile_nav_class(@tab, @highlight)}>
+        <span class="text-2xl">{@meta.icon}</span>
+        <span class="text-sm leading-tight text-center">{@meta.label}</span>
+      </div>
+    <% else %>
+      <.link id={@meta.id} navigate={@href} class={mobile_nav_class(@tab, @highlight)}>
+        <span class="text-2xl">{@meta.icon}</span>
+        <span class="text-sm leading-tight text-center">{@meta.label}</span>
+      </.link>
+    <% end %>
+    """
+  end
+
+  defp nav_grid_class(4), do: "grid-cols-4"
+  defp nav_grid_class(_), do: "grid-cols-5"
+
+  defp mobile_nav_class(tab, highlight) do
+    [
+      "flex flex-col items-center gap-1 py-3 active:bg-base-200 w-full",
+      tab == highlight && "text-primary",
+      tab != highlight && "text-base-content/60"
+    ]
+  end
+
+  defp mobile_nav_meta(:new_todo), do: %{id: "m-nav-new-todo", icon: "✚", label: "Todo"}
+  defp mobile_nav_meta(:todos), do: %{id: "m-nav-todos", icon: "📑", label: "Todos"}
+  defp mobile_nav_meta(:new_duty), do: %{id: "m-nav-new-duty", icon: "✚", label: "Duty"}
+  defp mobile_nav_meta(:duties), do: %{id: "m-nav-duties", icon: "💼", label: "Duties"}
+  defp mobile_nav_meta(:calendar), do: %{id: "m-nav-calendar", icon: "📅", label: "Calendar"}
+
+  defp mobile_nav_href(slug, :new_todo), do: ~p"/m/#{slug}/todos/new"
+  defp mobile_nav_href(slug, :todos), do: ~p"/m/#{slug}/todos"
+  defp mobile_nav_href(slug, :new_duty), do: ~p"/m/#{slug}/duties/new"
+  defp mobile_nav_href(slug, :duties), do: ~p"/m/#{slug}/duties"
+  defp mobile_nav_href(slug, :calendar), do: ~p"/m/#{slug}"
 
   defp mobile_more_sheet(assigns) do
     ~H"""

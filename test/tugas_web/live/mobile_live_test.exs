@@ -15,7 +15,7 @@ defmodule TugasWeb.MobileLiveTest do
     conn |> log_in_user(scope.user) |> put_req_header("user-agent", @mobile_ua)
   end
 
-  test "mobile dashboard restores filters saved in the session", %{conn: conn} do
+  test "mobile duty list restores filters saved in the session", %{conn: conn} do
     {scope, _} = manager_duty_scope_fixture()
 
     conn =
@@ -30,7 +30,7 @@ defmodule TugasWeb.MobileLiveTest do
         }
       })
 
-    {:ok, view, _html} = live(conn, ~p"/m/#{scope.entity.slug}")
+    {:ok, view, _html} = live(conn, ~p"/m/#{scope.entity.slug}/duties")
 
     assert has_element?(view, "#m-scope-mine.tab-active")
     assert has_element?(view, "#m-duty-search[value='audit']")
@@ -39,23 +39,23 @@ defmodule TugasWeb.MobileLiveTest do
     assert html =~ ~s(value="skipped" selected)
   end
 
-  test "mobile dashboard renders live cycles", %{conn: conn} do
+  test "mobile duty list renders live cycles", %{conn: conn} do
     {scope, duty} = assigned_member_scope_fixture()
     conn = mobile_conn(conn, scope)
 
-    {:ok, view, _html} = live(conn, ~p"/m/#{scope.entity.slug}")
+    {:ok, view, _html} = live(conn, ~p"/m/#{scope.entity.slug}/duties")
 
     assert has_element?(view, "#mobile-duties")
     assert has_element?(view, "#m-ob-#{duty.id}")
   end
 
-  test "mobile dashboard card shows the current event", %{conn: conn} do
+  test "mobile duty list card shows the current event", %{conn: conn} do
     {scope, duty} = manager_duty_scope_fixture()
     conn = mobile_conn(conn, scope)
 
     assert {:ok, _} = Duties.start_progress(scope, duty, %{note: "On it"})
 
-    {:ok, view, _html} = live(conn, ~p"/m/#{scope.entity.slug}")
+    {:ok, view, _html} = live(conn, ~p"/m/#{scope.entity.slug}/duties")
 
     assert has_element?(
              view,
@@ -191,7 +191,7 @@ defmodule TugasWeb.MobileLiveTest do
     refute Duties.get_duty!(scope, duty.id).completed_at == nil
   end
 
-  test "mobile dashboard filters completed cycles", %{conn: conn} do
+  test "mobile duty list filters completed cycles", %{conn: conn} do
     manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     member_scope = member_scope_on_entity(manager.entity)
     conn = mobile_conn(conn, member_scope)
@@ -218,7 +218,7 @@ defmodule TugasWeb.MobileLiveTest do
     assert {:ok, completed, _} =
              Duties.complete(member_scope, to_complete, %{note: "Done"})
 
-    {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}")
+    {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}/duties")
 
     # member defaults to Mine; switch the status dropdown to Completed
     view |> form("#m-duty-status-filter", %{lifecycle: "completed"}) |> render_change()
@@ -226,7 +226,7 @@ defmodule TugasWeb.MobileLiveTest do
     refute has_element?(view, "#m-duties-empty")
   end
 
-  test "mobile dashboard filters skipped cycles", %{conn: conn} do
+  test "mobile duty list filters skipped cycles", %{conn: conn} do
     manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     conn = mobile_conn(conn, manager)
     type = type_fixture(manager.entity)
@@ -241,7 +241,7 @@ defmodule TugasWeb.MobileLiveTest do
 
     assert {:ok, skipped, nil} = Duties.skip(manager, to_skip, %{note: "Skipping it"})
 
-    {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}")
+    {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}/duties")
 
     view |> form("#m-duty-status-filter", %{lifecycle: "skipped"}) |> render_change()
     assert has_element?(view, "#m-ob-#{skipped.id}")
@@ -405,7 +405,7 @@ defmodule TugasWeb.MobileLiveTest do
       |> put_req_header("user-agent", "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)")
       |> get(~p"/entities/#{scope.entity.slug}/duties")
 
-    assert redirected_to(conn) == ~p"/m/#{scope.entity.slug}"
+    assert redirected_to(conn) == ~p"/m/#{scope.entity.slug}/duties"
   end
 
   test "mobile: manager marks a completed cycle in error", %{conn: conn} do
@@ -563,7 +563,7 @@ defmodule TugasWeb.MobileLiveTest do
 
     assert has_element?(
              view,
-             "#m-new-duties-nav-link[href='/m/#{manager.entity.slug}/duties/new']"
+             "#m-nav-new-duty[href='/m/#{manager.entity.slug}/duties/new']"
            )
   end
 
@@ -582,7 +582,7 @@ defmodule TugasWeb.MobileLiveTest do
         })
     end
 
-    {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}")
+    {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}/duties")
 
     assert view |> element("#mobile-duties") |> render() =~ "Duty 25"
     refute view |> element("#mobile-duties") |> render() =~ "Duty 26"

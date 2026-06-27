@@ -150,13 +150,6 @@ defmodule TugasWeb.Plugs.AutoRouteByDevice do
 
   defp maybe_desktop_duties_index(path, _from), do: path
 
-  defp maybe_mobile_duties_index("/m/" <> slug_and_rest, "/entities/") do
-    case String.split(slug_and_rest, "/", parts: 2) do
-      [slug, "duties"] -> "/m/#{slug}"
-      _ -> "/m/" <> slug_and_rest
-    end
-  end
-
   defp maybe_mobile_duties_index(path, _from), do: path
 
   defp path_tail(path, prefix) do

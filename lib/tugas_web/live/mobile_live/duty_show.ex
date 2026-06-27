@@ -21,7 +21,7 @@ defmodule TugasWeb.MobileLive.DutyShow do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.mobile_app flash={@flash} current_scope={@current_scope} active={:duties}>
+    <Layouts.mobile_app flash={@flash} current_scope={@current_scope} nav_context={:calendar}>
       <div
         id="mobile-duty-show"
         class="px-2 py-2"

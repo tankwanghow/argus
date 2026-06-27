@@ -7,7 +7,7 @@ defmodule TugasWeb.MobileLive.InviteSession do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.mobile_app flash={@flash} current_scope={@current_scope} active={:more}>
+    <Layouts.mobile_app flash={@flash} current_scope={@current_scope} nav_context={:calendar}>
       <div class="flex flex-col h-full">
         <div class="flex items-center justify-between gap-2 px-4 py-3 border-b border-base-200">
           <.link navigate={~p"/m/#{@current_scope.entity.slug}"} class="btn btn-ghost btn-sm">

@@ -200,10 +200,10 @@ defmodule TugasWeb.TodoLiveTest do
     {:ok, view, html} = live(conn, ~p"/m/#{scope.entity.slug}/todos")
 
     assert html =~ "Todos"
-    assert has_element?(view, "#m-new-todo-nav-link")
-    assert has_element?(view, "#m-todos-nav-link")
-    assert has_element?(view, "#m-new-duties-nav-link")
-    assert has_element?(view, "#m-duties-nav-link")
+    assert has_element?(view, "#m-nav-new-todo")
+    refute has_element?(view, "#m-nav-todos")
+    assert has_element?(view, "#m-nav-duties")
+    assert has_element?(view, "#m-nav-calendar")
     refute has_element?(view, "#m-new-todo-btn")
     refute has_element?(view, "#m-todo-status-filter")
     assert has_element?(view, "#m-todos-empty")
@@ -228,7 +228,7 @@ defmodule TugasWeb.TodoLiveTest do
     {:ok, view, _html} = live(conn, ~p"/m/#{scope.entity.slug}/todos/new")
 
     assert has_element?(view, "#m-todo-modal")
-    assert has_element?(view, "#m-new-todo-nav-link.text-primary")
+    assert has_element?(view, "#m-nav-new-todo.text-primary")
   end
 
   test "unified list shows open and completed todos together without a filter", %{conn: conn} do
