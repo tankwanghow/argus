@@ -93,6 +93,7 @@ defmodule TugasWeb do
       import TugasWeb.DoneDocumentChecklist
       import TugasWeb.EventMeta
       import TugasWeb.UrgencyBadge
+      import TugasWeb.DutyCalendar, only: [duty_calendar: 1]
 
       # Common modules used in templates
       alias Phoenix.LiveView.JS
