@@ -94,7 +94,12 @@ defmodule ArgusWeb.DashboardLive.Index do
               data-event-count={row.event_count}
               data-event-status={row.latest_event && row.latest_event.status}
             >
-              <.obligation_row_link row={row} slug={@current_scope.entity.slug} today={@today} />
+              <.obligation_row_link
+                row={row}
+                slug={@current_scope.entity.slug}
+                today={@today}
+                timezone={@current_scope.entity.timezone}
+              />
             </li>
           </ul>
           <div
@@ -113,6 +118,7 @@ defmodule ArgusWeb.DashboardLive.Index do
   attr :row, :map, required: true
   attr :slug, :string, required: true
   attr :today, :any, required: true
+  attr :timezone, :string, default: nil
 
   defp obligation_row_link(assigns) do
     ~H"""
@@ -133,6 +139,7 @@ defmodule ArgusWeb.DashboardLive.Index do
           tier={@row.tier}
           obligation={@row.obligation}
           today={@today}
+          timezone={@timezone}
           in_error={!is_nil(@row.obligation.completed_in_error_at)}
         />
       </div>

@@ -105,6 +105,7 @@ defmodule ArgusWeb.ObligationLive.Show do
                 tier={@tier}
                 obligation={@obligation}
                 today={@today}
+                timezone={@current_scope.entity.timezone}
                 in_error={!is_nil(@obligation.completed_in_error_at)}
               />
               <div :if={@correctable?} class="dropdown dropdown-end">
@@ -268,7 +269,10 @@ defmodule ArgusWeb.ObligationLive.Show do
             >
               <div class="argus-event-head">
                 <span class="font-semibold text-sm">{humanize_status(event.status)}</span>
-                <span class="text-xs text-base-content/50">{format_datetime(event.inserted_at)}</span>
+                <span class="text-xs text-base-content/50">{format_datetime(
+                  event.inserted_at,
+                  @current_scope.entity.timezone
+                )}</span>
                 <span :if={event.status_by} class="text-xs text-base-content/80">
                   {event.status_by.email}
                 </span>
@@ -353,7 +357,10 @@ defmodule ArgusWeb.ObligationLive.Show do
               <li :for={log <- @audit_logs} id={"audit-#{log.id}"} class="p-3 space-y-1">
                 <div class="flex items-center justify-between gap-3">
                   <span class="font-medium">{log.field}</span>
-                  <span class="text-xs text-base-content/50">{format_datetime(log.inserted_at)}</span>
+                  <span class="text-xs text-base-content/50">{format_datetime(
+                    log.inserted_at,
+                    @current_scope.entity.timezone
+                  )}</span>
                 </div>
                 <div class="text-xs text-base-content/50">by {log.user.email}</div>
                 <div class="text-base-content/70">

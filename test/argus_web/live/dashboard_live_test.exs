@@ -154,7 +154,7 @@ defmodule ArgusWeb.DashboardLiveTest do
     {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}")
 
     view |> form("#obligation-status-filter", %{lifecycle: "completed"}) |> render_change()
-    assert has_element?(view, "#obligation-row-#{original.id}", "Completed with error")
+    assert has_element?(view, "#obligation-row-#{original.id}", "Completed error")
   end
 
   test "rows show the latest event status and actor", %{conn: conn} do

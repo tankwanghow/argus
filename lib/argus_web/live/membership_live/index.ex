@@ -113,7 +113,10 @@ defmodule ArgusWeb.MembershipLive.Index do
               <div class="flex-1 min-w-0">
                 <div class="font-medium truncate">{invite.email}</div>
                 <div class="text-xs text-base-content/50">
-                  {invite.role} · expires {format_date(DateTime.to_date(invite.expires_at))}
+                  {invite.role} · expires {format_zoned_date(
+                    invite.expires_at,
+                    @current_scope.entity.timezone
+                  )}
                 </div>
               </div>
               <span class="badge badge-warning badge-sm">pending</span>

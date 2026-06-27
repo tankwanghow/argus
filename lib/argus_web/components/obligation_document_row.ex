@@ -103,6 +103,7 @@ defmodule ArgusWeb.ObligationDocumentRow do
   attr :doc, :map, required: true
   attr :entity_slug, :string, required: true
   attr :obligation, :map, required: true
+  attr :timezone, :string, default: nil
   attr :show_dates?, :boolean, default: true
   attr :id_prefix, :string, default: ""
   attr :show_slot_badge?, :boolean, default: false
@@ -129,7 +130,7 @@ defmodule ArgusWeb.ObligationDocumentRow do
           :if={@show_dates?}
           class="text-xs text-base-content/50 shrink-0 whitespace-nowrap"
         >
-          {format_doc_datetime(@doc.inserted_at, @datetime_format)}
+          {format_doc_datetime(@doc.inserted_at, @datetime_format, @timezone)}
         </span>
       </div>
       <p :if={@doc.void_reason} class="text-xs text-base-content/50 mt-1 pl-5">
@@ -147,8 +148,7 @@ defmodule ArgusWeb.ObligationDocumentRow do
   defp event_id_attr(nil), do: %{}
   defp event_id_attr(id), do: %{"phx-value-event_id" => to_string(id)}
 
-  defp format_doc_datetime(dt, :short), do: format_datetime(dt, :short)
-  defp format_doc_datetime(dt, :default), do: format_datetime(dt)
+  defp format_doc_datetime(dt, format, timezone), do: format_datetime(dt, timezone, format)
 
   defp cycle_live?(%{completed_at: nil, closed_at: nil}), do: true
   defp cycle_live?(_), do: false

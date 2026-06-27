@@ -52,6 +52,7 @@ defmodule ArgusWeb.TodoLive.TeamLog do
           empty?={@empty?}
           end?={@end?}
           entity_slug={@current_scope.entity.slug}
+          timezone={@current_scope.entity.timezone}
           variant={:desktop}
         />
       </div>

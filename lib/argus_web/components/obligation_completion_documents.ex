@@ -64,7 +64,7 @@ defmodule ArgusWeb.ObligationCompletionDocuments do
               :if={live && @show_dates?}
               class="text-xs text-base-content/50 shrink-0 whitespace-nowrap"
             >
-              {format_datetime(live.inserted_at, :short)}
+              {format_datetime(live.inserted_at, @current_scope.entity.timezone, :short)}
             </span>
 
             <ObligationDocumentRow.live_actions
@@ -109,6 +109,7 @@ defmodule ArgusWeb.ObligationCompletionDocuments do
             doc={doc}
             entity_slug={@entity_slug}
             obligation={@obligation}
+            timezone={@current_scope.entity.timezone}
             show_dates?={@show_dates?}
             id_prefix={@id_prefix}
             show_slot_badge?={true}

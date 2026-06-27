@@ -12,6 +12,7 @@ defmodule ArgusWeb.MobileLive.Components do
   attr :row, :map, required: true, doc: "%{obligation: ..., urgency: ..., cycle_status: ...}"
   attr :today, Date, required: true
   attr :slug, :string, required: true
+  attr :timezone, :string, default: nil
 
   def obligation_card(assigns) do
     ~H"""
@@ -31,6 +32,7 @@ defmodule ArgusWeb.MobileLive.Components do
             tier={@row.tier}
             obligation={@row.obligation}
             today={@today}
+            timezone={@timezone}
             in_error={!is_nil(@row.obligation.completed_in_error_at)}
           />
         </div>

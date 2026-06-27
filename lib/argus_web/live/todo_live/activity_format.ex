@@ -21,9 +21,9 @@ defmodule ArgusWeb.TodoLive.ActivityFormat do
   def activity_subject(%{todo: %{title: title}}) when is_binary(title), do: " \"#{title}\""
   def activity_subject(_), do: ""
 
-  def format_time(%DateTime{} = dt) do
-    Calendar.strftime(dt, "%Y-%m-%d %H:%M")
+  def format_time(%DateTime{} = dt, timezone) do
+    ArgusWeb.CoreComponents.format_datetime(dt, timezone, :short)
   end
 
-  def format_time(_), do: ""
+  def format_time(_, _), do: ""
 end

@@ -64,7 +64,7 @@ defmodule ArgusWeb.CycleBadgeTest do
         obligation: %Obligation{completed_at: @at}
       })
 
-    assert html =~ "Completed with error"
+    assert html =~ "Completed error"
     assert html =~ "bg-error"
   end
 
