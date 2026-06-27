@@ -136,8 +136,11 @@ defmodule TugasWeb.DashboardLiveTest do
 
     assert has_element?(view, "#dashboard-todo-#{todo.id}", "Buy milk")
 
-    view |> element("#dashboard-todo-#{todo.id} input[type=checkbox]") |> render_click()
+    view |> element("#dashboard-todo-complete-#{todo.id}") |> render_click()
+    assert has_element?(view, "#dashboard-todo-#{todo.id}[data-effect=completed]")
+    assert has_element?(view, "#dashboard-todo-complete-#{todo.id}[checked]")
 
+    render_click(view, "finish_row_effect", %{"id" => todo.id})
     refute has_element?(view, "#dashboard-todo-#{todo.id}")
   end
 

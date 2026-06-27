@@ -8,9 +8,11 @@ defmodule TugasWeb.DashboardTodosPanel do
     statics: TugasWeb.static_paths()
 
   alias Tugas.Todos.Todo
+  alias TugasWeb.TodoLive.IndexHelpers
 
   attr :todos, :list, required: true
   attr :slug, :string, required: true
+  attr :row_effects, :map, default: %{}
 
   def dashboard_todos_panel(assigns) do
     ~H"""
@@ -30,8 +32,19 @@ defmodule TugasWeb.DashboardTodosPanel do
         id="dashboard-todos-list"
         class="flex-1 min-h-0 space-y-2 overflow-y-auto"
       >
-        <li :for={todo <- @todos} id={"dashboard-todo-#{todo.id}"} class="flex items-start gap-2">
+        <li
+          :for={todo <- @todos}
+          id={"dashboard-todo-#{todo.id}"}
+          phx-hook="TodoRowEffect"
+          data-todo-id={todo.id}
+          data-effect={IndexHelpers.row_effect_name(@row_effects, todo.id)}
+          class={[
+            "flex items-start gap-2 px-1 py-1 border border-transparent rounded",
+            IndexHelpers.row_effect_class(@row_effects, todo.id)
+          ]}
+        >
           <input
+            id={"dashboard-todo-complete-#{todo.id}"}
             type="checkbox"
             class="checkbox checkbox-sm mt-0.5"
             checked={Todo.completed?(todo)}
