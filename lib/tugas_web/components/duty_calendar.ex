@@ -79,11 +79,12 @@ defmodule TugasWeb.DutyCalendar do
 
   attr :row, :map, required: true
   attr :slug, :string, required: true
+  attr :id_prefix, :string, default: "duty-chip"
 
   defp duty_chip(assigns) do
     ~H"""
     <.link
-      id={"duty-chip-#{@row.duty.id}"}
+      id={"#{@id_prefix}-#{@row.duty.id}"}
       navigate={~p"/entities/#{@slug}/duties/#{@row.duty.id}"}
       class={[
         "block text-xs px-1.5 py-0.5 rounded border-l-2 truncate hover:bg-base-200",
@@ -109,7 +110,7 @@ defmodule TugasWeb.DutyCalendar do
         </h3>
         <ul class="mt-3 space-y-1">
           <li :for={row <- @rows}>
-            <.duty_chip row={row} slug={@slug} />
+            <.duty_chip row={row} slug={@slug} id_prefix="day-modal-duty-chip" />
           </li>
         </ul>
         <div class="modal-action">
