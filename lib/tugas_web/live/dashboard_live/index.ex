@@ -13,61 +13,61 @@ defmodule TugasWeb.DashboardLive.Index do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope} container_class="max-w-7xl">
       <div id="dashboard" class="tugas-page space-y-4">
-        <div class="flex flex-col lg:flex-row gap-6">
-          <div class="flex-1 min-w-0 space-y-3">
-            <div class="flex flex-wrap items-center gap-2">
-              <div id="dashboard-scope-toggle" class="tabs tabs-box">
-                <button
-                  id="dashboard-scope-mine"
-                  type="button"
-                  phx-click="set_scope"
-                  phx-value-mine="true"
-                  class={["tab", @mine? && "tab-active font-bold"]}
-                >
-                  Mine
-                </button>
-                <button
-                  id="dashboard-scope-team"
-                  type="button"
-                  phx-click="set_scope"
-                  phx-value-mine="false"
-                  class={["tab", !@mine? && "tab-active font-bold"]}
-                >
-                  Team
-                </button>
-              </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <div id="dashboard-scope-toggle" class="tabs tabs-box">
+            <button
+              id="dashboard-scope-mine"
+              type="button"
+              phx-click="set_scope"
+              phx-value-mine="true"
+              class={["tab", @mine? && "tab-active font-bold"]}
+            >
+              Mine
+            </button>
+            <button
+              id="dashboard-scope-team"
+              type="button"
+              phx-click="set_scope"
+              phx-value-mine="false"
+              class={["tab", !@mine? && "tab-active font-bold"]}
+            >
+              Team
+            </button>
+          </div>
 
-              <div class="flex items-center gap-1 ml-auto">
-                <button
-                  id="dashboard-prev-month"
-                  type="button"
-                  class="btn btn-ghost btn-sm"
-                  phx-click="prev_month"
-                >
-                  ‹
-                </button>
-                <span id="dashboard-month-label" class="text-sm font-semibold min-w-32 text-center">
-                  {Calendar.month_label(@year, @month)}
-                </span>
-                <button
-                  id="dashboard-next-month"
-                  type="button"
-                  class="btn btn-ghost btn-sm"
-                  phx-click="next_month"
-                >
-                  ›
-                </button>
-                <button
-                  id="dashboard-today"
-                  type="button"
-                  class="btn btn-ghost btn-sm"
-                  phx-click="today"
-                >
-                  Today
-                </button>
-              </div>
-            </div>
+          <div class="flex items-center gap-1 ml-auto">
+            <button
+              id="dashboard-prev-month"
+              type="button"
+              class="btn btn-ghost btn-sm"
+              phx-click="prev_month"
+            >
+              ‹
+            </button>
+            <span id="dashboard-month-label" class="text-sm font-semibold min-w-32 text-center">
+              {Calendar.month_label(@year, @month)}
+            </span>
+            <button
+              id="dashboard-next-month"
+              type="button"
+              class="btn btn-ghost btn-sm"
+              phx-click="next_month"
+            >
+              ›
+            </button>
+            <button
+              id="dashboard-today"
+              type="button"
+              class="btn btn-ghost btn-sm"
+              phx-click="today"
+            >
+              Today
+            </button>
+          </div>
+        </div>
 
+        <div class="flex flex-col lg:flex-row gap-6 lg:items-stretch">
+          <div class="flex-1 min-w-0">
             <.duty_calendar
               grid={@grid}
               grouped={@grouped}
@@ -79,7 +79,7 @@ defmodule TugasWeb.DashboardLive.Index do
             />
           </div>
 
-          <div class="w-full lg:w-80 shrink-0">
+          <div class="w-full lg:w-80 shrink-0 flex">
             <.dashboard_todos_panel
               todos={@todos}
               slug={@current_scope.entity.slug}

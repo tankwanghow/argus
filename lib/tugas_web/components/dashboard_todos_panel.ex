@@ -16,16 +16,20 @@ defmodule TugasWeb.DashboardTodosPanel do
     ~H"""
     <aside
       id="dashboard-todos"
-      class="rounded-lg border border-base-300 bg-base-200/40 p-3 space-y-3 lg:sticky lg:top-4"
+      class="flex flex-1 flex-col min-h-0 rounded-lg border border-base-300 bg-base-200/40 p-3"
     >
-      <div class="flex items-center gap-2">
+      <div class="flex shrink-0 items-center gap-2 pb-3">
         <h2 class="text-lg font-semibold">Todos</h2>
         <.link navigate={~p"/entities/#{@slug}/todos"} class="text-sm link link-primary">
           View all →
         </.link>
       </div>
 
-      <ul :if={@todos != []} id="dashboard-todos-list" class="space-y-2">
+      <ul
+        :if={@todos != []}
+        id="dashboard-todos-list"
+        class="flex-1 min-h-0 space-y-2 overflow-y-auto"
+      >
         <li :for={todo <- @todos} id={"dashboard-todo-#{todo.id}"} class="flex items-start gap-2">
           <input
             type="checkbox"
@@ -38,7 +42,7 @@ defmodule TugasWeb.DashboardTodosPanel do
         </li>
       </ul>
 
-      <p :if={@todos == []} class="text-sm text-base-content/60">
+      <p :if={@todos == []} class="flex-1 text-sm text-base-content/60">
         No open todos.
         <.link navigate={~p"/entities/#{@slug}/todos"} class="link link-primary">Add one</.link>
       </p>
