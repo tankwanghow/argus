@@ -17,6 +17,7 @@ defmodule ArgusWeb.TodoTeamActivity do
   attr :empty?, :boolean, default: false
   attr :end?, :boolean, default: true
   attr :entity_slug, :string, required: true
+  attr :timezone, :string, default: nil
   attr :variant, :atom, default: :desktop, values: [:desktop, :mobile]
 
   def todo_team_activity(assigns) do
@@ -35,14 +36,14 @@ defmodule ArgusWeb.TodoTeamActivity do
             phx-click="deleted_todo_notice"
             class="block w-full text-left p-3 text-sm hover:bg-base-200"
           >
-            <.entry_body log={log} variant={@variant} deleted?={true} />
+            <.entry_body log={log} variant={@variant} timezone={@timezone} deleted?={true} />
           </button>
           <.link
             :if={not deleted?(log)}
             navigate={todo_path(@variant, @entity_slug, log.todo_id)}
             class="block p-3 text-sm hover:bg-base-200"
           >
-            <.entry_body log={log} variant={@variant} deleted?={false} />
+            <.entry_body log={log} variant={@variant} timezone={@timezone} deleted?={false} />
           </.link>
         </li>
       </ul>
@@ -55,6 +56,7 @@ defmodule ArgusWeb.TodoTeamActivity do
 
   attr :log, :map, required: true
   attr :variant, :atom, required: true
+  attr :timezone, :string, default: nil
   attr :deleted?, :boolean, required: true
 
   defp entry_body(assigns) do
@@ -67,7 +69,7 @@ defmodule ArgusWeb.TodoTeamActivity do
         — {@log.field}: {@log.old_value || "—"} → {@log.new_value || "—"}
       </span>
       <span class="text-base-content/40">
-        · {ActivityFormat.format_time(@log.inserted_at)}
+        · {ActivityFormat.format_time(@log.inserted_at, @timezone)}
       </span>
     <% else %>
       <div class="font-medium">
@@ -77,7 +79,7 @@ defmodule ArgusWeb.TodoTeamActivity do
       <div class="text-xs text-base-content/60 mt-0.5">
         {ActivityFormat.activity_subject(@log)}{ActivityFormat.display_name(@log.user)}
         <span class="text-base-content/40">
-          · {ActivityFormat.format_time(@log.inserted_at)}
+          · {ActivityFormat.format_time(@log.inserted_at, @timezone)}
         </span>
       </div>
     <% end %>

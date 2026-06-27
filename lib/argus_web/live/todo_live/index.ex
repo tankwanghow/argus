@@ -77,7 +77,11 @@ defmodule ArgusWeb.TodoLive.Index do
                 </.link>
               </div>
               <div class="flex shrink-0 items-start gap-1">
-                <.todo_history todo={todo} logs={Map.get(@audit_by_id, todo.id, [])} />
+                <.todo_history
+                  todo={todo}
+                  logs={Map.get(@audit_by_id, todo.id, [])}
+                  timezone={@current_scope.entity.timezone}
+                />
                 <.todo_actions_menu todo={todo} current_scope={@current_scope} />
               </div>
             </div>
@@ -145,6 +149,7 @@ defmodule ArgusWeb.TodoLive.Index do
 
   attr :todo, Todo, required: true
   attr :logs, :list, required: true
+  attr :timezone, :string, default: nil
 
   defp todo_history(assigns) do
     ~H"""
@@ -160,7 +165,10 @@ defmodule ArgusWeb.TodoLive.Index do
             <span :if={log.field}>
               — {log.field}: {log.old_value || "—"} → {log.new_value || "—"}
             </span>
-            <span class="text-base-content/40"> · {ActivityFormat.format_time(log.inserted_at)}</span>
+            <span class="text-base-content/40"> · {ActivityFormat.format_time(
+              log.inserted_at,
+              @timezone
+            )}</span>
           </div>
         </li>
       </ul>

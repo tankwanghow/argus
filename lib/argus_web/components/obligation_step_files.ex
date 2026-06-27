@@ -57,7 +57,7 @@ defmodule ArgusWeb.ObligationStepFiles do
               :if={@show_dates?}
               class="text-xs text-base-content/50 shrink-0 whitespace-nowrap"
             >
-              {format_datetime(doc.inserted_at)}
+              {format_datetime(doc.inserted_at, @current_scope.entity.timezone)}
             </span>
             <ObligationDocumentRow.live_actions
               doc={doc}
@@ -105,6 +105,7 @@ defmodule ArgusWeb.ObligationStepFiles do
             doc={doc}
             entity_slug={@entity_slug}
             obligation={@obligation}
+            timezone={@current_scope.entity.timezone}
             show_dates?={@show_dates?}
             id_prefix={@id_prefix}
           />

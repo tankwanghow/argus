@@ -87,6 +87,7 @@ defmodule ArgusWeb.MobileLive.Dashboard do
           row={row}
           today={@today}
           slug={@current_scope.entity.slug}
+          timezone={@current_scope.entity.timezone}
         />
       </ul>
       <div

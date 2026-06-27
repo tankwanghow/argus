@@ -191,6 +191,16 @@ Two UIs share the same contexts/schemas, each with its own LiveViews and layout:
     any in-memory sort that loads only dated rows (e.g. the urgency window) must surface them somewhere
     or they silently vanish — the urgency tail does this with `due_after_or_null` (dateless last).
     See CLAUDE.md's dashboard section.
+- **Datetimes render in the entity timezone.** Stored `DateTime`s are UTC. In views, format them
+  with `ArgusWeb.CoreComponents.format_datetime(dt, @current_scope.entity.timezone, format)`
+  (`format` = `:default`/`:short`) — it shifts via `in_zone/2` (UTC fallback for a blank/invalid
+  zone). A stored datetime shown as a *day* (invite expiry, completion date) uses
+  `format_zoned_date/3` (shift **then** `to_date`). **Never `Calendar.strftime` a raw UTC
+  datetime.** `format_date/2` is for bare `Date`s only (`due_by`) — no shift. Shared components that
+  print datetimes (`cycle_badge`, `todo_team_activity`, `obligation_document_row` voided rows,
+  mobile `obligation_card`, dashboard `obligation_row_link`) take a `timezone` attr threaded from
+  the caller's `@current_scope`; don't reach for `@current_scope` inside a function component that
+  wasn't given it. Pairs with the render-time `Urgency.today_for(entity.timezone)` rule.
 - Gettext on **all** user-facing text — `gettext("...")` / `{gettext(...)}`. Locale in session
   (`set_locale`); English default, structured for more locales.
 - Rebind block results (`socket = if connected?(...) do ... end`); no `String.to_atom/1` on user

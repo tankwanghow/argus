@@ -364,6 +364,17 @@ Oban reminder jobs, REST API/mobile, billing beyond `plan`/`seat_limit` fields.
 ## Conventions
 
 - **TDD per the plan:** write the failing test, watch it fail, implement, watch it pass, commit. One commit per task.
+- **Datetimes display in the entity timezone.** Stored `DateTime`s are UTC; every rendered
+  datetime is shifted to `@current_scope.entity.timezone` via
+  `ArgusWeb.CoreComponents.format_datetime/3` (`(dt, timezone, format)`; `format` is `:default`
+  or `:short`). A stored datetime shown as a *day* (invite expiry, completion date) uses
+  `format_zoned_date/3` (shift **then** `to_date`, so it lands on the right local day near
+  midnight); the shared `in_zone/2` does the shift with a UTC fallback for a blank/invalid zone.
+  **Never `Calendar.strftime` a raw UTC datetime** in a view. `format_date/2` is **only** for bare
+  `Date`s (e.g. `due_by`) — they carry no instant and are never shifted. Shared components that
+  render datetimes (`cycle_badge`, `todo_team_activity`, document rows, mobile cards, dashboard
+  rows) take a `timezone` attr threaded from the caller's scope. This pairs with the render-time
+  `Urgency.today_for(entity.timezone)` rule above.
 - **Context modules own domain logic.** LiveViews call `Argus.Obligations`, `Argus.Entities`, `Argus.Accounts` — not Repo directly.
 - **Multi-step writes use `Ecto.Multi`/transactions** (create obligation + open event; Done + spawn next; skip + event).
 - File uploads (v1) go to the local filesystem under a **configurable** `:uploads_dir`

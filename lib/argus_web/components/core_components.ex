@@ -577,18 +577,53 @@ defmodule ArgusWeb.CoreComponents do
   end
 
   @doc """
-  Formats a `Date` for display, e.g. `15 Jan 2026`.
+  Formats a `Date` (a plain calendar date — no time zone) for display, e.g. `15 Jan 2026`.
+
+  `due_by` and other bare dates carry no instant, so they are never shifted; only stored
+  `DateTime`s (see `format_datetime/3`) are rendered in the entity's zone.
   """
-  def format_date(nil), do: "—"
-  def format_date(%Date{} = date), do: Calendar.strftime(date, "%d %b %Y")
+  def format_date(date, format \\ :default)
+  def format_date(nil, _format), do: "—"
   def format_date(%Date{} = date, :short), do: Calendar.strftime(date, "%Y-%m-%d")
+  def format_date(%Date{} = date, _format), do: Calendar.strftime(date, "%d %b %Y")
 
   @doc """
-  Formats a `DateTime` for display, e.g. `15 Jan 2026, 14:30`.
+  Formats a stored (UTC) `DateTime` for display **in the entity `timezone`**, e.g.
+  `15 Jan 2026, 14:30` (`:short` → `2026-01-15 14:30`). Falls back to the original instant
+  if the zone can't be resolved.
   """
-  def format_datetime(nil), do: ""
-  def format_datetime(%DateTime{} = dt), do: Calendar.strftime(dt, "%d %b %Y, %H:%M")
-  def format_datetime(%DateTime{} = dt, :short), do: Calendar.strftime(dt, "%Y-%m-%d %H:%M")
+  def format_datetime(dt, timezone, format \\ :default)
+  def format_datetime(nil, _timezone, _format), do: ""
+
+  def format_datetime(%DateTime{} = dt, timezone, :short),
+    do: dt |> in_zone(timezone) |> Calendar.strftime("%Y-%m-%d %H:%M")
+
+  def format_datetime(%DateTime{} = dt, timezone, _format),
+    do: dt |> in_zone(timezone) |> Calendar.strftime("%d %b %Y, %H:%M")
+
+  @doc """
+  Formats a stored (UTC) `DateTime` as a **date in the entity `timezone`** (e.g. a
+  completion day or invite expiry). Shifts the instant before taking the date so it lands
+  on the correct local day near midnight.
+  """
+  def format_zoned_date(dt, timezone, format \\ :default)
+  def format_zoned_date(nil, _timezone, _format), do: nil
+
+  def format_zoned_date(%DateTime{} = dt, timezone, format),
+    do: dt |> in_zone(timezone) |> DateTime.to_date() |> format_date(format)
+
+  @doc """
+  Shifts a UTC `DateTime` into `timezone`, falling back to the original instant when the
+  zone is missing/invalid. Public so non-CoreComponents render modules can reuse it.
+  """
+  def in_zone(%DateTime{} = dt, timezone) when is_binary(timezone) and timezone != "" do
+    case DateTime.shift_zone(dt, timezone) do
+      {:ok, shifted} -> shifted
+      {:error, _} -> dt
+    end
+  end
+
+  def in_zone(%DateTime{} = dt, _timezone), do: dt
 
   @doc """
   A human-friendly relative label for a due date against `today`,

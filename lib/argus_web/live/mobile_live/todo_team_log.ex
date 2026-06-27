@@ -46,6 +46,7 @@ defmodule ArgusWeb.MobileLive.TodoTeamLog do
           empty?={@empty?}
           end?={@end?}
           entity_slug={@current_scope.entity.slug}
+          timezone={@current_scope.entity.timezone}
           variant={:mobile}
         />
       </div>
