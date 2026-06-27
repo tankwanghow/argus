@@ -67,7 +67,7 @@ defmodule TugasWeb.MobileLive.DashboardTest do
            )
   end
 
-  test "someday duty appears in someday strip", %{conn: conn} do
+  test "someday duty appears in someday panel", %{conn: conn} do
     manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     conn = mobile_conn(conn, manager)
     type = type_fixture(manager.entity)
@@ -82,7 +82,7 @@ defmodule TugasWeb.MobileLive.DashboardTest do
 
     {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}")
 
-    assert has_element?(view, "#someday-strip #duty-chip-#{duty.id}")
+    assert has_element?(view, "#m-dashboard-someday #someday-panel-duty-chip-#{duty.id}")
   end
 
   test "open todo can be completed", %{conn: conn} do
@@ -150,36 +150,50 @@ defmodule TugasWeb.MobileLive.DashboardTest do
     assert has_element?(view, "#day-modal")
   end
 
-  test "someday overflow shows +N more on mobile", %{conn: conn} do
+  test "someday panel lists all duties without overflow chip", %{conn: conn} do
     manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     conn = mobile_conn(conn, manager)
     type = type_fixture(manager.entity)
 
-    for n <- 1..6 do
-      {:ok, _duty} =
-        Duties.create_duty(manager, %{
-          title: "Someday #{n}",
-          duty_type_id: type.id,
-          someday: true,
-          open_note: "open"
-        })
-    end
+    duties =
+      for n <- 1..7 do
+        {:ok, duty} =
+          Duties.create_duty(manager, %{
+            title: "Someday #{n}",
+            duty_type_id: type.id,
+            someday: true,
+            open_note: "open"
+          })
 
-    {:ok, hidden} =
-      Duties.create_duty(manager, %{
-        title: "Someday hidden",
-        duty_type_id: type.id,
-        someday: true,
-        open_note: "open"
-      })
+        duty
+      end
 
     {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}")
 
-    assert has_element?(view, "#someday-more", "+1 more")
-    refute has_element?(view, "#someday-strip #duty-chip-#{hidden.id}")
+    refute has_element?(view, "#someday-more")
+    refute has_element?(view, "#someday-strip")
 
-    view |> element("#someday-more") |> render_click()
-    assert has_element?(view, "#someday-modal #someday-modal-duty-chip-#{hidden.id}")
+    for duty <- duties do
+      assert has_element?(
+               view,
+               "#m-dashboard-someday #someday-panel-duty-chip-#{duty.id}",
+               duty.title
+             )
+    end
+  end
+
+  test "swipe carousel renders someday, calendar, and todos panels", %{conn: conn} do
+    manager = Tugas.EntitiesFixtures.manager_scope_fixture()
+    conn = mobile_conn(conn, manager)
+
+    {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}")
+
+    assert has_element?(view, "#m-dashboard-swipe")
+    assert has_element?(view, "#m-dashboard-someday")
+    assert has_element?(view, "#duty-calendar")
+    assert has_element?(view, "#dashboard-todos")
+    assert has_element?(view, "#m-dashboard-swipe-hint", "Someday")
+    assert has_element?(view, "#m-dashboard-swipe-hint", "Todos")
   end
 
   defp dashboard_open_todo_ids(view) do

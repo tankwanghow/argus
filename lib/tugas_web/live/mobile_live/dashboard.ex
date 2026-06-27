@@ -64,24 +64,57 @@ defmodule TugasWeb.MobileLive.Dashboard do
         </div>
       </div>
 
-      <div id="m-dashboard" class="px-4 py-4 space-y-4">
-        <.duty_calendar
-          variant={:mobile}
-          grid={@grid}
-          grouped={@grouped}
-          someday_rows={@someday_rows}
-          slug={@current_scope.entity.slug}
-          day_modal_date={@day_modal_date}
-          day_modal_rows={@day_modal_rows}
-          someday_modal_open?={@someday_modal_open?}
-        />
-        <.dashboard_todos_panel
-          variant={:mobile}
-          todos={@todos}
-          completed_todos={@completed_todos}
-          slug={@current_scope.entity.slug}
-          row_effects={@row_effects}
-        />
+      <div id="m-dashboard" class="px-4 py-3 space-y-2">
+        <div
+          id="m-dashboard-swipe-hint"
+          class="flex items-center justify-between text-[11px] text-base-content/50 px-1"
+        >
+          <span>← Someday</span>
+          <div id="m-dashboard-dots" class="flex items-center gap-1.5" aria-hidden="true">
+            <span data-dashboard-panel="0" class="size-1.5 rounded-full bg-base-content/20" />
+            <span data-dashboard-panel="1" class="size-1.5 rounded-full bg-primary" />
+            <span data-dashboard-panel="2" class="size-1.5 rounded-full bg-base-content/20" />
+          </div>
+          <span>Todos →</span>
+        </div>
+
+        <div
+          id="m-dashboard-swipe"
+          phx-hook="DashboardSwipe"
+          class="flex h-[calc(100dvh-15.5rem)] snap-x snap-mandatory overflow-x-auto overflow-y-hidden scroll-smooth [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+        >
+          <div class="w-full shrink-0 snap-center h-full min-h-0 overflow-y-auto pr-2">
+            <.mobile_someday_panel
+              rows={@someday_rows}
+              slug={@current_scope.entity.slug}
+              variant={:mobile}
+            />
+          </div>
+
+          <div class="w-full shrink-0 snap-center h-full min-h-0 overflow-y-auto px-1">
+            <.duty_calendar
+              variant={:mobile}
+              hide_someday_strip?={true}
+              grid={@grid}
+              grouped={@grouped}
+              someday_rows={@someday_rows}
+              slug={@current_scope.entity.slug}
+              day_modal_date={@day_modal_date}
+              day_modal_rows={@day_modal_rows}
+              someday_modal_open?={@someday_modal_open?}
+            />
+          </div>
+
+          <div class="w-full shrink-0 snap-center h-full min-h-0 overflow-y-auto pl-2">
+            <.dashboard_todos_panel
+              variant={:mobile}
+              todos={@todos}
+              completed_todos={@completed_todos}
+              slug={@current_scope.entity.slug}
+              row_effects={@row_effects}
+            />
+          </div>
+        </div>
       </div>
     </Layouts.mobile_app>
     """

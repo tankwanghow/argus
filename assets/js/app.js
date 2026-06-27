@@ -29,6 +29,7 @@ import {UploadDirect} from "./upload_direct"
 import {UploadUiPersist} from "./upload_ui_persist"
 import {TodoRowEffect} from "./todo_row_effect"
 import {TodoHighlight} from "./todo_highlight"
+import {DashboardSwipe} from "./dashboard_swipe"
 
 // The worker is a separate esbuild entry (js/pdf.worker.js) served as a static
 // asset; the browser only fetches it when a PDF is actually previewed.
@@ -63,7 +64,7 @@ const csrfToken = document.querySelector("meta[name='csrf-token']")?.getAttribut
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
-  hooks: {...colocatedHooks, PdfThumb, UploadDirect, UploadUiPersist, TodoRowEffect, TodoHighlight},
+  hooks: {...colocatedHooks, PdfThumb, UploadDirect, UploadUiPersist, TodoRowEffect, TodoHighlight, DashboardSwipe},
 })
 
 // Show progress bar on live navigation and form submits

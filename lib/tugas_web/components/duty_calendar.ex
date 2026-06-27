@@ -19,6 +19,7 @@ defmodule TugasWeb.DutyCalendar do
   attr :day_modal_date, :any, default: nil
   attr :day_modal_rows, :list, default: []
   attr :someday_modal_open?, :boolean, default: false
+  attr :hide_someday_strip?, :boolean, default: false
 
   def duty_calendar(assigns) do
     assigns =
@@ -26,6 +27,7 @@ defmodule TugasWeb.DutyCalendar do
       |> assign(:max_chips, CalendarHelpers.max_chips_per_day(assigns.variant))
       |> assign(:max_someday, CalendarHelpers.max_someday_chips(assigns.variant))
       |> assign(:mobile?, assigns.variant == :mobile)
+      |> assign(:show_someday_strip?, !assigns.hide_someday_strip? && assigns.someday_rows != [])
 
     ~H"""
     <div id="duty-calendar" class={calendar_root_class(@mobile?)}>
@@ -84,7 +86,7 @@ defmodule TugasWeb.DutyCalendar do
       </div>
 
       <section
-        :if={@someday_rows != []}
+        :if={@show_someday_strip?}
         id="someday-strip"
         class="shrink-0 rounded-lg border border-base-300 bg-base-200/40 p-3 space-y-2"
       >
@@ -128,6 +130,32 @@ defmodule TugasWeb.DutyCalendar do
         variant={@variant}
       />
     </div>
+    """
+  end
+
+  attr :rows, :list, required: true
+  attr :slug, :string, required: true
+  attr :variant, :atom, default: :mobile
+
+  def mobile_someday_panel(assigns) do
+    ~H"""
+    <section id="m-dashboard-someday" class="h-full min-h-0 flex flex-col px-1">
+      <h2 class="shrink-0 text-lg font-semibold text-base-content/80 pb-2">Someday</h2>
+      <p :if={@rows == []} class="text-sm text-base-content/60">
+        No someday duties.
+      </p>
+      <ul :if={@rows != []} class="min-h-0 flex-1 space-y-1 overflow-y-auto">
+        <li :for={row <- @rows}>
+          <.duty_chip
+            row={row}
+            slug={@slug}
+            variant={@variant}
+            id_prefix="someday-panel-duty-chip"
+            layout={:list}
+          />
+        </li>
+      </ul>
+    </section>
     """
   end
 
@@ -232,6 +260,7 @@ defmodule TugasWeb.DutyCalendar do
   defp chip_text_class(_), do: "block text-xs"
 
   defp chip_layout_class(:someday), do: "block w-44 max-w-44 shrink-0"
+  defp chip_layout_class(:list), do: "block w-full min-w-0"
   defp chip_layout_class(_), do: "block w-full min-w-0"
 
   defp show_type_name?(:mobile, :calendar), do: false

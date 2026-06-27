@@ -85,7 +85,7 @@ defmodule TugasWeb.DashboardTodosPanel do
     ~H"""
     <section
       id="dashboard-todos"
-      class="rounded-lg border border-base-300 bg-base-200/40 p-3"
+      class="h-full min-h-0 flex flex-col rounded-lg border border-base-300 bg-base-200/40 p-3"
     >
       {render_slot(@inner_block)}
     </section>
@@ -140,7 +140,7 @@ defmodule TugasWeb.DashboardTodosPanel do
     """
   end
 
-  defp panel_body_class(true), do: "space-y-2"
+  defp panel_body_class(true), do: "min-h-0 flex-1 space-y-2 overflow-y-auto"
   defp panel_body_class(false), do: "flex min-h-0 flex-1 flex-col"
 
   defp open_section_class(true), do: ""
@@ -151,7 +151,7 @@ defmodule TugasWeb.DashboardTodosPanel do
   defp completed_section_class(false),
     do: "mt-2 flex min-h-0 flex-[1] flex-col border-t border-base-300 pt-2"
 
-  defp list_class(true), do: "max-h-48 space-y-2 overflow-y-auto"
+  defp list_class(true), do: "space-y-2"
   defp list_class(false), do: "min-h-0 flex-1 space-y-2 overflow-y-auto"
 
   defp empty_class(true), do: "text-sm text-base-content/60"
