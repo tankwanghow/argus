@@ -73,6 +73,7 @@ defmodule TugasWeb.DutyCalendar do
               :if={idx < CalendarHelpers.max_someday_chips()}
               row={row}
               slug={@slug}
+              layout={:someday}
             />
           <% end %>
           <%= if length(@someday_rows) > CalendarHelpers.max_someday_chips() do %>
@@ -108,6 +109,7 @@ defmodule TugasWeb.DutyCalendar do
   attr :row, :map, required: true
   attr :slug, :string, required: true
   attr :id_prefix, :string, default: "duty-chip"
+  attr :layout, :atom, default: :calendar
 
   defp duty_chip(assigns) do
     ~H"""
@@ -115,7 +117,8 @@ defmodule TugasWeb.DutyCalendar do
       id={"#{@id_prefix}-#{@row.duty.id}"}
       navigate={~p"/entities/#{@slug}/duties/#{@row.duty.id}"}
       class={[
-        "block text-xs px-1.5 py-0.5 rounded border-l-2 truncate hover:bg-base-200",
+        "text-xs px-1.5 py-0.5 rounded border-l-2 truncate hover:bg-base-200",
+        chip_layout_class(@layout),
         tier_border(@row.tier)
       ]}
     >
@@ -124,6 +127,9 @@ defmodule TugasWeb.DutyCalendar do
     </.link>
     """
   end
+
+  defp chip_layout_class(:someday), do: "block w-44 max-w-44 shrink-0"
+  defp chip_layout_class(_), do: "block w-full min-w-0"
 
   attr :rows, :list, required: true
   attr :slug, :string, required: true
