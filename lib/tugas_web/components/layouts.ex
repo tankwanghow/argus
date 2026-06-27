@@ -31,6 +31,8 @@ defmodule TugasWeb.Layouts do
     default: nil,
     doc: "the current [scope](https://hexdocs.pm/phoenix/scopes.html)"
 
+  attr :container_class, :string, default: "max-w-4xl"
+
   slot :inner_block, required: true
 
   def app(assigns) do
@@ -94,7 +96,7 @@ defmodule TugasWeb.Layouts do
       <.entity_nav :if={entity_scope?(@current_scope)} current_scope={@current_scope} />
 
       <main class="flex-1 px-4 py-5 sm:px-6 lg:px-8">
-        <div class="mx-auto max-w-4xl space-y-3">
+        <div class={["mx-auto space-y-3", @container_class]}>
           {render_slot(@inner_block)}
         </div>
       </main>
@@ -110,6 +112,10 @@ defmodule TugasWeb.Layouts do
     ~H"""
     <nav class="border-b border-base-300 bg-base-200/50 px-4 sm:px-6 lg:px-8 overflow-visible">
       <div class="mx-auto max-w-4xl flex items-center justify-center gap-1 flex-wrap text-sm overflow-visible">
+        <.entity_nav_link
+          href={~p"/entities/#{@current_scope.entity.slug}"}
+          label="📅 Dashboard"
+        />
         <.entity_nav_link
           href={~p"/entities/#{@current_scope.entity.slug}/duties"}
           label="💼 Duties"
