@@ -281,9 +281,18 @@ defmodule ArgusWeb.TodoLiveTest do
     |> form("#todo-cancel-form", %{"cancel" => %{"note" => "No longer relevant"}})
     |> render_submit()
 
-    # Canceled todo stays in the unified list, muted, with a Canceled badge.
+    assert has_element?(view, "#todo-#{todo.id}[data-effect=canceled]")
     assert has_element?(view, "#todo-#{todo.id}.opacity-60")
     assert has_element?(view, "#todo-badge-#{todo.id}", "Canceled")
+
+    render_click(view, "finish_row_effect", %{"id" => todo.id})
+
+    # Canceled todo stays in the unified list, muted/struck, with no row actions.
+    assert has_element?(view, "#todo-#{todo.id}.opacity-60")
+    assert has_element?(view, "#todo-badge-#{todo.id}", "Canceled")
+    refute has_element?(view, "#todo-actions-#{todo.id}")
+    refute has_element?(view, "#todo-cancel-#{todo.id}")
+    refute has_element?(view, "#todo-delete-#{todo.id}")
   end
 
   test "escalate pre-fills obligation form from todo", %{conn: conn} do

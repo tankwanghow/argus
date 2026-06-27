@@ -486,8 +486,13 @@ defmodule ArgusWeb.TodoLive.IndexHelpers do
 
   defp insert_todo_row(socket, scope, %Todo{} = todo, _effect) do
     case Todos.get_todo(scope, todo.id) do
-      {:ok, full_todo} -> stream_insert_todo(socket, full_todo)
-      _ -> stream_insert_todo(socket, todo)
+      {:ok, full_todo} ->
+        socket
+        |> merge_audit_for(full_todo)
+        |> stream_insert_todo(full_todo)
+
+      _ ->
+        stream_insert_todo(socket, todo)
     end
   end
 
