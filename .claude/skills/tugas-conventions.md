@@ -38,7 +38,7 @@ Tugas must wire into it the same way (mirror peggy's `mix.exs` + `config/config.
 - **`~/Projects/elixir/.global_assets/`** — pinned binaries populated by `.global_assets/setup.sh`:
   esbuild **0.28.1**, tailwindcss **4.3.1** (linux x64 + arm64), heroicons **v2.2.0** (`optimized`).
   Run `~/Projects/elixir/.global_assets/setup.sh` once after cloning (idempotent; binaries are
-  git-ignored). **Add `argus` to that script's `link_heroicons` project list.** (The mix.exs path
+  git-ignored). **Add `tugas` to that script's `link_heroicons` project list.** (The mix.exs path
   below also self-heals the `deps/heroicons` symlink on `deps.get`, so it works even before the
   script edit.)
 - **`~/Projects/elixir/shared_config/`** — `workspace_assets.ex` (the `WorkspaceAssets` module),
@@ -56,14 +56,14 @@ Tugas must wire into it the same way (mirror peggy's `mix.exs` + `config/config.
     config :tailwind, version: "4.3.1"
   end
   ```
-  Profiles are named `argus` (`config :esbuild, tugas: [...]`, `config :tailwind, tugas: [...]`).
+  Profiles are named `tugas` (`config :esbuild, tugas: [...]`, `config :tailwind, tugas: [...]`).
   Also set `config :elixir, :time_zone_database, Tzdata.TimeZoneDatabase` (urgency needs real
   zones via `DateTime.now/1`).
 - **`mix.exs`** — replace the generated heroicons dep with `heroicons_dep()` and add the helpers
   `workspace_assets?/0`, `load_workspace_assets!/0`, `heroicons_dep/0`, `assets_setup_tasks/0`
   (each falls back to the stock github/hex install when `shared_config` is absent — copy peggy's
   verbatim). Aliases: `"assets.setup": assets_setup_tasks()`, `"assets.build": ["compile",
-  "tailwind argus", "esbuild argus"]`, matching `assets.deploy`, and `precommit`.
+  "tailwind tugas", "esbuild tugas"]`, matching `assets.deploy`, and `precommit`.
 - daisyUI 5 + daisyUI-theme + the heroicons plugin are vendored under `assets/vendor/` and loaded
   via `@plugin` in `app.css` (stock Phoenix 1.8 output) — keep that, just match peggy's themes.
 

@@ -7,21 +7,21 @@ peggy/
 pou_con/
 usbboot/
 
-argus/_build/
-argus/deps/
-argus/cover/
-argus/doc/
-argus/test/
-argus/tmp/
-argus/.elixir_ls/
-argus/.git/
-argus/assets/node_modules/
-argus/priv/static/assets/
-argus/priv/static/cache_manifest.json
-argus/deploy_to_linode/
-argus/*.tar
-argus/secret.txt
-argus/deploy.conf
+tugas/_build/
+tugas/deps/
+tugas/cover/
+tugas/doc/
+tugas/test/
+tugas/tmp/
+tugas/.elixir_ls/
+tugas/.git/
+tugas/assets/node_modules/
+tugas/priv/static/assets/
+tugas/priv/static/cache_manifest.json
+tugas/deploy_to_linode/
+tugas/*.tar
+tugas/secret.txt
+tugas/deploy.conf
 
 .global_assets/heroicons/.git/
 
