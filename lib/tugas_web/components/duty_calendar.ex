@@ -21,50 +21,53 @@ defmodule TugasWeb.DutyCalendar do
 
   def duty_calendar(assigns) do
     ~H"""
-    <div id="duty-calendar" class="space-y-4">
-      <div class="grid grid-cols-7 gap-px bg-base-300 rounded-lg overflow-hidden border border-base-300">
-        <div
-          :for={label <- ~w(Sun Mon Tue Wed Thu Fri Sat)}
-          class="bg-base-200 px-2 py-1.5 text-center text-xs font-semibold text-base-content/70"
-        >
-          {label}
-        </div>
-        <div
-          :for={cell <- @grid.weeks |> List.flatten()}
-          id={"calendar-day-#{cell.date}"}
-          class={[
-            "bg-base-100 min-h-24 p-1 space-y-0.5",
-            !cell.in_month? && "bg-base-200/40 text-base-content/40",
-            cell.today? && "ring-2 ring-inset ring-primary/40"
-          ]}
-        >
-          <div class="text-xs font-medium px-0.5">{cell.date.day}</div>
-          <%= for {row, idx} <- Enum.with_index(Map.get(@grouped, cell.date, [])) do %>
-            <.duty_chip
-              :if={idx < CalendarHelpers.max_chips_per_day()}
-              row={row}
-              slug={@slug}
-            />
-          <% end %>
-          <%= if length(Map.get(@grouped, cell.date, [])) > CalendarHelpers.max_chips_per_day() do %>
-            <% extra = length(Map.get(@grouped, cell.date, [])) - CalendarHelpers.max_chips_per_day() %>
-            <button
-              type="button"
-              id={"calendar-day-more-#{cell.date}"}
-              phx-click="open_day_modal"
-              phx-value-date={Date.to_iso8601(cell.date)}
-              class="text-xs text-primary hover:underline px-0.5"
-            >
-              +{extra} more
-            </button>
-          <% end %>
+    <div id="duty-calendar" class="flex h-full min-h-0 flex-col gap-4">
+      <div class="min-h-0 flex-1">
+        <div class="grid h-full grid-cols-7 gap-px bg-base-300 rounded-lg overflow-hidden border border-base-300">
+          <div
+            :for={label <- ~w(Sun Mon Tue Wed Thu Fri Sat)}
+            class="bg-base-200 px-2 py-1.5 text-center text-xs font-semibold text-base-content/70"
+          >
+            {label}
+          </div>
+          <div
+            :for={cell <- @grid.weeks |> List.flatten()}
+            id={"calendar-day-#{cell.date}"}
+            class={[
+              "bg-base-100 min-h-24 p-1 space-y-0.5",
+              !cell.in_month? && "bg-base-200/40 text-base-content/40",
+              cell.today? && "ring-2 ring-inset ring-primary/40"
+            ]}
+          >
+            <div class="text-xs font-medium px-0.5">{cell.date.day}</div>
+            <%= for {row, idx} <- Enum.with_index(Map.get(@grouped, cell.date, [])) do %>
+              <.duty_chip
+                :if={idx < CalendarHelpers.max_chips_per_day()}
+                row={row}
+                slug={@slug}
+              />
+            <% end %>
+            <%= if length(Map.get(@grouped, cell.date, [])) > CalendarHelpers.max_chips_per_day() do %>
+              <% extra =
+                length(Map.get(@grouped, cell.date, [])) - CalendarHelpers.max_chips_per_day() %>
+              <button
+                type="button"
+                id={"calendar-day-more-#{cell.date}"}
+                phx-click="open_day_modal"
+                phx-value-date={Date.to_iso8601(cell.date)}
+                class="text-xs text-primary hover:underline px-0.5"
+              >
+                +{extra} more
+              </button>
+            <% end %>
+          </div>
         </div>
       </div>
 
       <section
         :if={@someday_rows != []}
         id="someday-strip"
-        class="rounded-lg border border-base-300 bg-base-200/40 p-3 space-y-2"
+        class="shrink-0 rounded-lg border border-base-300 bg-base-200/40 p-3 space-y-2"
       >
         <h3 class="text-sm font-semibold text-base-content/70">Someday</h3>
         <div class="flex flex-wrap gap-1 items-center">

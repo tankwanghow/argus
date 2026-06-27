@@ -145,6 +145,43 @@ defmodule TugasWeb.DashboardLiveTest do
     assert has_element?(view, "#dashboard-completed-todo-#{todo.id}", "Buy milk")
   end
 
+  test "completing a todo backfills the open preview from the database", %{conn: conn} do
+    manager = Tugas.EntitiesFixtures.manager_scope_fixture()
+    conn = log_in_user(conn, manager.user)
+
+    # Dashboard open preview shows 11 todos; create one extra to verify backfill.
+    for n <- 1..12 do
+      {:ok, _} =
+        Todos.create_todo(manager, %{title: "Todo #{String.pad_leading("#{n}", 2, "0")}"})
+    end
+
+    {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}")
+
+    open_ids_before = dashboard_open_todo_ids(view)
+    assert length(open_ids_before) == 11
+
+    to_complete_id = List.last(open_ids_before)
+
+    view |> element("#dashboard-todo-complete-#{to_complete_id}") |> render_click()
+    render_click(view, "finish_row_effect", %{"id" => to_complete_id})
+
+    open_ids_after = dashboard_open_todo_ids(view)
+    assert length(open_ids_after) == 11
+    refute to_complete_id in open_ids_after
+    assert has_element?(view, "#dashboard-completed-todo-#{to_complete_id}")
+
+    assert MapSet.new(open_ids_after)
+           |> MapSet.difference(MapSet.new(open_ids_before))
+           |> MapSet.size() == 1
+  end
+
+  defp dashboard_open_todo_ids(view) do
+    ~r/id="dashboard-todo-([0-9a-f-]{36})"/
+    |> Regex.scan(render(view))
+    |> Enum.map(&List.last/1)
+    |> Enum.uniq()
+  end
+
   test "completed todo in sidebar can be reopened", %{conn: conn} do
     manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     conn = log_in_user(conn, manager.user)

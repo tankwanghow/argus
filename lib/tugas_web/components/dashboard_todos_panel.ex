@@ -19,7 +19,7 @@ defmodule TugasWeb.DashboardTodosPanel do
     ~H"""
     <aside
       id="dashboard-todos"
-      class="flex h-full min-h-0 flex-1 flex-col rounded-lg border border-base-300 bg-base-200/40 p-3"
+      class="flex h-full min-h-0 min-w-0 flex-col rounded-lg border border-base-300 bg-base-200/40 p-3"
     >
       <div class="flex shrink-0 items-center gap-2 pb-2">
         <h2 class="text-lg font-semibold">Todos</h2>
