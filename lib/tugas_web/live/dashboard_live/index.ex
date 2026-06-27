@@ -6,7 +6,8 @@ defmodule TugasWeb.DashboardLive.Index do
   alias Tugas.Todos.Todo
   alias TugasWeb.DashboardLive.CalendarHelpers, as: Calendar
   alias TugasWeb.DutiesFilter
-  @todo_preview_limit 22
+  @open_preview_limit 22
+  @completed_preview_limit 10
 
   @impl true
   def render(assigns) do
@@ -79,9 +80,10 @@ defmodule TugasWeb.DashboardLive.Index do
             />
           </div>
 
-          <div class="w-[15%]">
+          <div class="w-full lg:w-[15%] shrink-0 flex flex-col">
             <.dashboard_todos_panel
               todos={@todos}
+              completed_todos={@completed_todos}
               slug={@current_scope.entity.slug}
               row_effects={@row_effects}
             />
@@ -185,9 +187,14 @@ defmodule TugasWeb.DashboardLive.Index do
             {:ok, updated} ->
               effect = if Todo.completed?(updated), do: :completed, else: :updated
 
-              socket
-              |> assign(:todos, replace_todo(socket.assigns.todos, updated))
-              |> put_row_effect(updated.id, effect)
+              socket =
+                if Todo.completed?(updated) do
+                  assign(socket, :todos, replace_todo(socket.assigns.todos, updated))
+                else
+                  assign(socket, :completed_todos, replace_todo(socket.assigns.completed_todos, updated))
+                end
+
+              put_row_effect(socket, updated.id, effect)
 
             _ ->
               socket
@@ -204,13 +211,30 @@ defmodule TugasWeb.DashboardLive.Index do
     effect = Map.get(socket.assigns.row_effects || %{}, id)
     row_effects = Map.delete(socket.assigns.row_effects || %{}, id)
 
-    todos =
+    {todos, completed_todos} =
       case effect do
-        :completed -> Enum.reject(socket.assigns.todos, &(&1.id == id))
-        _ -> socket.assigns.todos
+        :completed ->
+          todo = Enum.find(socket.assigns.todos, &(&1.id == id))
+
+          {
+            Enum.reject(socket.assigns.todos, &(&1.id == id)),
+            prepend_unique(socket.assigns.completed_todos, todo, @completed_preview_limit)
+          }
+
+        :updated ->
+          todo = Enum.find(socket.assigns.completed_todos, &(&1.id == id))
+
+          {
+            prepend_unique(socket.assigns.todos, todo, @open_preview_limit),
+            Enum.reject(socket.assigns.completed_todos, &(&1.id == id))
+          }
+
+        _ ->
+          {socket.assigns.todos, socket.assigns.completed_todos}
       end
 
-    {:noreply, assign(socket, row_effects: row_effects, todos: todos)}
+    {:noreply,
+     assign(socket, row_effects: row_effects, todos: todos, completed_todos: completed_todos)}
   end
 
   def handle_event("close_modal_on_escape", _params, socket) do
@@ -244,12 +268,20 @@ defmodule TugasWeb.DashboardLive.Index do
     scope = socket.assigns.current_scope
 
     todos =
-      case Todos.list_todos_page(scope, status: :open, limit: @todo_preview_limit) do
+      case Todos.list_todos_page(scope, status: :open, limit: @open_preview_limit) do
         {:ok, %{rows: rows}} -> rows
         _ -> []
       end
 
-    assign(socket, :todos, todos)
+    completed_todos =
+      case Todos.list_todos_page(scope, status: :completed, limit: @completed_preview_limit) do
+        {:ok, %{rows: rows}} -> rows
+        _ -> []
+      end
+
+    socket
+    |> assign(:todos, todos)
+    |> assign(:completed_todos, completed_todos)
   end
 
   defp replace_todo(todos, %Todo{} = updated) do
@@ -261,5 +293,11 @@ defmodule TugasWeb.DashboardLive.Index do
 
   defp put_row_effect(socket, todo_id, effect) do
     assign(socket, :row_effects, Map.put(socket.assigns.row_effects || %{}, todo_id, effect))
+  end
+
+  defp prepend_unique(list, nil, _limit), do: list
+
+  defp prepend_unique(list, %Todo{} = todo, limit) do
+    [todo | Enum.reject(list, &(&1.id == todo.id))] |> Enum.take(limit)
   end
 end

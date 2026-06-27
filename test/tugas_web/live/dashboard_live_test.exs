@@ -142,6 +142,26 @@ defmodule TugasWeb.DashboardLiveTest do
 
     render_click(view, "finish_row_effect", %{"id" => todo.id})
     refute has_element?(view, "#dashboard-todo-#{todo.id}")
+    assert has_element?(view, "#dashboard-completed-todo-#{todo.id}", "Buy milk")
+  end
+
+  test "completed todo in sidebar can be reopened", %{conn: conn} do
+    manager = Tugas.EntitiesFixtures.manager_scope_fixture()
+    conn = log_in_user(conn, manager.user)
+
+    {:ok, todo} = Todos.create_todo(manager, %{title: "Restock pantry"})
+    {:ok, todo} = Todos.toggle_complete(manager, todo)
+
+    {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}")
+
+    assert has_element?(view, "#dashboard-completed-todo-#{todo.id}", "Restock pantry")
+
+    view |> element("#dashboard-completed-todo-complete-#{todo.id}") |> render_click()
+    assert has_element?(view, "#dashboard-completed-todo-#{todo.id}[data-effect=updated]")
+
+    render_click(view, "finish_row_effect", %{"id" => todo.id})
+    refute has_element?(view, "#dashboard-completed-todo-#{todo.id}")
+    assert has_element?(view, "#dashboard-todo-#{todo.id}", "Restock pantry")
   end
 
   test "someday overflow shows +N more and opens modal", %{conn: conn} do
