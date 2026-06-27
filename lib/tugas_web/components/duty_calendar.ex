@@ -61,7 +61,11 @@ defmodule TugasWeb.DutyCalendar do
         </div>
       </div>
 
-      <section :if={@someday_rows != []} id="someday-strip" class="space-y-2">
+      <section
+        :if={@someday_rows != []}
+        id="someday-strip"
+        class="rounded-lg border border-base-300 bg-base-200/40 p-3 space-y-2"
+      >
         <h3 class="text-sm font-semibold text-base-content/70">Someday</h3>
         <div class="flex flex-wrap gap-1 items-center">
           <%= for {row, idx} <- Enum.with_index(@someday_rows) do %>

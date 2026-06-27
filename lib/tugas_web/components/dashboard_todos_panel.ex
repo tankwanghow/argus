@@ -14,8 +14,11 @@ defmodule TugasWeb.DashboardTodosPanel do
 
   def dashboard_todos_panel(assigns) do
     ~H"""
-    <aside id="dashboard-todos" class="space-y-3 lg:sticky lg:top-4">
-      <div class="flex items-center justify-between">
+    <aside
+      id="dashboard-todos"
+      class="rounded-lg border border-base-300 bg-base-200/40 p-3 space-y-3 lg:sticky lg:top-4"
+    >
+      <div class="flex items-center gap-2">
         <h2 class="text-lg font-semibold">Todos</h2>
         <.link navigate={~p"/entities/#{@slug}/todos"} class="text-sm link link-primary">
           View all →
