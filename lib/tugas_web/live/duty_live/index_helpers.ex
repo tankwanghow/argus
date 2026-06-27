@@ -188,7 +188,7 @@ defmodule TugasWeb.DutyLive.IndexHelpers do
   defp encode_urgency_cursor({:tail, inner}),
     do: %{"m" => "t", "c" => inner} |> Jason.encode!() |> Base.url_encode64(padding: false)
 
-  defp build_rows(duties, today) do
+  def build_rows(duties, today) do
     summaries = Duties.event_summaries_for(duties)
 
     Enum.map(duties, fn duty ->
