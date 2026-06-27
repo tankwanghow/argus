@@ -6,15 +6,13 @@ defmodule TugasWeb.DashboardLive.Index do
   alias TugasWeb.DashboardLive.CalendarHelpers, as: Calendar
   alias TugasWeb.DutiesFilter
 
-  @todo_preview_limit 15
+  @todo_preview_limit 22
 
   @impl true
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope} container_class="max-w-7xl">
       <div id="dashboard" class="tugas-page space-y-4">
-        <.header>Dashboard</.header>
-
         <div class="flex flex-col lg:flex-row gap-6">
           <div class="flex-1 min-w-0 space-y-3">
             <div class="flex flex-wrap items-center gap-2">
@@ -40,16 +38,31 @@ defmodule TugasWeb.DashboardLive.Index do
               </div>
 
               <div class="flex items-center gap-1 ml-auto">
-                <button id="dashboard-prev-month" type="button" class="btn btn-ghost btn-sm" phx-click="prev_month">
+                <button
+                  id="dashboard-prev-month"
+                  type="button"
+                  class="btn btn-ghost btn-sm"
+                  phx-click="prev_month"
+                >
                   ‹
                 </button>
                 <span id="dashboard-month-label" class="text-sm font-semibold min-w-32 text-center">
                   {Calendar.month_label(@year, @month)}
                 </span>
-                <button id="dashboard-next-month" type="button" class="btn btn-ghost btn-sm" phx-click="next_month">
+                <button
+                  id="dashboard-next-month"
+                  type="button"
+                  class="btn btn-ghost btn-sm"
+                  phx-click="next_month"
+                >
                   ›
                 </button>
-                <button id="dashboard-today" type="button" class="btn btn-ghost btn-sm" phx-click="today">
+                <button
+                  id="dashboard-today"
+                  type="button"
+                  class="btn btn-ghost btn-sm"
+                  phx-click="today"
+                >
                   Today
                 </button>
               </div>
@@ -62,10 +75,11 @@ defmodule TugasWeb.DashboardLive.Index do
               slug={@current_scope.entity.slug}
               day_modal_date={@day_modal_date}
               day_modal_rows={@day_modal_rows}
+              someday_modal_open?={@someday_modal_open?}
             />
           </div>
 
-          <div class="w-full lg:w-80 shrink-0">
+          <div class="w-[15%] border-1 rounded p-2">
             <.dashboard_todos_panel
               todos={@todos}
               slug={@current_scope.entity.slug}
@@ -90,6 +104,7 @@ defmodule TugasWeb.DashboardLive.Index do
       |> assign(:month, month)
       |> assign(:day_modal_date, nil)
       |> assign(:day_modal_rows, [])
+      |> assign(:someday_modal_open?, false)
       |> DutiesFilter.assign_filters(session)
       |> load_dashboard()
 
@@ -138,11 +153,24 @@ defmodule TugasWeb.DashboardLive.Index do
     rows = Map.get(socket.assigns.grouped, date, [])
 
     {:noreply,
-     assign(socket, day_modal_date: date, day_modal_rows: rows)}
+     socket
+     |> assign(day_modal_date: date, day_modal_rows: rows)
+     |> assign(:someday_modal_open?, false)}
   end
 
   def handle_event("close_day_modal", _params, socket) do
     {:noreply, assign(socket, day_modal_date: nil, day_modal_rows: [])}
+  end
+
+  def handle_event("open_someday_modal", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:someday_modal_open?, true)
+     |> assign(day_modal_date: nil, day_modal_rows: [])}
+  end
+
+  def handle_event("close_someday_modal", _params, socket) do
+    {:noreply, assign(socket, :someday_modal_open?, false)}
   end
 
   def handle_event("toggle_todo_complete", %{"id" => id}, socket) do
@@ -166,10 +194,15 @@ defmodule TugasWeb.DashboardLive.Index do
   end
 
   def handle_event("close_modal_on_escape", _params, socket) do
-    if socket.assigns.day_modal_date do
-      {:noreply, assign(socket, day_modal_date: nil, day_modal_rows: [])}
-    else
-      {:noreply, socket}
+    cond do
+      socket.assigns.day_modal_date ->
+        {:noreply, assign(socket, day_modal_date: nil, day_modal_rows: [])}
+
+      socket.assigns.someday_modal_open? ->
+        {:noreply, assign(socket, :someday_modal_open?, false)}
+
+      true ->
+        {:noreply, socket}
     end
   end
 

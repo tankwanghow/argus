@@ -141,6 +141,38 @@ defmodule TugasWeb.DashboardLiveTest do
     refute has_element?(view, "#dashboard-todo-#{todo.id}")
   end
 
+  test "someday overflow shows +N more and opens modal", %{conn: conn} do
+    manager = Tugas.EntitiesFixtures.manager_scope_fixture()
+    conn = log_in_user(conn, manager.user)
+    type = type_fixture(manager.entity)
+
+    for n <- 1..10 do
+      {:ok, _duty} =
+        Duties.create_duty(manager, %{
+          title: "Someday #{String.pad_leading("#{n}", 2, "0")}",
+          duty_type_id: type.id,
+          someday: true,
+          open_note: "open"
+        })
+    end
+
+    {:ok, hidden} =
+      Duties.create_duty(manager, %{
+        title: "Someday hidden",
+        duty_type_id: type.id,
+        someday: true,
+        open_note: "open"
+      })
+
+    {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}")
+
+    assert has_element?(view, "#someday-more", "+1 more")
+    refute has_element?(view, "#someday-strip #duty-chip-#{hidden.id}")
+
+    view |> element("#someday-more") |> render_click()
+    assert has_element?(view, "#someday-modal #someday-modal-duty-chip-#{hidden.id}")
+  end
+
   test "day overflow opens modal with all duties", %{conn: conn} do
     manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     conn = log_in_user(conn, manager.user)

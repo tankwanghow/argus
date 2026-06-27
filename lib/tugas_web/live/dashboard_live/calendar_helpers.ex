@@ -6,8 +6,10 @@ defmodule TugasWeb.DashboardLive.CalendarHelpers do
   alias TugasWeb.DutyLive.IndexHelpers, as: Index
 
   @max_chips_per_day 3
+  @max_someday_chips 10
 
   def max_chips_per_day, do: @max_chips_per_day
+  def max_someday_chips, do: @max_someday_chips
 
   def month_range(year, month) do
     start = Date.new!(year, month, 1)

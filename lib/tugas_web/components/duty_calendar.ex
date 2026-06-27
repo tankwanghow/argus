@@ -17,6 +17,7 @@ defmodule TugasWeb.DutyCalendar do
   attr :slug, :string, required: true
   attr :day_modal_date, :any, default: nil
   attr :day_modal_rows, :list, default: []
+  attr :someday_modal_open?, :boolean, default: false
 
   def duty_calendar(assigns) do
     ~H"""
@@ -62,8 +63,25 @@ defmodule TugasWeb.DutyCalendar do
 
       <section :if={@someday_rows != []} id="someday-strip" class="space-y-2">
         <h3 class="text-sm font-semibold text-base-content/70">Someday</h3>
-        <div class="flex flex-wrap gap-1">
-          <.duty_chip :for={row <- @someday_rows} row={row} slug={@slug} />
+        <div class="flex flex-wrap gap-1 items-center">
+          <%= for {row, idx} <- Enum.with_index(@someday_rows) do %>
+            <.duty_chip
+              :if={idx < CalendarHelpers.max_someday_chips()}
+              row={row}
+              slug={@slug}
+            />
+          <% end %>
+          <%= if length(@someday_rows) > CalendarHelpers.max_someday_chips() do %>
+            <% extra = length(@someday_rows) - CalendarHelpers.max_someday_chips() %>
+            <button
+              type="button"
+              id="someday-more"
+              phx-click="open_someday_modal"
+              class="text-xs text-primary hover:underline px-0.5"
+            >
+              +{extra} more
+            </button>
+          <% end %>
         </div>
       </section>
 
@@ -71,6 +89,12 @@ defmodule TugasWeb.DutyCalendar do
         :if={@day_modal_date}
         date={@day_modal_date}
         rows={@day_modal_rows}
+        slug={@slug}
+      />
+
+      <.someday_modal
+        :if={@someday_modal_open?}
+        rows={@someday_rows}
         slug={@slug}
       />
     </div>
@@ -94,6 +118,33 @@ defmodule TugasWeb.DutyCalendar do
       <span class="font-medium">{@row.duty.title}</span>
       <span class="text-base-content/50 ml-1">{@row.duty.duty_type.name}</span>
     </.link>
+    """
+  end
+
+  attr :rows, :list, required: true
+  attr :slug, :string, required: true
+
+  defp someday_modal(assigns) do
+    ~H"""
+    <div id="someday-modal" class="modal modal-open">
+      <div class="modal-box max-w-md">
+        <h3 class="font-bold text-lg">Someday</h3>
+        <ul class="mt-3 space-y-1">
+          <li :for={row <- @rows}>
+            <.duty_chip row={row} slug={@slug} id_prefix="someday-modal-duty-chip" />
+          </li>
+        </ul>
+        <div class="modal-action">
+          <button type="button" class="btn" phx-click="close_someday_modal">Close</button>
+        </div>
+      </div>
+      <button
+        class="modal-backdrop"
+        type="button"
+        phx-click="close_someday_modal"
+        aria-label="Close"
+      />
+    </div>
     """
   end
 
