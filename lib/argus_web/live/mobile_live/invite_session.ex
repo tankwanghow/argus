@@ -129,6 +129,8 @@ defmodule ArgusWeb.MobileLive.InviteSession do
     {:noreply, assign(socket, :closed, true)}
   end
 
+  def handle_event("close_modal_on_escape", _params, socket), do: {:noreply, socket}
+
   @impl true
   def handle_info({:member_joined, membership}, socket) do
     {:noreply,

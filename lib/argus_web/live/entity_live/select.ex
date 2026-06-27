@@ -117,6 +117,14 @@ defmodule ArgusWeb.EntityLive.Select do
     end
   end
 
+  def handle_event("close_modal_on_escape", _params, socket) do
+    if socket.assigns[:editing_entity_id] do
+      {:noreply, assign(socket, editing_entity_id: nil, edit_form: nil)}
+    else
+      {:noreply, socket}
+    end
+  end
+
   defp assign_picker(socket, memberships) do
     changeset = Entities.change_entity(%Entity{})
 

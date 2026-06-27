@@ -153,6 +153,13 @@ export const UploadDirect = {
     input.style.left = "-9999px"
     document.body.appendChild(input)
     input.addEventListener("change", () => this.handle(input), {once: true})
+    const onWindowFocus = () => {
+      window.removeEventListener("focus", onWindowFocus)
+      setTimeout(() => {
+        if (input.isConnected && (!input.files || input.files.length === 0)) input.remove()
+      }, 300)
+    }
+    window.addEventListener("focus", onWindowFocus)
     input.click()
   },
 

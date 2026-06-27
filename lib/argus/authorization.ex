@@ -15,6 +15,7 @@ defmodule Argus.Authorization do
     :cancel_todo
   ]
 
+  def can?(%Scope{role: :admin}, :manage_entity), do: true
   def can?(%Scope{role: :admin}, _action), do: true
 
   def can?(%Scope{role: :manager}, :manage_types), do: true
@@ -24,9 +25,11 @@ defmodule Argus.Authorization do
   def can?(%Scope{role: :manager}, :end_series), do: true
   def can?(%Scope{role: :manager}, :void_document), do: true
   def can?(%Scope{role: :manager}, :mark_completed_in_error), do: true
+  def can?(%Scope{role: :manager}, :manage_entity), do: false
   def can?(%Scope{role: :manager}, action) when action in @todo_actions, do: true
   def can?(%Scope{role: :manager}, _), do: false
 
+  def can?(%Scope{role: :member}, :manage_entity), do: false
   def can?(%Scope{role: :member}, action) when action in @todo_actions, do: true
   def can?(%Scope{}, _), do: false
 

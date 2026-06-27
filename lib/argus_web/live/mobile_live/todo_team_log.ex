@@ -27,9 +27,9 @@ defmodule ArgusWeb.MobileLive.TodoTeamLog do
             value={@filter_search}
             placeholder="Search by todo or person…"
             phx-debounce="300"
-            class="input input-bordered w-[70%]"
+            class="input w-[70%]"
           />
-          <select name="action" class="select select-bordered w-[30%]">
+          <select name="action" class="select w-[30%]">
             <option
               :for={{label, value} <- TeamLogHelpers.action_options()}
               value={value}

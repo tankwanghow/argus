@@ -214,6 +214,8 @@ defmodule ArgusWeb.MembershipLive.Index do
     end
   end
 
+  def handle_event("close_modal_on_escape", _params, socket), do: {:noreply, socket}
+
   defp invite_flash(%{email: nil}), do: "Invitation created. Share the link below."
   defp invite_flash(%{email: email}), do: "Invitation sent to #{email}."
 

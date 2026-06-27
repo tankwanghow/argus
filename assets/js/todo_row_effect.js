@@ -26,6 +26,8 @@ export const TodoRowEffect = {
 
   destroyed() {
     this.clearListener()
+    this.hideMenu()
+    this.clearLongPress()
     this.cancelPress()
   },
 
@@ -73,7 +75,7 @@ export const TodoRowEffect = {
     this.pressTimer = null
     this.pressFired = false
 
-    const start = (e) => {
+    this.onPressStart = (e) => {
       if (e.target.closest(INTERACTIVE)) return
       this.pressFired = false
       this.cancelPress()
@@ -83,18 +85,36 @@ export const TodoRowEffect = {
       }, LONG_PRESS_MS)
     }
 
-    const cancel = () => this.cancelPress()
+    this.onPressCancel = () => this.cancelPress()
 
-    this.el.addEventListener("touchstart", start, {passive: true})
-    this.el.addEventListener("touchend", cancel)
-    this.el.addEventListener("touchmove", cancel, {passive: true})
-    this.el.addEventListener("touchcancel", cancel)
-    this.el.addEventListener("mousedown", start)
-    this.el.addEventListener("mouseup", cancel)
-    this.el.addEventListener("mouseleave", cancel)
-    this.el.addEventListener("contextmenu", (e) => {
+    this.onContextMenu = (e) => {
       if (this.pressFired) e.preventDefault()
-    })
+    }
+
+    this.el.addEventListener("touchstart", this.onPressStart, {passive: true})
+    this.el.addEventListener("touchend", this.onPressCancel)
+    this.el.addEventListener("touchmove", this.onPressCancel, {passive: true})
+    this.el.addEventListener("touchcancel", this.onPressCancel)
+    this.el.addEventListener("mousedown", this.onPressStart)
+    this.el.addEventListener("mouseup", this.onPressCancel)
+    this.el.addEventListener("mouseleave", this.onPressCancel)
+    this.el.addEventListener("contextmenu", this.onContextMenu)
+  },
+
+  clearLongPress() {
+    if (!this.onPressStart) return
+
+    this.el.removeEventListener("touchstart", this.onPressStart)
+    this.el.removeEventListener("touchend", this.onPressCancel)
+    this.el.removeEventListener("touchmove", this.onPressCancel)
+    this.el.removeEventListener("touchcancel", this.onPressCancel)
+    this.el.removeEventListener("mousedown", this.onPressStart)
+    this.el.removeEventListener("mouseup", this.onPressCancel)
+    this.el.removeEventListener("mouseleave", this.onPressCancel)
+    this.el.removeEventListener("contextmenu", this.onContextMenu)
+    this.onPressStart = null
+    this.onPressCancel = null
+    this.onContextMenu = null
   },
 
   showMenu() {
@@ -107,18 +127,36 @@ export const TodoRowEffect = {
 
     menu.style.display = "flex"
 
-    const onDoc = (e) => {
+    this.hideMenu()
+
+    this.onDocClick = (e) => {
       if (menu.contains(e.target)) return
-      menu.style.display = "none"
-      document.removeEventListener("touchstart", onDoc, true)
-      document.removeEventListener("mousedown", onDoc, true)
+      this.hideMenu()
     }
 
     // Defer so the press that opened the menu doesn't immediately close it.
-    setTimeout(() => {
-      document.addEventListener("touchstart", onDoc, true)
-      document.addEventListener("mousedown", onDoc, true)
+    this.menuOpenTimer = setTimeout(() => {
+      document.addEventListener("touchstart", this.onDocClick, true)
+      document.addEventListener("mousedown", this.onDocClick, true)
     }, 0)
+  },
+
+  hideMenu() {
+    if (this.menuOpenTimer) {
+      clearTimeout(this.menuOpenTimer)
+      this.menuOpenTimer = null
+    }
+
+    if (this.onDocClick) {
+      document.removeEventListener("touchstart", this.onDocClick, true)
+      document.removeEventListener("mousedown", this.onDocClick, true)
+      this.onDocClick = null
+    }
+
+    if (this.el.dataset.menuId) {
+      const menu = document.getElementById(this.el.dataset.menuId)
+      if (menu) menu.style.display = "none"
+    }
   },
 
   cancelPress() {

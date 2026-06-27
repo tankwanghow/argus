@@ -116,4 +116,7 @@ defmodule ArgusWeb.InvitationLive.Show do
        login_form: to_form(%{}, as: "login")
      )}
   end
+
+  @impl true
+  def handle_event("close_modal_on_escape", _params, socket), do: {:noreply, socket}
 end

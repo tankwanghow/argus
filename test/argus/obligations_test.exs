@@ -3,7 +3,9 @@ defmodule Argus.ObligationsTest do
 
   alias Argus.Obligations
 
-  import Argus.EntitiesFixtures, only: [manager_scope_fixture: 0, member_scope_fixture: 0]
+  import Argus.EntitiesFixtures,
+    only: [entity_scope_fixture: 0, manager_scope_fixture: 0, member_scope_fixture: 0]
+
   import Argus.ObligationsFixtures
 
   describe "create_obligation/2" do
@@ -216,6 +218,18 @@ defmodule Argus.ObligationsTest do
 
       assert {:error, :next_due_required} =
                Obligations.complete(scope, obligation, %{note: "Done"})
+    end
+
+    test "rejects complete on another entity's obligation" do
+      manager = manager_scope_fixture()
+      other_scope = entity_scope_fixture()
+      {_other_scope, obligation} = obligation_fixture(other_scope)
+
+      assert :not_found =
+               Obligations.complete(manager, obligation, %{
+                 note: "Done",
+                 next_due_by: ~D[2026-07-01]
+               })
     end
 
     test "requires a completion note" do

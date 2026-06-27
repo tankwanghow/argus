@@ -474,12 +474,14 @@ defmodule Argus.Obligations do
     obligation = Repo.preload(obligation, :collaborators)
     note = Map.get(attrs, :note) || Map.get(attrs, "note")
 
-    with true <- Authorization.can?(scope, :start_progress, obligation),
+    with :ok <- ensure_obligation_entity(scope, obligation),
+         true <- Authorization.can?(scope, :start_progress, obligation),
          :ok <- ensure_progressable(obligation),
          :ok <- validate_action_note(note),
          {:ok, event} <- insert_progress_event(scope, obligation, note) do
       {:ok, event}
     else
+      :not_found -> :not_found
       false -> :not_authorise
       {:error, _} = error -> error
     end
@@ -505,13 +507,15 @@ defmodule Argus.Obligations do
       ) do
     obligation = Repo.preload(obligation, :collaborators)
 
-    with true <- can_add_document?(scope, obligation),
+    with :ok <- ensure_obligation_entity(scope, obligation),
+         true <- can_add_document?(scope, obligation),
          :ok <- ensure_event_workable(event, obligation),
          :ok <- validate_document_slot(obligation, document_slot),
          {:ok, file} <- store_upload(upload, obligation),
          {:ok, document} <- insert_document(scope, event, file, document_slot) do
       {:ok, document}
     else
+      :not_found -> :not_found
       false -> :not_authorise
       {:error, _} = error -> error
     end
@@ -526,7 +530,8 @@ defmodule Argus.Obligations do
   end
 
   def update_obligation(%Scope{} = scope, %Obligation{} = obligation, attrs) do
-    with true <- Authorization.can?(scope, :edit_obligation),
+    with :ok <- ensure_obligation_entity(scope, obligation),
+         true <- Authorization.can?(scope, :edit_obligation),
          true <- live_cycle?(obligation) do
       changeset = Obligation.changeset(obligation, attrs)
 
@@ -536,12 +541,14 @@ defmodule Argus.Obligations do
         true -> apply_obligation_update(scope, obligation, changeset)
       end
     else
+      :not_found -> :not_found
       false -> :not_authorise
     end
   end
 
   def update_collaborators(%Scope{} = scope, %Obligation{} = obligation, user_ids) do
-    with true <- Authorization.can?(scope, :edit_obligation),
+    with :ok <- ensure_obligation_entity(scope, obligation),
+         true <- Authorization.can?(scope, :edit_obligation),
          true <- live_cycle?(obligation) do
       current =
         Collaborator
@@ -601,6 +608,7 @@ defmodule Argus.Obligations do
         {:error, _, reason, _} -> {:error, reason}
       end
     else
+      :not_found -> :not_found
       false -> :not_authorise
     end
   end
@@ -649,7 +657,8 @@ defmodule Argus.Obligations do
     obligation = Repo.get!(Obligation, event.obligation_id)
     note = Map.get(attrs, :note) || Map.get(attrs, "note")
 
-    with true <- can_edit_note?(scope, event, obligation) do
+    with :ok <- ensure_obligation_entity(scope, obligation),
+         true <- can_edit_note?(scope, event, obligation) do
       old_note = event.note
 
       Ecto.Multi.new()
@@ -667,6 +676,7 @@ defmodule Argus.Obligations do
         {:error, :event, changeset, _} -> {:error, changeset}
       end
     else
+      :not_found -> :not_found
       false -> {:error, :locked}
     end
   end
@@ -679,11 +689,13 @@ defmodule Argus.Obligations do
       ) do
     reason = Map.get(attrs, :reason) || Map.get(attrs, "reason")
 
-    with true <- document_voidable?(scope, obligation, document),
+    with :ok <- ensure_obligation_entity(scope, obligation),
+         true <- document_voidable?(scope, obligation, document),
          :ok <- validate_void_reason(obligation, reason),
          {:ok, voided} <- void_document_row(scope, document, reason) do
       {:ok, voided}
     else
+      :not_found -> :not_found
       false -> :not_authorise
       {:error, _} = error -> error
     end
@@ -694,11 +706,13 @@ defmodule Argus.Obligations do
         %Obligation{} = obligation,
         %EventDocument{} = document
       ) do
-    with true <- document_deletable?(scope, obligation, document),
+    with :ok <- ensure_obligation_entity(scope, obligation),
+         true <- document_deletable?(scope, obligation, document),
          :ok <- ensure_document_on_cycle(obligation, document),
          {:ok, deleted} <- delete_document_row(document) do
       {:ok, deleted}
     else
+      :not_found -> :not_found
       false -> :not_authorise
       {:error, _} = error -> error
     end
@@ -708,12 +722,14 @@ defmodule Argus.Obligations do
     obligation = Repo.preload(obligation, [:collaborators, :obligation_type])
     cycle_documents = list_cycle_documents(obligation)
 
-    with true <- Authorization.can?(scope, :mark_done, obligation),
+    with :ok <- ensure_obligation_entity(scope, obligation),
+         true <- Authorization.can?(scope, :mark_done, obligation),
          :ok <- Completion.validate_done_requirements(obligation, attrs, cycle_documents),
          :ok <- validate_next_due(obligation, attrs),
          {:ok, completed, spawned} <- complete_multi(scope, obligation, attrs) do
       {:ok, completed, spawned}
     else
+      :not_found -> :not_found
       false -> :not_authorise
       {:error, _} = error -> error
     end
@@ -735,13 +751,15 @@ defmodule Argus.Obligations do
         provided -> provided
       end
 
-    with true <- Authorization.can?(scope, :mark_completed_in_error),
+    with :ok <- ensure_obligation_entity(scope, obligation),
+         true <- Authorization.can?(scope, :mark_completed_in_error),
          :ok <- validate_correctable(obligation),
          :ok <- validate_action_note(reason),
          {:ok, original, replacement} <-
            mark_in_error_multi(scope, obligation, reason, replacement_due_by) do
       {:ok, original, replacement}
     else
+      :not_found -> :not_found
       false -> :not_authorise
       {:error, _} = error -> error
     end
@@ -752,11 +770,13 @@ defmodule Argus.Obligations do
     note = Map.get(attrs, :note) || Map.get(attrs, "note")
     next_due_by = Map.get(attrs, :next_due_by) || Map.get(attrs, "next_due_by")
 
-    with true <- Authorization.can?(scope, :skip),
+    with :ok <- ensure_obligation_entity(scope, obligation),
+         true <- Authorization.can?(scope, :skip),
          :ok <- validate_action_note(note),
          :ok <- validate_next_due(obligation, attrs) do
       skip_multi(scope, obligation, note, next_due_by)
     else
+      :not_found -> :not_found
       false -> :not_authorise
       {:error, _} = error -> error
     end
@@ -801,7 +821,8 @@ defmodule Argus.Obligations do
   def end_series(%Scope{} = scope, %Obligation{} = obligation, attrs) do
     note = Map.get(attrs, :note) || Map.get(attrs, "note")
 
-    with true <- Authorization.can?(scope, :end_series),
+    with :ok <- ensure_obligation_entity(scope, obligation),
+         true <- Authorization.can?(scope, :end_series),
          :ok <- validate_action_note(note) do
       now = DateTime.utc_now(:second)
 
@@ -833,6 +854,7 @@ defmodule Argus.Obligations do
           {:error, changeset}
       end
     else
+      :not_found -> :not_found
       false -> :not_authorise
       {:error, _} = error -> error
     end
@@ -1358,4 +1380,7 @@ defmodule Argus.Obligations do
       end)
     end)
   end
+
+  defp ensure_obligation_entity(%Scope{entity: %{id: id}}, %Obligation{entity_id: id}), do: :ok
+  defp ensure_obligation_entity(_, _), do: :not_found
 end

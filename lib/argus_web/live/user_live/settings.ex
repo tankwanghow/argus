@@ -203,4 +203,7 @@ defmodule ArgusWeb.UserLive.Settings do
         {:noreply, assign(socket, password_form: to_form(changeset, action: :insert))}
     end
   end
+
+  @impl true
+  def handle_event("close_modal_on_escape", _params, socket), do: {:noreply, socket}
 end

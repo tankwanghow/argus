@@ -33,7 +33,7 @@ defmodule ArgusWeb.MobileLive.Todos do
             data-effect={IndexHelpers.row_effect_name(@row_effects, todo.id)}
             data-menu-id={"m-todo-actions-#{todo.id}"}
             class={[
-              "px-2 py-4 border-1 select-none mb-2 rounded-xl shadow",
+              "px-2 py-4 border select-none mb-2 rounded-xl shadow",
               IndexHelpers.row_muted?(todo) && "opacity-60",
               @highlight_id == todo.id && "todo-row-highlight",
               IndexHelpers.row_effect_class(@row_effects, todo.id)

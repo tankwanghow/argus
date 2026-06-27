@@ -38,7 +38,7 @@ defmodule ArgusWeb.TodoLive.Index do
             data-todo-id={todo.id}
             data-effect={IndexHelpers.row_effect_name(@row_effects, todo.id)}
             class={[
-              "px-3 py-2 border-1 mb-1 shadow mb-1",
+              "px-3 py-2 border mb-1 shadow",
               IndexHelpers.row_muted?(todo) && "opacity-60",
               @highlight_id == todo.id && "todo-row-highlight",
               IndexHelpers.row_effect_class(@row_effects, todo.id)

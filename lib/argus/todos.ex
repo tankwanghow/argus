@@ -168,6 +168,9 @@ defmodule Argus.Todos do
 
   def update_todo(%Scope{} = scope, %Todo{} = todo, attrs) do
     cond do
+      ensure_todo_entity(scope, todo) == :not_found ->
+        :not_found
+
       not Authorization.can?(scope, :edit_todo) ->
         :not_authorise
 
@@ -201,6 +204,9 @@ defmodule Argus.Todos do
 
   def toggle_complete(%Scope{user: user} = scope, %Todo{} = todo) do
     cond do
+      ensure_todo_entity(scope, todo) == :not_found ->
+        :not_found
+
       not Authorization.can?(scope, :complete_todo) ->
         :not_authorise
 
@@ -217,6 +223,9 @@ defmodule Argus.Todos do
 
   def delete_todo(%Scope{} = scope, %Todo{} = todo) do
     cond do
+      ensure_todo_entity(scope, todo) == :not_found ->
+        :not_found
+
       not Authorization.can?(scope, :delete_todo) ->
         :not_authorise
 
@@ -248,6 +257,9 @@ defmodule Argus.Todos do
 
   def cancel_todo(%Scope{} = scope, %Todo{} = todo, note) do
     cond do
+      ensure_todo_entity(scope, todo) == :not_found ->
+        :not_found
+
       not Authorization.can?(scope, :cancel_todo) ->
         :not_authorise
 
@@ -281,6 +293,12 @@ defmodule Argus.Todos do
 
   def record_escalation(%Scope{} = scope, %Todo{} = todo, %Obligation{} = obligation) do
     cond do
+      ensure_todo_entity(scope, todo) == :not_found ->
+        :not_found
+
+      ensure_obligation_entity(scope, obligation) == :not_found ->
+        :not_found
+
       not Authorization.can?(scope, :create_obligation) ->
         :not_authorise
 
@@ -522,6 +540,12 @@ defmodule Argus.Todos do
 
   defp require_entity(%Scope{entity: %_{} = entity}), do: {:ok, entity}
   defp require_entity(_), do: :no_entity
+
+  defp ensure_todo_entity(%Scope{entity: %{id: id}}, %Todo{entity_id: id}), do: :ok
+  defp ensure_todo_entity(_, _), do: :not_found
+
+  defp ensure_obligation_entity(%Scope{entity: %{id: id}}, %Obligation{entity_id: id}), do: :ok
+  defp ensure_obligation_entity(_, _), do: :not_found
 
   defp apply_status_filter(query, :open) do
     query

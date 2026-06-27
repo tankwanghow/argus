@@ -476,18 +476,22 @@
 }
 
 .todo-row--created {
+  border-left-width: 4px;
   animation: todo-row-created 2.5s ease-out 300ms forwards;
 }
 
 .todo-row--updated {
+  border-left-width: 4px;
   animation: todo-row-updated 2.5s ease-out 150ms forwards;
 }
 
 .todo-row--completed {
+  border-left-width: 4px;
   animation: todo-row-completed 2.5s ease-out 150ms forwards;
 }
 
 .todo-row--canceled {
+  border-left-width: 4px;
   animation: todo-row-canceled 2.5s ease-out 150ms forwards;
 }
 

@@ -290,6 +290,20 @@ defmodule Argus.TodosTest do
     end
   end
 
+  describe "entity isolation" do
+    test "rejects mutations on another entity's todo" do
+      scope = entity_scope_fixture()
+      other_scope = entity_scope_fixture()
+      {:ok, todo} = Todos.create_todo(other_scope, %{title: "Other entity task"})
+      stale = backdate_todo!(todo, 49)
+
+      assert :not_found = Todos.update_todo(scope, todo, %{title: "Hacked"})
+      assert :not_found = Todos.toggle_complete(scope, todo)
+      assert :not_found = Todos.delete_todo(scope, todo)
+      assert :not_found = Todos.cancel_todo(scope, stale, "Nope")
+    end
+  end
+
   describe "record_escalation/3" do
     test "links todo to obligation and keeps it visible as escalated" do
       manager = manager_scope_fixture()
