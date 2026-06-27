@@ -71,8 +71,8 @@ topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})
 window.addEventListener("phx:page-loading-start", _info => topbar.show(300))
 window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
 
-window.addEventListener("phx:store-dashboard-filter", event => {
-  fetch("/session/dashboard-filter", {
+window.addEventListener("phx:store-duties-filter", event => {
+  fetch("/session/duties-filter", {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",

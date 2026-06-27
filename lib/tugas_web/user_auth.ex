@@ -7,7 +7,7 @@ defmodule TugasWeb.UserAuth do
   alias Tugas.Accounts
   alias Tugas.Accounts.Scope
   alias Tugas.Entities
-  alias TugasWeb.DashboardFilter.Store, as: DashboardFilterStore
+  alias TugasWeb.DutiesFilter.Store, as: DutiesFilterStore
 
   # Make the remember me cookie valid for 14 days. This should match
   # the session validity setting in UserToken.
@@ -53,7 +53,7 @@ defmodule TugasWeb.UserAuth do
 
     if user_token do
       case Accounts.get_user_by_session_token(user_token) do
-        {user, _} -> DashboardFilterStore.clear(user.id)
+        {user, _} -> DutiesFilterStore.clear(user.id)
         nil -> :ok
       end
 

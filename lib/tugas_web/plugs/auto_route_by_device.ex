@@ -23,6 +23,7 @@ defmodule TugasWeb.Plugs.AutoRouteByDevice do
 
   @mobile_capable_tails [
     "",
+    "/duties",
     "/duties/new",
     "/duty-types",
     "/todos",
@@ -127,13 +128,36 @@ defmodule TugasWeb.Plugs.AutoRouteByDevice do
   end
 
   defp redirect_swap(conn, path, from, to) do
-    new_path = String.replace_prefix(path, from, to)
+    new_path =
+      path
+      |> String.replace_prefix(from, to)
+      |> maybe_desktop_duties_index(from)
+      |> maybe_mobile_duties_index(from)
+
     qs = if conn.query_string == "", do: "", else: "?" <> conn.query_string
 
     conn
     |> Phoenix.Controller.redirect(to: new_path <> qs)
     |> halt()
   end
+
+  defp maybe_desktop_duties_index("/entities/" <> rest, "/m/") when rest != "" do
+    case String.split(rest, "/", parts: 2) do
+      [_slug] -> "/entities/#{rest}"
+      _ -> "/entities/" <> rest
+    end
+  end
+
+  defp maybe_desktop_duties_index(path, _from), do: path
+
+  defp maybe_mobile_duties_index("/m/" <> slug_and_rest, "/entities/") do
+    case String.split(slug_and_rest, "/", parts: 2) do
+      [slug, "duties"] -> "/m/#{slug}"
+      _ -> "/m/" <> slug_and_rest
+    end
+  end
+
+  defp maybe_mobile_duties_index(path, _from), do: path
 
   defp path_tail(path, prefix) do
     case String.split(path, prefix, parts: 2) do

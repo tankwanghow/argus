@@ -7,7 +7,7 @@ defmodule Tugas.Application do
 
   @impl true
   def start(_type, _args) do
-    TugasWeb.DashboardFilter.Store.init()
+    TugasWeb.DutiesFilter.Store.init()
 
     children = [
       TugasWeb.Telemetry,
@@ -30,7 +30,7 @@ defmodule Tugas.Application do
   # whenever the application is updated.
   @impl true
   def config_change(changed, _new, removed) do
-    TugasWeb.DashboardFilter.Store.init()
+    TugasWeb.DutiesFilter.Store.init()
     TugasWeb.Endpoint.config_change(changed, removed)
     :ok
   end

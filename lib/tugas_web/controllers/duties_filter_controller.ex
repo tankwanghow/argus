@@ -1,14 +1,14 @@
-defmodule TugasWeb.DashboardFilterController do
+defmodule TugasWeb.DutiesFilterController do
   use TugasWeb, :controller
 
-  alias TugasWeb.DashboardFilter
+  alias TugasWeb.DutiesFilter
 
   def update(conn, params) do
     slug = params["entity_slug"]
 
     if is_binary(slug) and slug != "" do
       conn
-      |> DashboardFilter.put_session(slug, params)
+      |> DutiesFilter.put_session(slug, params)
       |> send_resp(:no_content, "")
     else
       send_resp(conn, :unprocessable_entity, "")

@@ -76,7 +76,7 @@ defmodule TugasWeb.DutyLive.Form do
       {:ok,
        socket
        |> put_flash(:error, "You are not authorized to create duties.")
-       |> push_navigate(to: ~p"/entities/#{socket.assigns.current_scope.entity.slug}")}
+       |> push_navigate(to: ~p"/entities/#{socket.assigns.current_scope.entity.slug}/duties")}
     end
   end
 

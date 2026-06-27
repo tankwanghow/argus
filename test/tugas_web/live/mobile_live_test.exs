@@ -22,7 +22,7 @@ defmodule TugasWeb.MobileLiveTest do
       conn
       |> mobile_conn(scope)
       |> init_test_session(%{})
-      |> Plug.Conn.put_session(:dashboard_filters, %{
+      |> Plug.Conn.put_session(:duties_filters, %{
         scope.entity.slug => %{
           "mine" => "true",
           "lifecycle" => "skipped",
@@ -403,7 +403,7 @@ defmodule TugasWeb.MobileLiveTest do
       conn
       |> log_in_user(scope.user)
       |> put_req_header("user-agent", "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)")
-      |> get(~p"/entities/#{scope.entity.slug}")
+      |> get(~p"/entities/#{scope.entity.slug}/duties")
 
     assert redirected_to(conn) == ~p"/m/#{scope.entity.slug}"
   end

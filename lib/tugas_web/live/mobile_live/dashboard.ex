@@ -1,7 +1,7 @@
 defmodule TugasWeb.MobileLive.Dashboard do
   use TugasWeb, :live_view
 
-  alias TugasWeb.DashboardFilter
+  alias TugasWeb.DutiesFilter
   alias TugasWeb.DutyLive.IndexHelpers, as: Index
   import TugasWeb.MobileLive.Components
 
@@ -10,8 +10,9 @@ defmodule TugasWeb.MobileLive.Dashboard do
     ~H"""
     <Layouts.mobile_app flash={@flash} current_scope={@current_scope} active={:duties}>
       <div class="sticky top-0 z-30 px-4 py-3 bg-base-100/95 backdrop-blur border-b border-base-200 space-y-2">
-        <h1 class="text-lg font-semibold truncate">
-          Duties - <span class="text-base-content/50">{@current_scope.entity.slug}</span>
+        <h1 class="flex items-center gap-2 text-lg font-semibold truncate">
+          <.brand_logo class="size-9" /> Duties -
+          <span class="text-base-content/50">{@current_scope.entity.slug}</span>
         </h1>
         <div class="flex">
           <div class="w-[65%]">
@@ -109,14 +110,14 @@ defmodule TugasWeb.MobileLive.Dashboard do
     {:ok,
      socket
      |> assign(:today, today)
-     |> DashboardFilter.assign_filters(session)
+     |> DutiesFilter.assign_filters(session)
      |> load_first_page()}
   end
 
   @impl true
   def handle_event("set_scope", %{"mine" => mine}, socket) do
     {:noreply,
-     socket |> assign(:mine?, mine == "true") |> load_first_page() |> DashboardFilter.persist()}
+     socket |> assign(:mine?, mine == "true") |> load_first_page() |> DutiesFilter.persist()}
   end
 
   def handle_event("set_status", %{"lifecycle" => lifecycle}, socket) do
@@ -124,7 +125,7 @@ defmodule TugasWeb.MobileLive.Dashboard do
      socket
      |> assign(:lifecycle, Index.parse_lifecycle(lifecycle))
      |> load_first_page()
-     |> DashboardFilter.persist()}
+     |> DutiesFilter.persist()}
   end
 
   def handle_event("set_sort", %{"sort" => sort}, socket) do
@@ -132,13 +133,13 @@ defmodule TugasWeb.MobileLive.Dashboard do
      socket
      |> assign(:sort, Index.parse_sort(sort))
      |> load_first_page()
-     |> DashboardFilter.persist()}
+     |> DutiesFilter.persist()}
   end
 
   def handle_event("search", params, socket) do
     query = Map.get(params, "value") || Map.get(params, "q") || ""
 
-    {:noreply, socket |> assign(:query, query) |> load_first_page() |> DashboardFilter.persist()}
+    {:noreply, socket |> assign(:query, query) |> load_first_page() |> DutiesFilter.persist()}
   end
 
   def handle_event("load_more", _params, socket) do

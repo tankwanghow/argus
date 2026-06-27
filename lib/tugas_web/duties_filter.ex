@@ -1,11 +1,11 @@
-defmodule TugasWeb.DashboardFilter do
+defmodule TugasWeb.DutiesFilter do
   @moduledoc false
 
   alias Tugas.Accounts.Scope
-  alias TugasWeb.DashboardFilter.Store
+  alias TugasWeb.DutiesFilter.Store
   alias TugasWeb.DutyLive.IndexHelpers, as: Index
 
-  @session_key "dashboard_filters"
+  @session_key "duties_filters"
   @lifecycles ~w(live completed skipped all)
   @sorts ~w(due_asc due_desc title urgency someday)
 
@@ -33,7 +33,7 @@ defmodule TugasWeb.DashboardFilter do
     filters = Store.get(user_id) |> Map.put(slug, entry)
     Store.put(user_id, filters)
 
-    Phoenix.LiveView.push_event(socket, "store-dashboard-filter", %{
+    Phoenix.LiveView.push_event(socket, "store-duties-filter", %{
       entity_slug: slug,
       mine: entry["mine"],
       lifecycle: entry["lifecycle"],
@@ -49,10 +49,10 @@ defmodule TugasWeb.DashboardFilter do
   def put_session(conn, slug, params) when is_binary(slug) do
     filters =
       conn
-      |> Plug.Conn.get_session(:dashboard_filters)
+      |> Plug.Conn.get_session(:duties_filters)
       |> merge_session(slug, params)
 
-    conn = Plug.Conn.put_session(conn, :dashboard_filters, filters)
+    conn = Plug.Conn.put_session(conn, :duties_filters, filters)
 
     if user_id = user_id(conn) do
       Store.put(user_id, filters)

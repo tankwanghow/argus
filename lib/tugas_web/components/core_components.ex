@@ -696,4 +696,38 @@ defmodule TugasWeb.CoreComponents do
   def translate_errors(errors, field) when is_list(errors) do
     for {^field, {msg, opts}} <- errors, do: translate_error({msg, opts})
   end
+
+  @doc """
+  Renders the Tugas brand mark — stacked duty rows with a recurrence arc.
+  """
+  attr :class, :any, default: "size-8"
+  attr :show_wordmark, :boolean, default: false
+  attr :wordmark_class, :any, default: "font-semibold text-lg tracking-tight"
+
+  def brand_logo(assigns) do
+    ~H"""
+    <span class="inline-flex items-center gap-2.5" role="img" aria-label="Tugas">
+      <svg viewBox="0 0 40 40" class={@class} aria-hidden="true">
+        <rect x="1" y="1" width="38" height="38" rx="11" fill="currentColor" class="text-[#0D6E6E]" />
+        <rect x="9" y="10" width="20" height="4.5" rx="2.25" fill="#fff" fill-opacity="0.95" />
+        <rect x="9" y="17.5" width="15" height="4.5" rx="2.25" fill="#fff" fill-opacity="0.78" />
+        <rect x="9" y="25" width="22" height="4.5" rx="2.25" fill="#fff" fill-opacity="0.58" />
+        <path
+          d="M29.5 28.5a7 7 0 1 0-7-12.2"
+          stroke="#E8B86D"
+          stroke-width="2.25"
+          stroke-linecap="round"
+        />
+        <path
+          d="M22.5 16.3 29.5 16.3 29.5 23.3"
+          stroke="#E8B86D"
+          stroke-width="2.25"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </svg>
+      <span :if={@show_wordmark} class={@wordmark_class}>Tugas</span>
+    </span>
+    """
+  end
 end

@@ -59,6 +59,7 @@ defmodule TugasWeb.Router do
         {TugasWeb.Locale, :default}
       ] do
       live "/entities/:entity_slug", DashboardLive.Index, :index
+      live "/entities/:entity_slug/duties", DutyLive.Index, :index
       live "/entities/:entity_slug/duties/new", DutyLive.Form, :new
       live "/entities/:entity_slug/duties/:id", DutyLive.Show, :show
       live "/entities/:entity_slug/duty-types", DutyTypeLive.Index, :index
@@ -79,7 +80,7 @@ defmodule TugasWeb.Router do
     end
 
     post "/users/update-password", UserSessionController, :update_password
-    post "/session/dashboard-filter", DashboardFilterController, :update
+    post "/session/duties-filter", DutiesFilterController, :update
 
     get "/view-mode", ViewModeController, :set
     get "/set-view", ViewModeController, :set

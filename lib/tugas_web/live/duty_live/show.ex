@@ -856,7 +856,7 @@ defmodule TugasWeb.DutyLive.Show do
         {:noreply,
          socket
          |> put_flash(:info, "Duty completed.")
-         |> push_navigate(to: ~p"/entities/#{scope.entity.slug}")}
+         |> push_navigate(to: ~p"/entities/#{scope.entity.slug}/duties")}
 
       {:error, :next_due_required} ->
         {:noreply, put_flash(socket, :error, "Next due date is required for recurring duties.")}
@@ -904,7 +904,7 @@ defmodule TugasWeb.DutyLive.Show do
         {:noreply,
          socket
          |> put_flash(:info, "Cycle skipped.")
-         |> push_navigate(to: ~p"/entities/#{scope.entity.slug}")}
+         |> push_navigate(to: ~p"/entities/#{scope.entity.slug}/duties")}
 
       {:error, :next_due_required} ->
         {:noreply, put_flash(socket, :error, "Next due date is required for recurring duties.")}
@@ -936,7 +936,7 @@ defmodule TugasWeb.DutyLive.Show do
         {:noreply,
          socket
          |> put_flash(:info, "Series ended.")
-         |> push_navigate(to: ~p"/entities/#{scope.entity.slug}")}
+         |> push_navigate(to: ~p"/entities/#{scope.entity.slug}/duties")}
 
       {:error, :note_required} ->
         {:noreply, put_flash(socket, :error, "A reason is required.")}

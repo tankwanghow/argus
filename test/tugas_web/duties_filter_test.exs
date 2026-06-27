@@ -1,11 +1,11 @@
-defmodule TugasWeb.DashboardFilterTest do
+defmodule TugasWeb.DutiesFilterTest do
   use ExUnit.Case, async: true
 
   alias Tugas.Accounts.User
   alias Tugas.Accounts.Scope
   alias Tugas.Entities.{Entity, Membership}
-  alias TugasWeb.DashboardFilter
-  alias TugasWeb.DashboardFilter.Store
+  alias TugasWeb.DutiesFilter
+  alias TugasWeb.DutiesFilter.Store
 
   @user_id "11111111-1111-4111-8111-111111111111"
 
@@ -26,17 +26,17 @@ defmodule TugasWeb.DashboardFilterTest do
   describe "load/2" do
     test "returns role defaults when session is empty" do
       assert %{mine?: false, lifecycle: :live, query: ""} =
-               DashboardFilter.load(%{}, scope(:manager, "acme"))
+               DutiesFilter.load(%{}, scope(:manager, "acme"))
     end
 
     test "members default to Mine" do
       assert %{mine?: true, lifecycle: :live, query: ""} =
-               DashboardFilter.load(%{}, scope(:member, "acme"))
+               DutiesFilter.load(%{}, scope(:member, "acme"))
     end
 
     test "restores saved filters for the current entity" do
       session = %{
-        "dashboard_filters" => %{
+        "duties_filters" => %{
           "acme" => %{
             "mine" => "true",
             "lifecycle" => "completed",
@@ -46,7 +46,7 @@ defmodule TugasWeb.DashboardFilterTest do
       }
 
       assert %{mine?: true, lifecycle: :completed, query: "tax"} =
-               DashboardFilter.load(session, scope(:manager, "acme"))
+               DutiesFilter.load(session, scope(:manager, "acme"))
     end
 
     test "prefers the in-memory store over the session snapshot" do
@@ -55,29 +55,29 @@ defmodule TugasWeb.DashboardFilterTest do
       })
 
       session = %{
-        "dashboard_filters" => %{
+        "duties_filters" => %{
           "acme" => %{"mine" => "false", "lifecycle" => "live", "query" => "session"}
         }
       }
 
       assert %{mine?: true, lifecycle: :skipped, query: "store"} =
-               DashboardFilter.load(session, scope(:manager, "acme"))
+               DutiesFilter.load(session, scope(:manager, "acme"))
     end
 
     test "restores an explicit Team choice for a member (mine=false)" do
       session = %{
-        "dashboard_filters" => %{
+        "duties_filters" => %{
           "acme" => %{"mine" => "false", "lifecycle" => "live", "query" => ""}
         }
       }
 
       assert %{mine?: false, lifecycle: :live, query: ""} =
-               DashboardFilter.load(session, scope(:member, "acme"))
+               DutiesFilter.load(session, scope(:member, "acme"))
     end
 
     test "ignores filters saved for other entities" do
       session = %{
-        "dashboard_filters" => %{
+        "duties_filters" => %{
           "other-entity" => %{
             "mine" => "true",
             "lifecycle" => "skipped",
@@ -87,12 +87,12 @@ defmodule TugasWeb.DashboardFilterTest do
       }
 
       assert %{mine?: false, lifecycle: :live, query: ""} =
-               DashboardFilter.load(session, scope(:manager, "acme"))
+               DutiesFilter.load(session, scope(:manager, "acme"))
     end
 
     test "falls back to defaults for invalid lifecycle values" do
       session = %{
-        "dashboard_filters" => %{
+        "duties_filters" => %{
           "acme" => %{
             "mine" => "not-a-boolean",
             "lifecycle" => "bogus",
@@ -102,33 +102,33 @@ defmodule TugasWeb.DashboardFilterTest do
       }
 
       assert %{mine?: true, lifecycle: :live, query: "find me"} =
-               DashboardFilter.load(session, scope(:member, "acme"))
+               DutiesFilter.load(session, scope(:member, "acme"))
     end
 
     test "restores a saved sort and defaults to due_asc" do
       session = %{
-        "dashboard_filters" => %{
+        "duties_filters" => %{
           "acme" => %{"mine" => "false", "lifecycle" => "live", "query" => "", "sort" => "title"}
         }
       }
 
-      assert %{sort: :title} = DashboardFilter.load(session, scope(:manager, "acme"))
-      assert %{sort: :due_asc} = DashboardFilter.load(%{}, scope(:manager, "beta"))
+      assert %{sort: :title} = DutiesFilter.load(session, scope(:manager, "acme"))
+      assert %{sort: :due_asc} = DutiesFilter.load(%{}, scope(:manager, "beta"))
     end
 
     test "rejects a bogus sort value" do
       session = %{
-        "dashboard_filters" => %{
+        "duties_filters" => %{
           "acme" => %{"mine" => "false", "lifecycle" => "live", "query" => "", "sort" => "bogus"}
         }
       }
 
-      assert %{sort: :due_asc} = DashboardFilter.load(session, scope(:manager, "acme"))
+      assert %{sort: :due_asc} = DutiesFilter.load(session, scope(:manager, "acme"))
     end
 
     test "restores a saved someday sort" do
       session = %{
-        "dashboard_filters" => %{
+        "duties_filters" => %{
           "acme" => %{
             "mine" => "false",
             "lifecycle" => "completed",
@@ -138,13 +138,13 @@ defmodule TugasWeb.DashboardFilterTest do
         }
       }
 
-      assert %{sort: :someday} = DashboardFilter.load(session, scope(:manager, "acme"))
+      assert %{sort: :someday} = DutiesFilter.load(session, scope(:manager, "acme"))
     end
   end
 
   describe "merge_session/3" do
     test "stores normalized filter values per entity slug" do
-      assert DashboardFilter.merge_session(%{}, "acme", %{
+      assert DutiesFilter.merge_session(%{}, "acme", %{
                "mine" => true,
                "lifecycle" => "completed",
                "query" => "tax",
@@ -161,7 +161,7 @@ defmodule TugasWeb.DashboardFilterTest do
 
     test "rejects invalid lifecycle values" do
       entry =
-        DashboardFilter.merge_session(%{}, "acme", %{
+        DutiesFilter.merge_session(%{}, "acme", %{
           "mine" => "true",
           "lifecycle" => "bogus",
           "query" => "tax"

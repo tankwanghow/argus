@@ -310,98 +310,71 @@
 }
 
 /* ─────────────────────────────  Landing page  ─────────────────────────────
-   Self-contained editorial "night-watch" aesthetic for the logged-out marketing
-   page. Scoped under .tugas-landing so none of it leaks into the app UI, and it
+   Self-contained "cycle ledger" aesthetic for the logged-out marketing page.
+   Scoped under .tugas-landing so none of it leaks into the app UI, and it
    renders identically regardless of the active daisyUI theme. */
 .tugas-landing {
-  --night: #070a14;
-  --night-2: #0d1224;
-  --line: #1d2640;
-  --slate: #98a1ba;
-  --paper: #f4f1e9;
-  --amber: #f5a524;
-  --amber-soft: #ffd06b;
-  --watch: #6aa6ff;
-  background: var(--night);
-  color: #eaedf6;
-  font-feature-settings: "ss01";
+  --ink: #1a2332;
+  --surface: #f5f3ee;
+  --surface-2: #ffffff;
+  --line: #e4dfd4;
+  --muted: #5c6478;
+  --teal: #0d6e6e;
+  --teal-soft: #e6f3f3;
+  --gold: #c4822a;
+  --coral: #c45d3a;
+  --sage: #8b9a7b;
+  background: var(--surface);
+  color: var(--ink);
 }
 
 .tugas-landing .font-display {
-  font-family: ui-serif, "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
-  letter-spacing: -0.025em;
-  font-weight: 600;
+  font-family: "Instrument Serif", ui-serif, Georgia, serif;
+  letter-spacing: -0.02em;
+  font-weight: 400;
 }
 
 .tugas-hero {
   position: relative;
   isolation: isolate;
+  background: var(--surface);
+}
+
+.tugas-mesh::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
   background:
-    radial-gradient(115% 120% at 82% -15%, rgba(245, 165, 36, 0.20), transparent 48%),
-    radial-gradient(90% 95% at 8% -5%, rgba(106, 166, 255, 0.18), transparent 52%),
-    linear-gradient(180deg, var(--night) 0%, var(--night-2) 100%);
+    radial-gradient(70% 55% at 92% 8%, rgba(13, 110, 110, 0.09), transparent 55%),
+    radial-gradient(55% 45% at 4% 18%, rgba(196, 130, 42, 0.07), transparent 50%),
+    linear-gradient(180deg, var(--surface) 0%, #faf8f4 100%);
 }
 
-/* Faint topographic grid + film grain for depth */
-.tugas-grid::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
+.tugas-teal-grid {
   background-image:
-    linear-gradient(to right, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
-  background-size: 56px 56px;
-  mask-image: radial-gradient(120% 90% at 50% 0%, #000 35%, transparent 78%);
-}
-
-.tugas-grain::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  opacity: 0.045;
-  mix-blend-mode: overlay;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-}
-
-/* The watching eye — concentric radar rings */
-@keyframes tugas-ring {
-  0%   { transform: scale(0.45); opacity: 0.65; }
-  100% { transform: scale(1.9); opacity: 0; }
-}
-.tugas-ring {
-  transform-origin: center;
-  animation: tugas-ring 4.5s ease-out infinite;
-}
-
-@keyframes tugas-sweep {
-  to { transform: rotate(360deg); }
-}
-.tugas-sweep {
-  animation: tugas-sweep 7s linear infinite;
-  transform-origin: center;
+    linear-gradient(to right, rgba(255, 255, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+  background-size: 48px 48px;
 }
 
 @keyframes tugas-float {
   0%, 100% { transform: translateY(0); }
-  50%      { transform: translateY(-12px); }
+  50%      { transform: translateY(-10px); }
 }
-.tugas-float { animation: tugas-float 7s ease-in-out infinite; }
+.tugas-float { animation: tugas-float 6s ease-in-out infinite; }
 
-/* Staggered page-load reveal */
 @keyframes tugas-rise {
-  from { opacity: 0; transform: translateY(20px); }
+  from { opacity: 0; transform: translateY(16px); }
   to   { opacity: 1; transform: none; }
 }
 .tugas-reveal {
   opacity: 0;
-  animation: tugas-rise 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+  animation: tugas-rise 0.85s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
 }
 
 .tugas-underline {
-  background-image: linear-gradient(var(--amber), var(--amber));
+  background-image: linear-gradient(var(--teal), var(--teal));
   background-size: 0% 2px;
   background-position: 0 100%;
   background-repeat: no-repeat;
@@ -521,7 +494,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tugas-ring, .tugas-sweep, .tugas-float, .tugas-reveal {
+  .tugas-float, .tugas-reveal {
     animation: none;
     opacity: 1;
   }
@@ -544,14 +517,32 @@
 }
 
 /* Scoped, collision-free palette helpers used by the landing markup */
-.tugas-landing .c-amber { color: var(--amber); }
-.tugas-landing .c-watch { color: var(--watch); }
-.tugas-landing .c-slate { color: var(--slate); }
-.tugas-landing .c-dim   { color: rgba(234, 237, 246, 0.72); }
-.tugas-landing .c-night { color: var(--night); }
-.tugas-landing .bg-ink2 { background: var(--night-2); }
-.tugas-landing .bg-glass { background: rgba(255, 255, 255, 0.035); }
-.tugas-landing .bg-amber { background: var(--amber); }
-.tugas-landing .bg-paper { background: var(--paper); }
-.tugas-landing .b-line  { border-color: var(--line); }
-.tugas-landing .b-amber { border-color: rgba(245, 165, 36, 0.45); }
+.tugas-landing .text-ink { color: var(--ink); }
+.tugas-landing .c-muted { color: var(--muted); }
+.tugas-landing .c-teal { color: var(--teal); }
+.tugas-landing .c-coral { color: var(--coral); }
+.tugas-landing .text-coral { color: var(--coral); }
+.tugas-landing .text-gold { color: var(--gold); }
+.tugas-landing .bg-surface { background: var(--surface); }
+.tugas-landing .bg-surface-2 { background: var(--surface-2); }
+.tugas-landing .bg-teal { background: var(--teal); }
+.tugas-landing .bg-teal-soft { background: var(--teal-soft); }
+.tugas-landing .bg-coral { background: var(--coral); }
+.tugas-landing .bg-gold { background: var(--gold); }
+.tugas-landing .bg-sage { background: var(--sage); }
+.tugas-landing .border-coral { border-color: var(--coral); }
+.tugas-landing .border-gold { border-color: var(--gold); }
+.tugas-landing .b-line { border-color: var(--line); }
+.tugas-landing .b-teal-soft { border-color: rgba(13, 110, 110, 0.15); }
+.tugas-landing .b-teal-muted { border-color: rgba(13, 110, 110, 0.4); }
+.tugas-landing .b-sage { border-color: rgba(139, 154, 123, 0.4); }
+.tugas-landing .tugas-glow-teal { background: rgba(13, 110, 110, 0.08); }
+.tugas-landing .tugas-glow-gold { background: rgba(196, 130, 42, 0.12); }
+.tugas-landing .tugas-btn-shadow { box-shadow: 0 1px 3px rgba(13, 110, 110, 0.2); }
+.tugas-landing .tugas-btn-shadow-lg { box-shadow: 0 4px 14px rgba(13, 110, 110, 0.25); }
+.tugas-landing .tugas-badge-shadow { box-shadow: 0 8px 20px rgba(13, 110, 110, 0.3); }
+.tugas-landing .tugas-card-shadow { box-shadow: 0 20px 50px rgba(26, 35, 50, 0.08); }
+.tugas-landing .tugas-feature-card:hover {
+  border-color: rgba(13, 110, 110, 0.3);
+  box-shadow: 0 4px 16px rgba(13, 110, 110, 0.05);
+}

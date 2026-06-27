@@ -1,7 +1,7 @@
-defmodule TugasWeb.DashboardFilter.Store do
+defmodule TugasWeb.DutiesFilter.Store do
   @moduledoc false
 
-  @table :tugas_dashboard_filters
+  @table :tugas_duties_filters
 
   def init, do: ensure_table!()
 

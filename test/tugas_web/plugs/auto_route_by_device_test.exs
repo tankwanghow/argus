@@ -13,6 +13,8 @@ defmodule TugasWeb.Plugs.AutoRouteByDeviceTest do
     test "desktop-only paths are absent from the whitelist" do
       tails = AutoRouteByDevice.mobile_capable_tails()
 
+      assert "" in tails
+      assert "/duties" in tails
       assert "/duties/new" in tails
       assert "/duty-types" in tails
       assert "/todos" in tails
@@ -28,6 +30,19 @@ defmodule TugasWeb.Plugs.AutoRouteByDeviceTest do
         |> put_req_header("user-agent", @mobile_ua)
         |> Map.put(:request_path, "/entities/acme")
         |> Map.put(:path_info, ["entities", "acme"])
+        |> Map.put(:query_string, "")
+        |> AutoRouteByDevice.call([])
+
+      assert redirected_to(conn) == "/m/acme"
+      assert conn.halted
+    end
+
+    test "redirects mobile UA from desktop duties index to mobile", %{conn: conn} do
+      conn =
+        conn
+        |> put_req_header("user-agent", @mobile_ua)
+        |> Map.put(:request_path, "/entities/acme/duties")
+        |> Map.put(:path_info, ["entities", "acme", "duties"])
         |> Map.put(:query_string, "")
         |> AutoRouteByDevice.call([])
 
@@ -171,8 +186,8 @@ defmodule TugasWeb.Plugs.AutoRouteByDeviceTest do
         conn
         |> put_req_header("user-agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X)")
         |> put_req_cookie("tugas_view", "mobile")
-        |> Map.put(:request_path, "/entities/acme")
-        |> Map.put(:path_info, ["entities", "acme"])
+        |> Map.put(:request_path, "/entities/acme/duties")
+        |> Map.put(:path_info, ["entities", "acme", "duties"])
         |> Map.put(:query_string, "")
         |> AutoRouteByDevice.call([])
 

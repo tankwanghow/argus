@@ -2,36 +2,21 @@
 
 <div class="tugas-landing min-h-screen">
   <%!-- ───────────────────────── Header ───────────────────────── --%>
-  <header class="absolute inset-x-0 top-0 z-20">
-    <div class="mx-auto max-w-6xl px-5 sm:px-8 h-20 flex items-center justify-between">
+  <header class="sticky top-0 z-20 border-b b-line bg-surface/90 backdrop-blur-md">
+    <div class="mx-auto max-w-6xl px-5 sm:px-8 h-16 flex items-center justify-between">
       <a href="/" class="flex items-center gap-2.5">
-        <svg viewBox="0 0 40 40" class="size-8" aria-hidden="true">
-          <circle cx="20" cy="20" r="18" fill="none" stroke="#f5a524" stroke-width="1.5" />
-          <ellipse
-            cx="20"
-            cy="20"
-            rx="17"
-            ry="8"
-            fill="none"
-            stroke="#6aa6ff"
-            stroke-width="1.2"
-            opacity="0.6"
-          />
-          <circle cx="20" cy="20" r="5" fill="#f5a524" />
-          <circle cx="20" cy="20" r="2" fill="#070a14" />
-        </svg>
-        <span class="font-display text-2xl tracking-tight">Tugas</span>
+        <.brand_logo class="size-9" show_wordmark wordmark_class="font-display text-2xl text-ink" />
       </a>
       <nav class="flex items-center gap-2 sm:gap-3">
         <.link
           href={~p"/users/log-in"}
-          class="px-3 py-2 text-sm c-dim hover:text-white transition-colors"
+          class="px-3 py-2 text-sm c-muted hover:text-ink transition-colors"
         >
           Log in
         </.link>
         <.link
           href={~p"/users/register"}
-          class="bg-amber c-night font-semibold text-sm rounded-full px-5 py-2.5 hover:brightness-110 transition"
+          class="bg-teal text-white font-semibold text-sm rounded-lg px-5 py-2.5 hover:brightness-110 transition tugas-btn-shadow"
         >
           Get started
         </.link>
@@ -40,27 +25,28 @@
   </header>
 
   <%!-- ───────────────────────── Hero ───────────────────────── --%>
-  <section class="tugas-hero tugas-grid tugas-grain relative overflow-hidden">
-    <div class="mx-auto max-w-6xl px-5 sm:px-8 pt-32 pb-24 lg:pt-40 lg:pb-28 grid lg:grid-cols-12 gap-12 items-center">
+  <section class="tugas-hero tugas-mesh relative overflow-hidden">
+    <div class="mx-auto max-w-6xl px-5 sm:px-8 pt-16 pb-20 lg:pt-24 lg:pb-28 grid lg:grid-cols-12 gap-12 lg:gap-16 items-center">
       <div class="lg:col-span-6">
-        <p class="tugas-reveal inline-flex items-center gap-2 text-xs uppercase tracking-[0.2em] c-amber b-amber border rounded-full px-3 py-1.5">
-          <span class="size-1.5 rounded-full bg-amber"></span> Statutory compliance, watched
+        <p class="tugas-reveal inline-flex items-center gap-2 text-xs font-medium uppercase tracking-[0.18em] c-teal bg-teal-soft border b-teal-soft rounded-full px-3.5 py-1.5">
+          <span class="size-1.5 rounded-full bg-teal"></span> Duty tracking for teams
         </p>
 
         <h1
-          class="tugas-reveal font-display text-5xl sm:text-6xl lg:text-7xl leading-[0.95] mt-6"
+          class="tugas-reveal font-display text-[2.75rem] sm:text-6xl lg:text-[4.25rem] leading-[1.02] text-ink mt-6"
           style="animation-delay:.08s"
         >
-          Never miss a <span class="c-amber">deadline</span> again.
+          Recurring duties,<br />
+          <span class="c-teal italic">always in view.</span>
         </h1>
 
         <p
-          class="tugas-reveal c-dim text-lg leading-relaxed mt-6 max-w-xl"
+          class="tugas-reveal c-muted text-lg leading-relaxed mt-6 max-w-xl"
           style="animation-delay:.16s"
         >
-          Tugas is the all-seeing tracker for your business's recurring duties —
-          EPF, SOCSO, SST, SSM, LHDN and every cycle in between. One row per cycle,
-          urgency surfaced on sight, and an audit trail that never forgets.
+          Tugas keeps recurring operational cycles on one sorted dashboard —
+          orders, maintenance, rentals, tax filling and everything in between. One row per cycle,
+          urgency surfaced at a glance, and an audit trail that stays intact.
         </p>
 
         <div
@@ -69,121 +55,126 @@
         >
           <.link
             href={~p"/users/register"}
-            class="bg-amber c-night font-semibold rounded-full px-6 py-3.5 hover:brightness-110 transition inline-flex items-center gap-2"
+            class="bg-teal text-white font-semibold rounded-lg px-6 py-3.5 hover:brightness-110 transition inline-flex items-center gap-2 tugas-btn-shadow-lg"
           >
             Start tracking free <.icon name="hero-arrow-right-mini" class="size-4" />
           </.link>
-          <.link href={~p"/users/log-in"} class="tugas-underline font-medium px-2 py-3.5">
+          <.link href={~p"/users/log-in"} class="tugas-underline font-medium px-2 py-3.5 text-ink">
             I already have an account
           </.link>
         </div>
 
         <div
-          class="tugas-reveal flex items-center gap-6 mt-10 text-sm c-slate"
+          class="tugas-reveal flex flex-wrap items-center gap-x-6 gap-y-2 mt-10 text-sm c-muted"
           style="animation-delay:.32s"
         >
           <span class="inline-flex items-center gap-2">
-            <.icon name="hero-check-circle-mini" class="size-4 c-amber" /> No credit card
+            <.icon name="hero-check-circle-mini" class="size-4 c-teal" /> No credit card
           </span>
           <span class="inline-flex items-center gap-2">
-            <.icon name="hero-bolt-mini" class="size-4 c-amber" /> Magic-link sign in
+            <.icon name="hero-bolt-mini" class="size-4 c-teal" /> Magic-link sign in
           </span>
         </div>
       </div>
 
-      <%!-- Hero visual: watching eye + floating product preview --%>
+      <%!-- Hero visual: product preview with urgency tiers --%>
       <div class="lg:col-span-6 relative">
         <div class="relative mx-auto w-full max-w-md">
-          <div class="absolute -top-10 -right-6 size-64 hidden sm:block" aria-hidden="true">
-            <svg viewBox="0 0 200 200" class="size-full">
-              <g fill="none" stroke="#6aa6ff" stroke-width="1">
-                <circle class="tugas-ring" cx="100" cy="100" r="40" style="animation-delay:0s" />
-                <circle class="tugas-ring" cx="100" cy="100" r="40" style="animation-delay:1.5s" />
-                <circle class="tugas-ring" cx="100" cy="100" r="40" style="animation-delay:3s" />
-              </g>
-              <circle cx="100" cy="100" r="9" fill="#f5a524" />
-              <circle cx="100" cy="100" r="3.5" fill="#070a14" />
-            </svg>
+          <div
+            class="absolute -left-6 -top-8 size-32 rounded-full tugas-glow-teal blur-2xl"
+            aria-hidden="true"
+          >
+          </div>
+          <div
+            class="absolute -right-4 bottom-0 size-40 rounded-full tugas-glow-gold blur-3xl"
+            aria-hidden="true"
+          >
           </div>
 
-          <%!-- faux dashboard card — the real product UI, in miniature --%>
-          <div class="tugas-float relative bg-ink2 border b-line rounded-2xl shadow-2xl shadow-black/40 overflow-hidden">
-            <div class="flex items-center gap-2 px-4 py-3 border-b b-line">
-              <span class="size-2.5 rounded-full bg-amber"></span>
-              <span class="text-sm font-medium">Acme Sdn Bhd</span>
-              <span class="ml-auto text-xs c-slate">Duties</span>
+          <div class="tugas-float relative bg-surface-2 border b-line rounded-2xl tugas-card-shadow overflow-hidden">
+            <div class="flex items-center gap-2.5 px-4 py-3.5 border-b b-line bg-surface">
+              <.brand_logo class="size-6" />
+              <span class="text-sm font-semibold text-ink">Acme Sdn Bhd</span>
+              <span class="ml-auto text-xs c-muted font-medium">Live duties</span>
             </div>
             <div class="p-4 space-y-4 text-sm">
               <div>
-                <div class="flex items-center gap-2 text-xs uppercase tracking-wide text-red-400">
-                  <span class="size-2 rounded-full bg-red-500"></span> Overdue (1)
+                <div class="flex items-center gap-2 text-xs uppercase tracking-wide font-medium text-coral">
+                  <span class="size-2 rounded-full bg-coral"></span> Overdue
                 </div>
-                <div class="mt-2 rounded-lg bg-glass border-l-4 border-red-500 p-3 flex items-center justify-between">
+                <div class="mt-2 rounded-xl bg-surface border-l-4 border-coral p-3.5 flex items-center justify-between gap-3">
                   <div>
-                    <div class="font-medium">EPF — June</div>
-                    <div class="c-slate text-xs">Monthly · Siti</div>
+                    <div class="font-semibold text-ink">HVAC Maintenance — June</div>
+                    <div class="c-muted text-xs mt-0.5">Monthly · Siti</div>
                   </div>
-                  <span class="text-xs text-red-400">2 days overdue</span>
+                  <span class="text-xs font-medium text-coral whitespace-nowrap">2d overdue</span>
                 </div>
               </div>
               <div>
-                <div class="flex items-center gap-2 text-xs uppercase tracking-wide text-amber-400">
-                  <span class="size-2 rounded-full bg-amber"></span> Due soon (1)
+                <div class="flex items-center gap-2 text-xs uppercase tracking-wide font-medium text-gold">
+                  <span class="size-2 rounded-full bg-gold"></span> Due soon
                 </div>
-                <div class="mt-2 rounded-lg bg-glass border-l-4 b-amber p-3 flex items-center justify-between">
+                <div class="mt-2 rounded-xl bg-surface border-l-4 border-gold p-3.5 flex items-center justify-between gap-3">
                   <div>
-                    <div class="font-medium">SST Return — Q2</div>
-                    <div class="c-slate text-xs">Quarterly · Daniel</div>
+                    <div class="font-semibold text-ink">Office Rental — Q3</div>
+                    <div class="c-muted text-xs mt-0.5">Quarterly · Daniel</div>
                   </div>
-                  <span class="text-xs c-amber">due in 5 days</span>
+                  <span class="text-xs font-medium text-gold whitespace-nowrap">5d left</span>
                 </div>
               </div>
               <div>
-                <div class="flex items-center gap-2 text-xs uppercase tracking-wide c-slate">
-                  <span class="size-2 rounded-full bg-slate-500"></span> On track (1)
+                <div class="flex items-center gap-2 text-xs uppercase tracking-wide font-medium c-muted">
+                  <span class="size-2 rounded-full bg-sage"></span> On track
                 </div>
-                <div class="mt-2 rounded-lg bg-glass border-l-4 border-transparent p-3 flex items-center justify-between">
+                <div class="mt-2 rounded-xl bg-surface border-l-4 b-sage p-3.5 flex items-center justify-between gap-3">
                   <div>
-                    <div class="font-medium">SSM Annual Return</div>
-                    <div class="c-slate text-xs">Annual · Mei Ling</div>
+                    <div class="font-semibold text-ink">Supply Order — Weekly</div>
+                    <div class="c-muted text-xs mt-0.5">Weekly · Mei Ling</div>
                   </div>
-                  <span class="text-xs c-slate">due in 96 days</span>
+                  <span class="text-xs c-muted whitespace-nowrap">96d left</span>
                 </div>
               </div>
             </div>
+          </div>
+
+          <div
+            class="absolute -bottom-5 -right-2 sm:right-0 bg-teal text-white text-xs font-semibold rounded-lg px-3 py-2 tugas-badge-shadow tugas-reveal"
+            style="animation-delay:.4s"
+          >
+            Sorted by urgency
           </div>
         </div>
       </div>
     </div>
 
     <%!-- duty strip --%>
-    <div class="border-t b-line">
-      <div class="mx-auto max-w-6xl px-5 sm:px-8 py-5 flex flex-wrap items-center justify-center gap-x-8 gap-y-2 text-sm c-slate">
-        <span class="uppercase tracking-[0.2em] text-xs">Built for Malaysian SMEs &amp; firms</span>
-        <span class="font-display text-lg">EPF</span>
-        <span class="font-display text-lg">SOCSO</span>
-        <span class="font-display text-lg">SST</span>
-        <span class="font-display text-lg">SSM</span>
-        <span class="font-display text-lg">LHDN</span>
+    <div class="border-t b-line bg-surface-2/60">
+      <div class="mx-auto max-w-6xl px-5 sm:px-8 py-5 flex flex-wrap items-center justify-center gap-x-8 gap-y-2 text-sm c-muted">
+        <span class="uppercase tracking-[0.18em] text-xs font-medium">Built for teams with recurring work</span>
+        <span class="font-display text-lg text-ink/80">Orders</span>
+        <span class="font-display text-lg text-ink/80">Maintenance</span>
+        <span class="font-display text-lg text-ink/80">Rentals</span>
+        <span class="font-display text-lg text-ink/80">Inspections</span>
+        <span class="font-display text-lg text-ink/80">Renewals</span>
       </div>
     </div>
   </section>
 
   <%!-- ───────────────────────── Features ───────────────────────── --%>
-  <section class="bg-ink2 border-y b-line">
+  <section class="bg-surface-2 border-y b-line">
     <div class="mx-auto max-w-6xl px-5 sm:px-8 py-20 lg:py-28">
       <div class="max-w-2xl">
-        <p class="text-xs uppercase tracking-[0.2em] c-amber">Why Tugas</p>
-        <h2 class="font-display text-4xl sm:text-5xl mt-3">
-          A vigilance layer over every duty.
+        <p class="text-xs uppercase tracking-[0.18em] c-teal font-medium">Why Tugas</p>
+        <h2 class="font-display text-4xl sm:text-5xl text-ink mt-3">
+          Built for recurring work.
         </h2>
-        <p class="c-dim mt-4 text-lg">
-          No bell, no inbox to ignore. The work that needs you surfaces the moment you
-          open the dashboard — coloured by how late it is in your timezone.
+        <p class="c-muted mt-4 text-lg leading-relaxed">
+          No bell, no inbox to ignore. Open the dashboard and the work that needs
+          you is already sorted — coloured by how urgent it is in your timezone.
         </p>
       </div>
 
-      <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-px mt-14 b-line border rounded-2xl overflow-hidden bg-[#1d2640]">
+      <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 mt-14">
         <.feature
           icon="hero-arrow-path"
           title="One row per cycle"
@@ -192,7 +183,7 @@
         <.feature
           icon="hero-fire"
           title="Urgency on sight"
-          body="Overdue and due-soon are computed at render time from each type's reminder offsets — surfaced as red and amber, sorted to the top."
+          body="Overdue and due-soon are computed at render time from each type's reminder offsets — surfaced as colour, sorted to the top."
         />
         <.feature
           icon="hero-users"
@@ -202,7 +193,7 @@
         <.feature
           icon="hero-document-check"
           title="Evidence to close"
-          body="Require a note or named documents before an duty can be marked done — counted across the whole cycle, voids excluded."
+          body="Require a note or named documents before a duty can be marked done — counted across the whole cycle, voids excluded."
         />
         <.feature
           icon="hero-clipboard-document-list"
@@ -212,46 +203,47 @@
         <.feature
           icon="hero-device-phone-mobile"
           title="Desk & field"
-          body="A focused mobile view for fieldwork — dashboard, list and the full open to done workflow in your pocket."
+          body="A focused mobile view for fieldwork — dashboard, list and the full open-to-done workflow in your pocket."
         />
       </div>
     </div>
   </section>
 
   <%!-- ───────────────────────── How it works ───────────────────────── --%>
-  <section class="bg-paper c-night">
-    <div class="mx-auto max-w-6xl px-5 sm:px-8 py-20 lg:py-28">
+  <section class="bg-teal text-white relative overflow-hidden">
+    <div class="tugas-teal-grid absolute inset-0 opacity-30" aria-hidden="true"></div>
+    <div class="relative mx-auto max-w-6xl px-5 sm:px-8 py-20 lg:py-28">
       <div class="flex flex-wrap items-end justify-between gap-6">
-        <h2 class="font-display text-4xl sm:text-5xl max-w-md">
+        <h2 class="font-display text-4xl sm:text-5xl max-w-lg leading-tight">
           From blank slate to never-late in three steps.
         </h2>
-        <p class="max-w-sm text-[#4a5170]">
+        <p class="max-w-sm text-white/75 leading-relaxed">
           Set up an entity, define the duties that recur, and let the dashboard do
-          the worrying.
+          the sorting.
         </p>
       </div>
 
-      <ol class="grid md:grid-cols-3 gap-8 mt-14">
-        <li>
-          <span class="font-display text-6xl text-[#d8d2c2]">01</span>
-          <h3 class="font-display text-2xl mt-2">Create your entity</h3>
-          <p class="text-[#4a5170] mt-2">
+      <ol class="grid md:grid-cols-3 gap-6 mt-14">
+        <li class="rounded-2xl bg-white/10 border border-white/15 p-7 backdrop-blur-sm">
+          <span class="inline-flex size-8 items-center justify-center rounded-full bg-gold text-teal text-sm font-bold">1</span>
+          <h3 class="font-display text-2xl mt-4">Create your entity</h3>
+          <p class="text-white/75 mt-2 leading-relaxed">
             Spin up a workspace per company. Invite your team and set their roles —
             admin, manager or member.
           </p>
         </li>
-        <li>
-          <span class="font-display text-6xl text-[#d8d2c2]">02</span>
-          <h3 class="font-display text-2xl mt-2">Define duty types</h3>
-          <p class="text-[#4a5170] mt-2">
-            Start from Malaysian presets or build your own — interval, reminder offsets
+        <li class="rounded-2xl bg-white/10 border border-white/15 p-7 backdrop-blur-sm">
+          <span class="inline-flex size-8 items-center justify-center rounded-full bg-gold text-teal text-sm font-bold">2</span>
+          <h3 class="font-display text-2xl mt-4">Define duty types</h3>
+          <p class="text-white/75 mt-2 leading-relaxed">
+            Start from sample presets or build your own — interval, reminder offsets
             and what's required to close it.
           </p>
         </li>
-        <li>
-          <span class="font-display text-6xl text-[#d8d2c2]">03</span>
-          <h3 class="font-display text-2xl mt-2">Work the dashboard</h3>
-          <p class="text-[#4a5170] mt-2">
+        <li class="rounded-2xl bg-white/10 border border-white/15 p-7 backdrop-blur-sm">
+          <span class="inline-flex size-8 items-center justify-center rounded-full bg-gold text-teal text-sm font-bold">3</span>
+          <h3 class="font-display text-2xl mt-4">Work the dashboard</h3>
+          <p class="text-white/75 mt-2 leading-relaxed">
             Overdue and due-soon rise to the top. Complete a cycle and the next one is
             born automatically.
           </p>
@@ -260,40 +252,78 @@
     </div>
   </section>
 
+  <%!-- ───────────────────────── Quick todos callout ───────────────────────── --%>
+  <section class="bg-surface border-y b-line">
+    <div class="mx-auto max-w-6xl px-5 sm:px-8 py-16 lg:py-20 grid lg:grid-cols-2 gap-10 items-center">
+      <div>
+        <p class="text-xs uppercase tracking-[0.18em] c-teal font-medium">Quick todos</p>
+        <h2 class="font-display text-3xl sm:text-4xl text-ink mt-3">
+          Small tasks, same team visibility.
+        </h2>
+        <p class="c-muted mt-4 leading-relaxed">
+          Not everything needs a full duty. Quick todos handle lightweight checklist
+          work — and escalate into a duty when the job grows.
+        </p>
+      </div>
+      <div class="rounded-2xl border b-line bg-surface-2 p-6 shadow-sm">
+        <div class="flex items-center gap-3 pb-4 border-b b-line">
+          <.icon name="hero-clipboard-document-list" class="size-5 c-teal" />
+          <span class="font-semibold text-ink">Team todos</span>
+        </div>
+        <ul class="mt-4 space-y-3 text-sm">
+          <li class="flex items-center gap-3 rounded-lg bg-surface px-3 py-2.5">
+            <span class="size-4 rounded border-2 b-teal-muted"></span>
+            <span class="text-ink">Call vendor re: maintenance quote</span>
+          </li>
+          <li class="flex items-center gap-3 rounded-lg bg-surface px-3 py-2.5 line-through c-muted">
+            <span class="size-4 rounded bg-teal/20 flex items-center justify-center">
+              <.icon name="hero-check-mini" class="size-3 c-teal" />
+            </span>
+            <span>Upload board minutes</span>
+          </li>
+          <li class="flex items-center gap-3 rounded-lg bg-surface px-3 py-2.5">
+            <span class="size-4 rounded border-2 b-teal-muted"></span>
+            <span class="text-ink">Review rental agreement renewal</span>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
   <%!-- ───────────────────────── Stats ───────────────────────── --%>
-  <section class="bg-ink2 border-y b-line">
+  <section class="bg-surface-2">
     <div class="mx-auto max-w-6xl px-5 sm:px-8 py-16 grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
       <div>
-        <div class="font-display text-5xl c-amber">0</div>
-        <div class="c-slate text-sm mt-1">missed deadlines, by design</div>
+        <div class="font-display text-5xl c-teal">0</div>
+        <div class="c-muted text-sm mt-1">missed deadlines, by design</div>
       </div>
       <div>
-        <div class="font-display text-5xl">8</div>
-        <div class="c-slate text-sm mt-1">recurrence intervals</div>
+        <div class="font-display text-5xl text-ink">8</div>
+        <div class="c-muted text-sm mt-1">recurrence intervals</div>
       </div>
       <div>
-        <div class="font-display text-5xl">3</div>
-        <div class="c-slate text-sm mt-1">roles, clearly scoped</div>
+        <div class="font-display text-5xl text-ink">3</div>
+        <div class="c-muted text-sm mt-1">roles, clearly scoped</div>
       </div>
       <div>
-        <div class="font-display text-5xl">∞</div>
-        <div class="c-slate text-sm mt-1">audit history kept</div>
+        <div class="font-display text-5xl text-ink">∞</div>
+        <div class="c-muted text-sm mt-1">audit history kept</div>
       </div>
     </div>
   </section>
 
   <%!-- ───────────────────────── Final CTA ───────────────────────── --%>
-  <section class="tugas-hero tugas-grid tugas-grain relative overflow-hidden">
+  <section class="tugas-hero tugas-mesh relative overflow-hidden border-t b-line">
     <div class="mx-auto max-w-3xl px-5 sm:px-8 py-24 lg:py-32 text-center">
-      <h2 class="font-display text-4xl sm:text-6xl leading-tight">
-        Put a hundred eyes<br />on your deadlines.
+      <h2 class="font-display text-4xl sm:text-5xl lg:text-6xl leading-tight text-ink">
+        Turn recurring dread into a calm, sorted list.
       </h2>
-      <p class="c-dim text-lg mt-5 max-w-xl mx-auto">
-        Join Tugas and turn statutory dread into a calm, sorted list.
+      <p class="c-muted text-lg mt-5 max-w-xl mx-auto leading-relaxed">
+        Create your entity, invite your team, and let every recurring duty land where you can see it.
       </p>
       <.link
         href={~p"/users/register"}
-        class="bg-amber c-night font-semibold rounded-full px-7 py-4 mt-9 inline-flex items-center gap-2 hover:brightness-110 transition"
+        class="bg-teal text-white font-semibold rounded-lg px-7 py-4 mt-9 inline-flex items-center gap-2 hover:brightness-110 transition tugas-btn-shadow-lg"
       >
         Get started — it's free <.icon name="hero-arrow-right-mini" class="size-4" />
       </.link>
@@ -301,21 +331,15 @@
   </section>
 
   <%!-- ───────────────────────── Footer ───────────────────────── --%>
-  <footer class="border-t b-line">
+  <footer class="border-t b-line bg-surface">
     <div class="mx-auto max-w-6xl px-5 sm:px-8 py-10 flex flex-col sm:flex-row items-center justify-between gap-4">
-      <div class="flex items-center gap-2.5">
-        <svg viewBox="0 0 40 40" class="size-6" aria-hidden="true">
-          <circle cx="20" cy="20" r="18" fill="none" stroke="#f5a524" stroke-width="1.5" />
-          <circle cx="20" cy="20" r="5" fill="#f5a524" />
-        </svg>
-        <span class="font-display text-lg">Tugas</span>
-      </div>
-      <p class="c-slate text-sm">Statutory duty tracking for Malaysian businesses.</p>
+      <.brand_logo class="size-7" show_wordmark wordmark_class="font-display text-lg text-ink" />
+      <p class="c-muted text-sm">Recurring duty tracking for teams.</p>
       <div class="flex items-center gap-5 text-sm">
-        <.link href={~p"/users/log-in"} class="c-dim hover:text-white transition-colors">
+        <.link href={~p"/users/log-in"} class="c-muted hover:text-ink transition-colors">
           Log in
         </.link>
-        <.link href={~p"/users/register"} class="c-amber tugas-underline">Get started</.link>
+        <.link href={~p"/users/register"} class="c-teal font-medium tugas-underline">Get started</.link>
       </div>
     </div>
   </footer>

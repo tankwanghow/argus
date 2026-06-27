@@ -5,10 +5,10 @@ defmodule TugasWeb.PageControllerTest do
     conn = get(conn, ~p"/")
     html = html_response(conn, 200)
 
-    assert html =~ "Never miss a"
-    assert html =~ "deadline"
+    assert html =~ "Recurring duties"
+    assert html =~ "always in view"
     assert html =~ "Start tracking free"
-    assert html =~ "A vigilance layer over every duty"
+    assert html =~ "Built for recurring work"
     assert html =~ ~p"/users/register"
     assert html =~ ~p"/users/log-in"
   end

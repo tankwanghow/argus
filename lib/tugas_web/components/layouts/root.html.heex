@@ -4,19 +4,20 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="csrf-token" content={get_csrf_token()} />
-    <meta name="theme-color" content="#ddd4c4" />
+    <meta name="theme-color" content="#0d6e6e" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,500;0,9..40,600;1,9..40,500&family=Source+Sans+3:wght@400;500;600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,500&family=Instrument+Serif:ital@0;1&family=Source+Sans+3:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
     <meta
       name="description"
-      content="Tugas tracks recurring statutory duties for Malaysian businesses — EPF, SOCSO, SST, SSM, LHDN and more. Urgency on sight, one row per cycle, full audit trail."
+      content="Tugas tracks recurring duties for teams — orders, maintenance, rentals and more. Always in view, one row per cycle, full audit trail."
     />
+    <link rel="icon" href={~p"/images/logo.svg"} type="image/svg+xml" />
     <link rel="icon" href={~p"/favicon.ico"} sizes="48x48" />
-    <.live_title default="Tugas — never miss a deadline" suffix=" · Tugas">
+    <.live_title default="Tugas — recurring duties, always in view" suffix=" · Tugas">
       {assigns[:page_title]}
     </.live_title>
     <link phx-track-static rel="stylesheet" href={~p"/assets/css/app.css"} />

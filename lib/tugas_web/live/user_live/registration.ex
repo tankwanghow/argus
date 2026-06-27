@@ -9,7 +9,7 @@ defmodule TugasWeb.UserLive.Registration do
     ~H"""
     <Layouts.mobile_standalone flash={@flash}>
       <div class="w-full max-w-sm card bg-base-100 shadow">
-        <div class="card-body gap-4">
+        <div class="card-body gap-1">
           <div class="text-center">
             <h1 class="text-lg font-semibold">Register for an account</h1>
             <p class="text-sm text-base-content/60 mt-1">

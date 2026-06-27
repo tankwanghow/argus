@@ -48,7 +48,7 @@ defmodule TugasWeb.DutyLiveTest do
     assert {:ok, _skipped, nil} =
              Duties.skip(manager, to_skip, %{note: "No longer needed"})
 
-    {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}")
+    {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}/duties")
 
     assert has_element?(view, "#duty-row-#{live_duty.id}")
     refute has_element?(view, "#duty-row-#{completed.id}")
@@ -63,7 +63,7 @@ defmodule TugasWeb.DutyLiveTest do
     member_conn = log_in_user(conn, member_scope.user)
 
     {:ok, member_view, _html} =
-      live(member_conn, ~p"/entities/#{manager.entity.slug}")
+      live(member_conn, ~p"/entities/#{manager.entity.slug}/duties")
 
     # member defaults to Mine + Live
     assert has_element?(member_view, "#scope-mine.tab-active")
@@ -472,7 +472,7 @@ defmodule TugasWeb.DutyLiveTest do
     })
     |> render_submit()
 
-    assert_redirect(view, ~p"/entities/#{scope.entity.slug}")
+    assert_redirect(view, ~p"/entities/#{scope.entity.slug}/duties")
     assert Duties.get_duty!(scope, duty.id).closed_at
 
     live_cycles =
@@ -518,7 +518,7 @@ defmodule TugasWeb.DutyLiveTest do
     |> form("#skip-form", %{"skip" => %{"note" => "Not needed"}})
     |> render_submit()
 
-    assert_redirect(view, ~p"/entities/#{scope.entity.slug}")
+    assert_redirect(view, ~p"/entities/#{scope.entity.slug}/duties")
     assert Duties.get_duty!(scope, duty.id).closed_at
   end
 
@@ -564,7 +564,7 @@ defmodule TugasWeb.DutyLiveTest do
     |> form("#end-series-form", %{"end_series" => %{"note" => "Client left"}})
     |> render_submit()
 
-    assert_redirect(view, ~p"/entities/#{scope.entity.slug}")
+    assert_redirect(view, ~p"/entities/#{scope.entity.slug}/duties")
 
     ended = Duties.get_duty!(scope, duty.id)
     assert ended.series_ended_at
@@ -823,7 +823,7 @@ defmodule TugasWeb.DutyLiveTest do
     |> form("#done-form", %{"done" => %{"next_due_by" => "2026-07-15", "note" => "Done"}})
     |> render_submit()
 
-    assert_redirect(view, ~p"/entities/#{scope.entity.slug}")
+    assert_redirect(view, ~p"/entities/#{scope.entity.slug}/duties")
   end
 
   test "completion modal: satisfied slot shows file, unsatisfied shows uploader", %{conn: conn} do

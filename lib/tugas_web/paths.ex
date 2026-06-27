@@ -14,5 +14,6 @@ defmodule TugasWeb.Paths do
   end
 
   def desktop_entity(slug), do: ~p"/entities/#{slug}"
+  def desktop_duties(slug), do: ~p"/entities/#{slug}/duties"
   def mobile_entity(slug), do: ~p"/m/#{slug}"
 end

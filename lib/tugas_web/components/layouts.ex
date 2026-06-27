@@ -48,7 +48,7 @@ defmodule TugasWeb.Layouts do
             navigate={entity_dashboard_nav(@current_scope)}
             class="flex items-center gap-2 font-bold text-lg"
           >
-            <span>Tugas</span>
+            <.brand_logo class="size-7" show_wordmark wordmark_class="font-bold text-lg" />
             <span
               :if={entity_scope?(@current_scope)}
               class="text-base-content/60"
@@ -111,7 +111,7 @@ defmodule TugasWeb.Layouts do
     <nav class="border-b border-base-300 bg-base-200/50 px-4 sm:px-6 lg:px-8 overflow-visible">
       <div class="mx-auto max-w-4xl flex items-center justify-center gap-1 flex-wrap text-sm overflow-visible">
         <.entity_nav_link
-          href={~p"/entities/#{@current_scope.entity.slug}"}
+          href={~p"/entities/#{@current_scope.entity.slug}/duties"}
           label="💼 Duties"
         />
         <.entity_nav_link
@@ -338,8 +338,8 @@ defmodule TugasWeb.Layouts do
   def mobile_standalone(assigns) do
     ~H"""
     <.flash_group flash={@flash} />
-    <div class="min-h-screen bg-base-200 flex flex-col items-center justify-center p-6 gap-6">
-      <div class="text-2xl font-bold tracking-tight">Tugas</div>
+    <div class="min-h-screen bg-base-200 flex flex-col items-center justify-center p-4 gap-2">
+      <.brand_logo class="size-9" show_wordmark wordmark_class="text-xl font-bold tracking-tight" />
       {render_slot(@inner_block)}
     </div>
     """
@@ -359,7 +359,7 @@ defmodule TugasWeb.Layouts do
       id="tugas-shell"
       phx-window-keydown="close_modal_on_escape"
       phx-key="Escape"
-      class="min-h-screen bg-base-100 pb-20"
+      class="min-h-screen bg-base-100 pb-10"
     >
       <.doc_preview_modal />
       {render_slot(@inner_block)}

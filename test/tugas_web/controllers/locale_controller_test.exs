@@ -16,20 +16,20 @@ defmodule TugasWeb.LocaleControllerTest do
 
     conn =
       conn
-      |> put_req_header("referer", "http://localhost:4000/entities/#{slug}?x=1")
+      |> put_req_header("referer", "http://localhost:4000/entities/#{slug}/duties?x=1")
       |> get(~p"/locale/ms")
 
-    assert redirected_to(conn) == "/entities/#{slug}?x=1"
+    assert redirected_to(conn) == "/entities/#{slug}/duties?x=1"
     assert Tugas.Repo.reload(scope.user).locale == "ms"
   end
 
   test "ignores an unsupported locale", %{conn: conn, scope: scope} do
     conn =
       conn
-      |> put_req_header("referer", "http://localhost:4000/entities/#{scope.entity.slug}")
+      |> put_req_header("referer", "http://localhost:4000/entities/#{scope.entity.slug}/duties")
       |> get(~p"/locale/xx")
 
-    assert redirected_to(conn) == "/entities/#{scope.entity.slug}"
+    assert redirected_to(conn) == "/entities/#{scope.entity.slug}/duties"
     assert Tugas.Repo.reload(scope.user).locale == "en"
   end
 
