@@ -7,6 +7,8 @@ defmodule Tugas.Accounts do
   alias Tugas.Repo
 
   alias Tugas.Accounts.{User, UserToken, UserNotifier}
+  alias Tugas.Entities
+  alias Tugas.Entities.Entity
 
   ## Database getters
 
@@ -344,6 +346,66 @@ defmodule Tugas.Accounts do
   """
   def delete_user_session_token(token) do
     Repo.delete_all(from(UserToken, where: [token: ^token, context: "session"]))
+    :ok
+  end
+
+  ## App API tokens
+
+  @doc "Mints a single-use, 5-minute pairing code bound to one entity. Returns the plaintext."
+  def create_pairing_code(%User{} = user, %Entity{} = entity) do
+    {plaintext, token} = UserToken.build_api_pairing_token(user, entity)
+    Repo.insert!(token)
+    plaintext
+  end
+
+  @doc """
+  Exchanges a valid pairing code for a long-lived API token.
+
+  Single-use: the pairing row is deleted in the same transaction that mints
+  the API token. Returns `{:ok, {api_token_plaintext, entity}}` or `:error`.
+  """
+  def exchange_pairing_code(code) do
+    with {:ok, query} <- UserToken.verify_api_pairing_token_query(code),
+         {%User{} = user, %UserToken{} = pairing} <- Repo.one(query) || :error do
+      entity = Entities.get_entity!(pairing.entity_id)
+
+      Repo.transact(fn ->
+        Repo.delete!(pairing)
+        {plaintext, api_token} = UserToken.build_api_token(user, entity)
+        Repo.insert!(api_token)
+        {:ok, {plaintext, entity}}
+      end)
+    else
+      _ -> :error
+    end
+  end
+
+  @doc "Returns `{user, entity_id}` for a valid API token, else `:error`."
+  def fetch_api_token_user(token) do
+    with {:ok, query} <- UserToken.verify_api_token_query(token),
+         {%User{} = user, %UserToken{} = t} <- Repo.one(query) || :error do
+      {user, t.entity_id}
+    else
+      _ -> :error
+    end
+  end
+
+  @doc "Lists a user's active app (API) tokens, newest first."
+  def list_api_tokens(%User{} = user) do
+    Repo.all(
+      from t in UserToken,
+        where: t.user_id == ^user.id and t.context == "api",
+        order_by: [desc: t.inserted_at]
+    )
+  end
+
+  @doc "Revokes one of the user's API tokens by id."
+  def delete_api_token(%User{} = user, id) do
+    Repo.delete_all(
+      from t in UserToken,
+        where: t.id == ^id and t.user_id == ^user.id and t.context == "api"
+    )
+
     :ok
   end
 

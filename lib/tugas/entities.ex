@@ -106,6 +106,13 @@ defmodule Tugas.Entities do
     |> Repo.all()
   end
 
+  @doc "Fetches a non-deleted entity by id. Raises if missing."
+  def get_entity!(id) do
+    Entity
+    |> where([e], e.id == ^id and is_nil(e.deleted_at))
+    |> Repo.one!()
+  end
+
   def get_entity_by_slug_for_user!(slug, %User{} = user) do
     Entity
     |> join(:inner, [e], m in Membership, on: m.entity_id == e.id)

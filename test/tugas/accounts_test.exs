@@ -583,6 +583,45 @@ defmodule Tugas.AccountsTest do
     end
   end
 
+  describe "app API tokens" do
+    import Tugas.EntitiesFixtures
+
+    test "create_pairing_code then exchange yields a working api token, single-use" do
+      scope = entity_scope_fixture()
+
+      code = Accounts.create_pairing_code(scope.user, scope.entity)
+      assert is_binary(code)
+
+      assert {:ok, {api_token, entity}} = Accounts.exchange_pairing_code(code)
+      assert entity.id == scope.entity.id
+      assert {user, entity_id} = Accounts.fetch_api_token_user(api_token)
+      assert user.id == scope.user.id
+      assert entity_id == scope.entity.id
+
+      # single-use: the same code cannot be exchanged again
+      assert Accounts.exchange_pairing_code(code) == :error
+    end
+
+    test "exchange_pairing_code rejects an unknown code" do
+      assert Accounts.exchange_pairing_code("nope") == :error
+    end
+
+    test "fetch_api_token_user rejects an unknown token" do
+      assert Accounts.fetch_api_token_user("nope") == :error
+    end
+
+    test "list/delete api tokens" do
+      scope = entity_scope_fixture()
+
+      {:ok, {_token, _entity}} =
+        Accounts.exchange_pairing_code(Accounts.create_pairing_code(scope.user, scope.entity))
+
+      assert [row] = Accounts.list_api_tokens(scope.user)
+      assert :ok = Accounts.delete_api_token(scope.user, row.id)
+      assert Accounts.list_api_tokens(scope.user) == []
+    end
+  end
+
   defp set_username(user, username) do
     user
     |> Ecto.Changeset.change(username: username)
