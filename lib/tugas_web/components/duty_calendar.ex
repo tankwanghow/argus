@@ -180,7 +180,12 @@ defmodule TugasWeb.DutyCalendar do
         cell.today? && "ring-2 ring-inset ring-primary/40"
       ]}
     >
-      <div class={["font-medium px-0.5", @mobile? && "text-[10px]", !@mobile? && "text-xs"]}>
+      <div class={[
+        "font-medium px-0.5",
+        @mobile? && "text-[10px]",
+        !@mobile? && "text-xs",
+        date_accent_class(cell)
+      ]}>
         {cell.date.day}
       </div>
       <p
@@ -333,6 +338,14 @@ defmodule TugasWeb.DutyCalendar do
 
   defp cell_class(true), do: "min-h-0"
   defp cell_class(false), do: "min-h-24"
+
+  defp date_accent_class(cell) do
+    if sunday_or_holiday?(cell), do: "text-error", else: nil
+  end
+
+  defp sunday_or_holiday?(%{date: date, holidays: holidays}) do
+    Date.day_of_week(date, :sunday) == 1 or holidays != []
+  end
 
   defp someday_chips_class(true), do: "flex gap-1 overflow-x-auto flex-nowrap items-center"
   defp someday_chips_class(false), do: "flex flex-wrap gap-1 items-center"

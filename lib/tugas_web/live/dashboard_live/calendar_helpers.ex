@@ -125,11 +125,11 @@ defmodule TugasWeb.DashboardLive.CalendarHelpers do
 
   defp start_of_week(date) do
     dow = Date.day_of_week(date, :sunday)
-    Date.add(date, -dow)
+    Date.add(date, -(dow - 1))
   end
 
   defp end_of_week(date) do
     dow = Date.day_of_week(date, :sunday)
-    Date.add(date, 6 - dow)
+    Date.add(date, 7 - dow)
   end
 end

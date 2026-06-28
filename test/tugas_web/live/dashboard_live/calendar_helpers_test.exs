@@ -3,6 +3,17 @@ defmodule TugasWeb.DashboardLive.CalendarHelpersTest do
 
   alias TugasWeb.DashboardLive.CalendarHelpers
 
+  test "build_month_grid starts each week on Sunday" do
+    grid = CalendarHelpers.build_month_grid(2026, 6, ~D[2026-06-15])
+
+    first_week =
+      grid.weeks
+      |> List.first()
+
+    assert hd(first_week).date == ~D[2026-05-31]
+    assert Date.day_of_week(hd(first_week).date, :sunday) == 1
+  end
+
   test "build_month_grid includes leading/trailing days and marks today" do
     today = ~D[2026-06-15]
     grid = CalendarHelpers.build_month_grid(2026, 6, today)

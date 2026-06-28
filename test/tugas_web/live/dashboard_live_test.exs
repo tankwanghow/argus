@@ -47,6 +47,26 @@ defmodule TugasWeb.DashboardLiveTest do
              "#calendar-holiday-#{holiday_date}",
              "Independence Day"
            )
+
+    assert has_element?(
+             view,
+             "#calendar-day-#{holiday_date} .text-error",
+             Integer.to_string(holiday_date.day)
+           )
+  end
+
+  test "sunday dates render in red on the calendar", %{conn: conn} do
+    manager = Tugas.EntitiesFixtures.manager_scope_fixture()
+    conn = log_in_user(conn, manager.user)
+    sunday = ~D[2026-06-07]
+
+    {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}")
+
+    assert has_element?(
+             view,
+             "#calendar-day-#{sunday} .text-error",
+             Integer.to_string(sunday.day)
+           )
   end
 
   test "duty appears on its due date cell", %{conn: conn} do
