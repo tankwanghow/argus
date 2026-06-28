@@ -15,8 +15,7 @@ defmodule TugasWeb.MobileLive.Todos do
       nav_highlight={if(@live_action == :new, do: :new_todo, else: nil)}
     >
       <div id="m-todos-page" class="p-4" phx-hook="TodoHighlight" data-highlight-id={@highlight_id}>
-        <div class="flex items-center justify-between gap-2 mb-3">
-        </div>
+        <div class="flex items-center justify-between gap-2 mb-3"></div>
         <ul
           id="m-todos-list"
           class="divide-base-400"
