@@ -10,8 +10,10 @@ defmodule TugasWeb.DutiesFilter do
   @sorts ~w(due_asc due_desc title urgency someday)
 
   def assign_filters(socket, session) do
-    filters = load(session, socket.assigns.current_scope)
+    assign_from_filters(socket, load(session, socket.assigns.current_scope))
+  end
 
+  def assign_from_filters(socket, filters) do
     socket
     |> Phoenix.Component.assign(:mine?, filters.mine?)
     |> Phoenix.Component.assign(:lifecycle, filters.lifecycle)

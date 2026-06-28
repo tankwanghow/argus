@@ -26,15 +26,22 @@ defmodule Tugas.Holidays.WarmCache do
     {:noreply, state}
   end
 
+  @impl true
+  def handle_cast({:ensure_year, country_code, year, region}, state) do
+    warm_year(country_code, year, region)
+    {:noreply, state}
+  end
+
   def run(opts \\ []) do
     force? = Keyword.get(opts, :force, false)
 
     if force? or enabled?() do
       Logger.info("[tugas] Public holiday cache warm started")
       Tugas.Holidays.Store.clear()
+      _ = Countries.refresh_from_nager()
 
       try do
-        countries = Countries.all()
+        countries = warm_countries()
         years = warm_years()
         total = warm_jobs(countries, years)
 
@@ -62,6 +69,18 @@ defmodule Tugas.Holidays.WarmCache do
     :ok
   end
 
+  def ensure_year(country_code, year, region) do
+    case Process.whereis(__MODULE__) do
+      nil ->
+        Task.start(fn -> Holidays.fetch_and_store(country_code, year, region) end)
+
+      pid ->
+        GenServer.cast(pid, {:ensure_year, country_code, year, region})
+    end
+
+    :ok
+  end
+
   defp warm_country("MY", years) do
     Enum.each(years, fn year ->
       Enum.each(MalaysiaRegion.codes(), fn region ->
@@ -77,17 +96,16 @@ defmodule Tugas.Holidays.WarmCache do
   end
 
   defp warm_year(country_code, year, region) do
-    Holidays.list_for_range(
-      country_code,
-      Date.new!(year, 1, 1),
-      Date.new!(year, 12, 31),
-      region
-    )
+    Holidays.fetch_and_store(country_code, year, region)
+  end
+
+  defp warm_countries do
+    Application.get_env(:tugas, :holiday_warm_countries, Countries.all())
   end
 
   defp warm_years do
     year = Date.utc_today().year
-    [year, year + 1]
+    [year - 1, year, year + 1]
   end
 
   defp warm_jobs(countries, years) do

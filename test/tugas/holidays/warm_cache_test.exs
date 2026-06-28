@@ -15,6 +15,12 @@ defmodule Tugas.Holidays.WarmCacheTest do
 
     Application.put_env(:tugas, :warm_holiday_cache, true)
 
+    Application.put_env(:tugas, :holiday_warm_countries, [
+      %{code: "MY", name: "Malaysia"},
+      %{code: "SG", name: "Singapore"},
+      %{code: "US", name: "United States"}
+    ])
+
     counter = :counters.new(1, [])
 
     Application.put_env(:tugas, :nager_countries_fetcher, fn ->
@@ -37,6 +43,7 @@ defmodule Tugas.Holidays.WarmCacheTest do
     on_exit(fn ->
       _ = stop_warm_cache()
       Application.delete_env(:tugas, :warm_holiday_cache)
+      Application.delete_env(:tugas, :holiday_warm_countries)
       Application.delete_env(:tugas, :nager_countries_fetcher)
       Application.delete_env(:tugas, :holidays_fetcher)
       Store.clear()
@@ -49,8 +56,9 @@ defmodule Tugas.Holidays.WarmCacheTest do
   test "fetches holidays for all countries and both warm years", %{counter: counter} do
     WarmCache.run()
 
-    # MY, SG, US × 2 years; MY fetches every state/territory per year
-    assert :counters.get(counter, 1) == 36
+    # MY, SG, US × 3 warm years; MY fetches every state/territory per year
+    my_regions = length(Tugas.Entities.MalaysiaRegion.codes())
+    assert :counters.get(counter, 1) == my_regions * 3 + 6
   end
 
   test "no-ops when disabled" do

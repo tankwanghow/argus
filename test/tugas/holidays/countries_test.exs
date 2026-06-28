@@ -25,13 +25,13 @@ defmodule Tugas.Holidays.CountriesTest do
     :ok
   end
 
-  test "includes Malaysia plus Nager countries" do
+  test "includes Malaysia plus seeded Nager countries" do
     codes = Countries.codes()
 
     assert "MY" in codes
     assert "SG" in codes
     assert "DE" in codes
-    assert length(codes) == 6
+    assert length(codes) >= 151
   end
 
   test "lists Malaysia first in options" do
@@ -45,18 +45,45 @@ defmodule Tugas.Holidays.CountriesTest do
     refute Countries.valid?(nil)
   end
 
-  test "caches the country list" do
+  test "all/0 does not call the live fetcher" do
     counter = :counters.new(1, [])
 
     Application.put_env(:tugas, :nager_countries_fetcher, fn ->
       :counters.add(counter, 1, 1)
-      [%{code: "SG", name: "Singapore"}]
+      []
     end)
 
     Countries.clear()
-    Countries.all()
-    Countries.all()
+    assert "SG" in Countries.codes()
+    assert "US" in Countries.codes()
+    assert :counters.get(counter, 1) == 0
+  end
 
+  test "refresh_from_nager/0 caches a successful live refresh" do
+    counter = :counters.new(1, [])
+
+    Application.put_env(:tugas, :nager_countries_fetcher, fn ->
+      :counters.add(counter, 1, 1)
+
+      for idx <- 1..10 do
+        %{code: "C#{idx}", name: "Country #{idx}"}
+      end ++ [%{code: "SG", name: "Singapore Updated"}]
+    end)
+
+    Countries.clear()
+    assert :ok = Countries.refresh_from_nager()
     assert :counters.get(counter, 1) == 1
+
+    assert {"Singapore Updated", "SG"} in Countries.options()
+    Countries.refresh_from_nager()
+    assert :counters.get(counter, 1) == 2
+  end
+
+  test "refresh_from_nager/0 ignores a degraded live response" do
+    Application.put_env(:tugas, :nager_countries_fetcher, fn -> [] end)
+
+    Countries.clear()
+    assert :error = Countries.refresh_from_nager()
+    assert length(Countries.codes()) > 1
   end
 end

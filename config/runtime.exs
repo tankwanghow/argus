@@ -154,4 +154,6 @@ if config_env() == :prod do
     ]
 
   config :tugas, :mail_from, {"Tugas", mail_from}
+
+  config :tugas, :warm_holiday_cache, true
 end

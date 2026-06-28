@@ -12,7 +12,7 @@ defmodule Tugas.Holidays.Nager do
 
     case Req.get(url, receive_timeout: 5_000) do
       {:ok, %{status: 200, body: body}} when is_list(body) ->
-        Enum.map(body, &parse_holiday/1)
+        parse_holidays(body)
 
       _ ->
         []
@@ -35,13 +35,25 @@ defmodule Tugas.Holidays.Nager do
     _ -> []
   end
 
-  defp parse_holiday(%{"date" => iso} = row) do
-    {:ok, date} = Date.from_iso8601(iso)
-
-    %{
-      date: date,
-      name: Map.get(row, "name"),
-      local_name: Map.get(row, "localName")
-    }
+  def parse_holidays(rows) when is_list(rows) do
+    Enum.flat_map(rows, &parse_holiday/1)
   end
+
+  defp parse_holiday(%{"date" => iso} = row) do
+    case Date.from_iso8601(iso) do
+      {:ok, date} ->
+        [
+          %{
+            date: date,
+            name: Map.get(row, "name"),
+            local_name: Map.get(row, "localName")
+          }
+        ]
+
+      _ ->
+        []
+    end
+  end
+
+  defp parse_holiday(_), do: []
 end

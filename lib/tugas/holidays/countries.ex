@@ -7,6 +7,8 @@ defmodule Tugas.Holidays.Countries do
   @cache_key :all
   @my_country %{code: "MY", name: "Malaysia"}
   @favorite_codes ~w(MY SG JP GB US AU)
+  @min_live_countries 10
+  @static_json "holidays/nager_countries.json"
 
   def init, do: ensure_table!()
 
@@ -18,9 +20,7 @@ defmodule Tugas.Holidays.Countries do
         countries
 
       [] ->
-        countries = load_countries()
-        :ets.insert(@table, {@cache_key, countries})
-        countries
+        static_countries()
     end
   end
 
@@ -34,24 +34,52 @@ defmodule Tugas.Holidays.Countries do
   def valid?(code) when is_binary(code), do: String.upcase(code) in codes()
   def valid?(_), do: false
 
+  def refresh_from_nager do
+    ensure_table!()
+
+    case countries_fetcher().() do
+      list when is_list(list) and length(list) >= @min_live_countries ->
+        countries =
+          ([@my_country] ++ list)
+          |> Enum.uniq_by(& &1.code)
+          |> prioritize_favorites()
+          |> Enum.sort_by(fn %{name: name, code: code} ->
+            {favorite_rank(code), String.downcase(name)}
+          end)
+
+        :ets.insert(@table, {@cache_key, countries})
+        :ok
+
+      _ ->
+        :error
+    end
+  end
+
   def clear do
     if table?(), do: :ets.delete(@table, @cache_key)
     :ok
   end
 
-  defp load_countries do
-    nager_countries =
-      case countries_fetcher().() do
-        list when is_list(list) -> list
-        _ -> []
-      end
-
-    ((@my_country |> List.wrap()) ++ nager_countries)
+  defp static_countries do
+    ([@my_country] ++ load_static_nager_countries())
     |> Enum.uniq_by(& &1.code)
     |> prioritize_favorites()
     |> Enum.sort_by(fn %{name: name, code: code} ->
       {favorite_rank(code), String.downcase(name)}
     end)
+  end
+
+  defp load_static_nager_countries do
+    path = Path.join(:code.priv_dir(:tugas), @static_json)
+
+    with {:ok, body} <- File.read(path),
+         {:ok, rows} <- Jason.decode(body) do
+      Enum.map(rows, fn %{"countryCode" => code, "name" => name} ->
+        %{code: code, name: name}
+      end)
+    else
+      _ -> []
+    end
   end
 
   defp countries_fetcher do

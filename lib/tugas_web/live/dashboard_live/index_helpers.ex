@@ -18,6 +18,7 @@ defmodule TugasWeb.DashboardLive.IndexHelpers do
   def mount_dashboard(socket, session) do
     scope = socket.assigns.current_scope
     today = Urgency.today_for(scope.entity.timezone)
+    filters = DutiesFilter.load(session, scope)
 
     socket =
       socket
@@ -27,16 +28,15 @@ defmodule TugasWeb.DashboardLive.IndexHelpers do
       |> assign(:day_modal_holidays, [])
       |> assign(:someday_modal_open?, false)
       |> assign(:row_effects, %{})
-      |> DutiesFilter.assign_filters(session)
-      |> assign_calendar_month(session)
+      |> DutiesFilter.assign_from_filters(filters)
+      |> assign_calendar_month(filters, today)
       |> load_dashboard()
 
     {:ok, socket}
   end
 
-  defp assign_calendar_month(socket, session) do
-    filters = DutiesFilter.load(session, socket.assigns.current_scope)
-    {default_year, default_month} = Calendar.current_month(socket.assigns.today)
+  defp assign_calendar_month(socket, filters, today) do
+    {default_year, default_month} = Calendar.current_month(today)
 
     {year, month} =
       case {filters.year, filters.month} do

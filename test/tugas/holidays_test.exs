@@ -81,6 +81,25 @@ defmodule Tugas.HolidaysTest do
       assert Holidays.list_for_range("SG", ~D[2026-01-01], ~D[2026-12-31]) == []
       assert Store.get({"SG", 2026, ""}) == :miss
     end
+
+    test "returns immediately on cache miss without blocking on the default fetcher" do
+      Application.delete_env(:tugas, :holidays_fetcher)
+
+      parent = self()
+
+      Application.put_env(:tugas, :holidays_registry_fetcher, fn country, year, region ->
+        send(parent, {:fetch_started, country, year, region})
+        Process.sleep(5_000)
+        [%{date: Date.new!(year, 1, 1), name: "Late", local_name: nil}]
+      end)
+
+      on_exit(fn ->
+        Application.delete_env(:tugas, :holidays_registry_fetcher)
+      end)
+
+      assert Holidays.list_for_range("SG", ~D[2026-01-01], ~D[2026-01-31]) == []
+      assert_receive {:fetch_started, "SG", 2026, nil}, 1_000
+    end
   end
 
   describe "display_name/2" do

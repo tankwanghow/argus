@@ -60,6 +60,7 @@ export const DashboardSwipe = {
 
     if (Math.abs(dx) < this.swipeThreshold) return
     if (Math.abs(dx) < Math.abs(dy)) return
+    if (this.panelIndex !== 1) return
 
     if (dx > 0) {
       this.pushEvent("prev_month", {})

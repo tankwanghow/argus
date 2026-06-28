@@ -11,6 +11,7 @@ defmodule Tugas.Holidays do
   alias Tugas.Entities.MalaysiaRegion
   alias Tugas.Holidays.Registry
   alias Tugas.Holidays.Store
+  alias Tugas.Holidays.WarmCache
 
   def list_for_range(%Entity{} = entity, %Date{} = start_date, %Date{} = end_date) do
     list_for_range(entity.country_code, start_date, end_date, entity.holiday_region)
@@ -61,6 +62,17 @@ defmodule Tugas.Holidays do
 
   def label(holiday, locale), do: display_name(holiday, locale)
 
+  def fetch_and_store(country_code, year, region) do
+    cache_key = {country_code, year, region || ""}
+
+    if Store.get(cache_key) == :miss do
+      holidays = do_fetch_year(country_code, year, region)
+      if holidays != [], do: Store.put(cache_key, holidays)
+    end
+
+    :ok
+  end
+
   defp normalize_region(country_code, region) do
     if Registry.uses_region?(country_code) do
       case region do
@@ -85,27 +97,30 @@ defmodule Tugas.Holidays do
   defp fetch_year(country_code, year, region) do
     cache_key = {country_code, year, region || ""}
 
-    if test_fetcher?() do
-      do_fetch_year(country_code, year, region)
-    else
-      case Store.get(cache_key) do
-        holidays when is_list(holidays) and holidays != [] ->
-          holidays
+    case Application.get_env(:tugas, :holidays_fetcher) do
+      fetcher when is_function(fetcher, 3) ->
+        fetcher.(country_code, year, region)
 
-        _ ->
-          holidays = do_fetch_year(country_code, year, region)
-          if holidays != [], do: Store.put(cache_key, holidays)
-          holidays
-      end
+      _ ->
+        case Store.get(cache_key) do
+          holidays when is_list(holidays) ->
+            holidays
+
+          :miss ->
+            WarmCache.ensure_year(country_code, year, region)
+            []
+        end
     end
   end
 
-  defp test_fetcher?, do: not is_nil(Application.get_env(:tugas, :holidays_fetcher))
-
   defp do_fetch_year(country_code, year, region) do
-    fetcher = Application.get_env(:tugas, :holidays_fetcher, &Registry.fetch/3)
-    fetcher.(country_code, year, region)
+    holidays_fetcher().(country_code, year, region)
   rescue
     _ -> []
+  end
+
+  defp holidays_fetcher do
+    Application.get_env(:tugas, :holidays_fetcher) ||
+      Application.get_env(:tugas, :holidays_registry_fetcher, &Registry.fetch/3)
   end
 end
