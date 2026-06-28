@@ -199,7 +199,7 @@ defmodule TugasWeb.TodoLiveTest do
 
     {:ok, view, html} = live(conn, ~p"/m/#{scope.entity.slug}/todos")
 
-    assert html =~ "Todos"
+    assert html =~ "No todos yet"
     assert has_element?(view, "#m-nav-new-todo")
     refute has_element?(view, "#m-nav-todos")
     assert has_element?(view, "#m-nav-duties")
