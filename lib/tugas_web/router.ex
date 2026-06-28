@@ -26,8 +26,14 @@ defmodule TugasWeb.Router do
     get "/locale/:locale", LocaleController, :update
   end
 
-  # App API (token-authenticated). The pairing exchange is added in its own
-  # unauthenticated scope above this one (see Task 6).
+  # App API — pairing exchange (unauthenticated: the pairing code IS the credential).
+  scope "/api", TugasWeb.Api, as: :api do
+    pipe_through :api
+
+    post "/pair", PairController, :create
+  end
+
+  # App API (token-authenticated).
   scope "/api", TugasWeb.Api, as: :api do
     pipe_through [:api, TugasWeb.Plugs.ApiTokenAuth]
 
