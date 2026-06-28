@@ -92,8 +92,9 @@ Tech stack: Elixir 1.19 / OTP 28, Phoenix 1.8.5, LiveView 1.2.1, Ecto 3.13, Post
 ## Architecture
 
 Phoenix LiveView monolith, PostgreSQL, **binary_id (UUID) primary keys everywhere** via the
-`Tugas.Schema` macro (`use Tugas.Schema`). No background jobs, no REST API, no notification
-system in v1.
+`Tugas.Schema` macro (`use Tugas.Schema`). No background jobs and no notification system in v1.
+There is a **small token-authenticated JSON API** used only by the voice-todo mobile app (see
+the App API section below) — the web UI itself is still all LiveView, no REST.
 
 ### Multi-tenancy & scope
 
@@ -361,10 +362,40 @@ returns, keyset pagination, LiveView streams), and **escalate into** a real duty
 - **Seeding.** `mix tugas.seed_todos` seeds sample todos for local/demo use (dev task, not run in
   tests or prod).
 
+### App API — token-authenticated todo capture (voice-todo mobile app)
+
+A deliberately tiny JSON API exists **only** to let the companion mobile app (on-device dictation →
+text) create a quick todo. It is **not** a general REST API and adds no new domain logic — it reuses
+`Tugas.Todos.create_todo/2` unchanged (so the 200-char cap and `created` audit row apply). Spec/plan:
+`docs/superpowers/specs/2026-06-28-voice-todo-app-design.md`, `docs/superpowers/plans/2026-06-28-voice-todo-app.md`.
+
+- **Tokens live in `users_tokens`** with two new entity-scoped contexts (the table gained a nullable
+  `entity_id`): **`api_pairing`** — a hashed, **single-use, 5-minute** pairing code; **`api`** — the
+  long-lived app token. **One token is bound to exactly one entity** (one entity per install). Builders/
+  verifiers are on `Accounts.UserToken` (`build_api_token/2`, `build_api_pairing_token/2`,
+  `verify_api_token_query/1`, `verify_api_pairing_token_query/1`); context API is on `Tugas.Accounts`
+  (`create_pairing_code/2`, `exchange_pairing_code/1` → `{:ok, {token, entity}}` deleting the pairing
+  row in the same transaction, `fetch_api_token_user/1` → `{user, entity_id}`, `list_api_tokens/1`,
+  `delete_api_token/2`).
+- **Two-stage pairing.** The QR encodes `{host, entity_slug, pairing_code}`; the app exchanges the code
+  **once** via `POST /api/pair` (unauthenticated — the code *is* the credential) for the long-lived
+  token, which is **never displayed** in the web UI. A photographed/stale QR is useless after 5 min or
+  one use.
+- **Endpoints** (`TugasWeb.Api.*`, router `/api` scopes): `POST /api/pair` → `201 {token, entity_slug,
+  host}` / `401`; `POST /api/entities/:slug/todos` (bearer) → `201 {id}` / `403` (entity mismatch or
+  disabled/unaccepted membership) / `422` (changeset). Auth is the **`TugasWeb.Plugs.ApiTokenAuth`**
+  plug, which assigns a user-only `%Scope{}` + `:api_token_entity_id`; the todo controller rebuilds the
+  full entity scope (`get_entity_by_slug_for_user!` + `get_membership!` + active check + `Scope.put_entity`).
+- **Pairing UI:** sudo-gated, entity-scoped `TugasWeb.ConnectAppLive.Show` at
+  `/entities/:entity_slug/connect-app` (live_session `:entity_connect_app`) renders the QR + a
+  **Regenerate** button + a **revoke list** of paired tokens. Linked as **📱 Connect app** in the
+  desktop account menu. Audio never reaches the server — the API accepts a text `title` only.
+
 ### Out of scope for v1
 
 Subjects/client-asset linking (use the duty title), in-app/email/SMS notifications,
-Oban reminder jobs, REST API/mobile, billing beyond `plan`/`seat_limit` fields.
+Oban reminder jobs, a general REST API, billing beyond `plan`/`seat_limit` fields. (The narrow
+token-authenticated **App API** above is the one exception — scoped solely to mobile todo capture.)
 
 ## Conventions
 
