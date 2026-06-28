@@ -8,123 +8,135 @@ defmodule TugasWeb.MobileLive.Dashboard do
   def render(assigns) do
     ~H"""
     <Layouts.mobile_app flash={@flash} current_scope={@current_scope} nav_context={:calendar}>
-      <div class="sticky top-0 z-30 px-4 pt-3 bg-base-100/95 backdrop-blur space-y-1">
-        <h1 class="flex items-center gap-2 text-lg font-semibold truncate">
-          <.brand_logo class="size-9" /> Calendar -
-          <span class="text-base-content/50">{@current_scope.entity.slug}</span>
-        </h1>
-        <div id="dashboard-scope-toggle" class="flex items-center justify-between gap-2">
-          <button
-            id="dashboard-scope-mine"
-            type="button"
-            phx-click="set_scope"
-            phx-value-mine="true"
-            class={["border border-base-300 rounded-lg px-2 py-1", @mine? && "border-2 font-bold"]}
-          >
-            Mine
-          </button>
-          <button
-            id="dashboard-scope-team"
-            type="button"
-            phx-click="set_scope"
-            phx-value-mine="false"
-            class={["border border-base-300 rounded-lg px-2 py-1", !@mine? && "border-2 font-bold"]}
-          >
-            Team
-          </button>
-          <button
-            id="dashboard-prev-month"
-            type="button"
-            class="border border-base-300 rounded-lg px-3 py-1 font-bold"
-            phx-click="prev_month"
-          >
-            ‹
-          </button>
-          <span id="dashboard-month-label" class="text-xs text-center">
-            {Calendar.month_label(@year, @month)}
-          </span>
-          <button
-            id="dashboard-next-month"
-            type="button"
-            class="border border-base-300 rounded-lg px-3 py-1 font-bold"
-            phx-click="next_month"
-          >
-            ›
-          </button>
-          <button
-            id="dashboard-today"
-            type="button"
-            class="border border-base-300 rounded-lg px-2 py-1"
-            phx-click="today"
-          >
-            Today
-          </button>
-        </div>
-      </div>
-
-      <div id="m-dashboard" phx-hook="DashboardSwipe" class="px-1 py-1 space-y-1">
-        <div id="m-dashboard-swipe-hint" class="tabs tabs-box w-full">
-          <button
-            type="button"
-            id="m-dashboard-go-someday"
-            data-dashboard-go="0"
-            class="tab flex-1 min-h-8 text-sm"
-          >
-            someday
-          </button>
-          <button
-            type="button"
-            id="m-dashboard-go-calendar"
-            data-dashboard-go="1"
-            class="tab flex-1 min-h-8 text-sm tab-active font-bold"
-          >
-            calendar
-          </button>
-          <button
-            type="button"
-            id="m-dashboard-go-todos"
-            data-dashboard-go="2"
-            class="tab flex-1 min-h-8 text-sm"
-          >
-            todo
-          </button>
+      <div class="flex h-[calc(100dvh-2.5rem)] min-h-0 flex-col">
+        <div class="sticky top-0 z-30 shrink-0 px-4 pt-3 bg-base-100/95 backdrop-blur space-y-1">
+          <h1 class="flex items-center gap-2 text-lg font-semibold truncate">
+            <.brand_logo class="size-9" /> Calendar -
+            <span class="text-base-content/50">{@current_scope.entity.slug}</span>
+          </h1>
+          <div id="dashboard-scope-toggle" class="flex items-center justify-between gap-2">
+            <button
+              id="dashboard-scope-mine"
+              type="button"
+              phx-click="set_scope"
+              phx-value-mine="true"
+              class={["border border-base-300 rounded-lg px-2 py-1", @mine? && "border-2 font-bold"]}
+            >
+              Mine
+            </button>
+            <button
+              id="dashboard-scope-team"
+              type="button"
+              phx-click="set_scope"
+              phx-value-mine="false"
+              class={["border border-base-300 rounded-lg px-2 py-1", !@mine? && "border-2 font-bold"]}
+            >
+              Team
+            </button>
+            <button
+              id="dashboard-prev-month"
+              type="button"
+              class="border border-base-300 rounded-lg px-3 py-1 font-bold"
+              phx-click="prev_month"
+            >
+              ‹
+            </button>
+            <span id="dashboard-month-label" class="text-xs text-center">
+              {Calendar.month_label(@year, @month)}
+            </span>
+            <button
+              id="dashboard-next-month"
+              type="button"
+              class="border border-base-300 rounded-lg px-3 py-1 font-bold"
+              phx-click="next_month"
+            >
+              ›
+            </button>
+            <button
+              id="dashboard-today"
+              type="button"
+              class="border border-base-300 rounded-lg px-2 py-1"
+              phx-click="today"
+            >
+              Today
+            </button>
+          </div>
         </div>
 
         <div
-          id="m-dashboard-swipe"
-          class="flex h-[calc(100dvh-15.5rem)] snap-x snap-mandatory overflow-x-auto overflow-y-hidden scroll-smooth [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+          id="m-dashboard"
+          phx-hook="DashboardSwipe"
+          class="flex min-h-0 flex-1 flex-col px-1 py-1 gap-1"
         >
-          <div class="w-full shrink-0 snap-center h-full min-h-0 overflow-y-auto pr-2">
-            <.mobile_someday_panel
-              rows={@someday_rows}
-              slug={@current_scope.entity.slug}
-              variant={:mobile}
-            />
+          <div id="m-dashboard-swipe-hint" class="tabs tabs-box w-full shrink-0">
+            <button
+              type="button"
+              id="m-dashboard-go-someday"
+              data-dashboard-go="0"
+              class="tab flex-1 min-h-8 text-sm"
+            >
+              someday
+            </button>
+            <button
+              type="button"
+              id="m-dashboard-go-calendar"
+              data-dashboard-go="1"
+              class="tab flex-1 min-h-8 text-sm tab-active font-bold"
+            >
+              calendar
+            </button>
+            <button
+              type="button"
+              id="m-dashboard-go-todos"
+              data-dashboard-go="2"
+              class="tab flex-1 min-h-8 text-sm"
+            >
+              todo
+            </button>
           </div>
 
-          <div class="w-full shrink-0 snap-center h-full min-h-0 overflow-y-auto px-1">
-            <.duty_calendar
-              variant={:mobile}
-              hide_someday_strip?={true}
-              grid={@grid}
-              grouped={@grouped}
-              someday_rows={@someday_rows}
-              slug={@current_scope.entity.slug}
-              day_modal_date={@day_modal_date}
-              day_modal_rows={@day_modal_rows}
-              day_modal_holidays={@day_modal_holidays}
-              someday_modal_open?={@someday_modal_open?}
-            />
-          </div>
+          <div id="m-dashboard-panels" class="relative min-h-0 flex-1">
+            <div
+              data-dashboard-panel="0"
+              class="hidden h-full min-h-0 overflow-y-auto pr-2"
+            >
+              <.mobile_someday_panel
+                rows={@someday_rows}
+                slug={@current_scope.entity.slug}
+                variant={:mobile}
+              />
+            </div>
 
-          <div class="w-full shrink-0 snap-center h-full min-h-0 overflow-y-auto pl-2">
-            <.dashboard_todos_panel
-              variant={:mobile}
-              todos={@todos}
-              completed_todos={@completed_todos}
-              slug={@current_scope.entity.slug}
-              row_effects={@row_effects}
-            />
+            <div
+              data-dashboard-panel="1"
+              class="flex h-full min-h-0 flex-col overflow-hidden px-1"
+            >
+              <.duty_calendar
+                variant={:mobile}
+                hide_someday_strip?={true}
+                grid={@grid}
+                grouped={@grouped}
+                someday_rows={@someday_rows}
+                slug={@current_scope.entity.slug}
+                day_modal_date={@day_modal_date}
+                day_modal_rows={@day_modal_rows}
+                day_modal_holidays={@day_modal_holidays}
+                someday_modal_open?={@someday_modal_open?}
+              />
+            </div>
+
+            <div
+              data-dashboard-panel="2"
+              class="hidden h-full min-h-0 overflow-y-auto pl-2"
+            >
+              <.dashboard_todos_panel
+                variant={:mobile}
+                todos={@todos}
+                completed_todos={@completed_todos}
+                slug={@current_scope.entity.slug}
+                row_effects={@row_effects}
+              />
+            </div>
           </div>
         </div>
       </div>

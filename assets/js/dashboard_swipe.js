@@ -1,32 +1,33 @@
-// Mobile dashboard: three full-width panels (Someday | Calendar | Todos).
-// Tab strip jumps between panels; native scroll + snap still works.
+// Mobile dashboard: tab strip switches Someday | Calendar | Todos panels.
+// Horizontal swipes change the calendar month (right = previous, left = next).
 export const DashboardSwipe = {
   mounted() {
-    this.swipeEl = this.el.querySelector("#m-dashboard-swipe")
+    this.panelsEl = this.el.querySelector("#m-dashboard-panels")
     this.panelIndex = 1
-    this.onScroll = this.onScroll.bind(this)
+    this.touchStartX = null
+    this.touchStartY = null
+    this.swipeThreshold = 50
     this.onGoClick = this.onGoClick.bind(this)
+    this.onTouchStart = this.onTouchStart.bind(this)
+    this.onTouchEnd = this.onTouchEnd.bind(this)
 
-    if (this.swipeEl) {
-      this.swipeEl.addEventListener("scroll", this.onScroll, {passive: true})
-    }
+    this.el.addEventListener("touchstart", this.onTouchStart, {passive: true})
+    this.el.addEventListener("touchend", this.onTouchEnd, {passive: true})
 
     this.el.querySelectorAll("[data-dashboard-go]").forEach(btn => {
       btn.addEventListener("click", this.onGoClick)
     })
 
-    this.scrollToPanel(this.panelIndex, false)
+    this.showPanel(this.panelIndex)
   },
 
   updated() {
-    this.scrollToPanel(this.panelIndex, false)
-    this.updateTabs(this.panelIndex)
+    this.showPanel(this.panelIndex)
   },
 
   destroyed() {
-    if (this.swipeEl) {
-      this.swipeEl.removeEventListener("scroll", this.onScroll)
-    }
+    this.el.removeEventListener("touchstart", this.onTouchStart)
+    this.el.removeEventListener("touchend", this.onTouchEnd)
 
     this.el.querySelectorAll("[data-dashboard-go]").forEach(btn => {
       btn.removeEventListener("click", this.onGoClick)
@@ -38,22 +39,41 @@ export const DashboardSwipe = {
     if (Number.isNaN(index)) return
 
     this.panelIndex = index
-    this.scrollToPanel(index, true)
+    this.showPanel(index)
   },
 
-  onScroll() {
-    const w = this.swipeEl?.clientWidth
-    if (!w) return
-
-    this.panelIndex = Math.round(this.swipeEl.scrollLeft / w)
-    this.updateTabs(this.panelIndex)
+  onTouchStart(event) {
+    const touch = event.changedTouches[0]
+    this.touchStartX = touch.clientX
+    this.touchStartY = touch.clientY
   },
 
-  scrollToPanel(index, smooth) {
-    const w = this.swipeEl?.clientWidth
-    if (!w) return
+  onTouchEnd(event) {
+    if (this.touchStartX == null || this.touchStartY == null) return
 
-    this.swipeEl.scrollTo({left: w * index, behavior: smooth ? "smooth" : "instant"})
+    const touch = event.changedTouches[0]
+    const dx = touch.clientX - this.touchStartX
+    const dy = touch.clientY - this.touchStartY
+
+    this.touchStartX = null
+    this.touchStartY = null
+
+    if (Math.abs(dx) < this.swipeThreshold) return
+    if (Math.abs(dx) < Math.abs(dy)) return
+
+    if (dx > 0) {
+      this.pushEvent("prev_month", {})
+    } else {
+      this.pushEvent("next_month", {})
+    }
+  },
+
+  showPanel(index) {
+    this.panelsEl?.querySelectorAll("[data-dashboard-panel]").forEach(panel => {
+      const active = Number(panel.dataset.dashboardPanel) === index
+      panel.classList.toggle("hidden", !active)
+    })
+
     this.updateTabs(index)
   },
 

@@ -182,13 +182,13 @@ defmodule TugasWeb.MobileLive.DashboardTest do
     end
   end
 
-  test "swipe carousel renders someday, calendar, and todos panels", %{conn: conn} do
+  test "tab panels render someday, calendar, and todos views", %{conn: conn} do
     manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     conn = mobile_conn(conn, manager)
 
     {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}")
 
-    assert has_element?(view, "#m-dashboard-swipe")
+    assert has_element?(view, "#m-dashboard-panels")
     assert has_element?(view, "#m-dashboard-someday")
     assert has_element?(view, "#duty-calendar")
     assert has_element?(view, "#dashboard-todos")
