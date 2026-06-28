@@ -379,7 +379,7 @@ defmodule TugasWeb.Layouts do
       id="tugas-shell"
       phx-window-keydown="close_modal_on_escape"
       phx-key="Escape"
-      class="min-h-dvh bg-base-100 pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))]"
+      class="min-h-dvh bg-base-100 pb-[calc(3.5rem+env(safe-area-inset-bottom,0px))]"
     >
       <.doc_preview_modal />
       {render_slot(@inner_block)}
@@ -420,7 +420,7 @@ defmodule TugasWeb.Layouts do
       |> assign(:cols, cols)
 
     ~H"""
-    <nav class="fixed bottom-0 inset-x-0 z-30 h-[calc(4.5rem+env(safe-area-inset-bottom,0px))] bg-base-100 border-t border-base-300 pb-[env(safe-area-inset-bottom,0px)]">
+    <nav class="fixed bottom-0 inset-x-0 z-30 h-[calc(3.5rem+env(safe-area-inset-bottom,0px))] bg-base-100 border-t border-base-300 pb-[env(safe-area-inset-bottom,0px)]">
       <ul class={["grid h-full", nav_grid_class(@cols)]}>
         <li :for={tab <- @tabs}>
           <.mobile_nav_item tab={tab} slug={@slug} highlight={@highlight} />
@@ -442,8 +442,8 @@ defmodule TugasWeb.Layouts do
       phx-click={JS.show(to: "#mobile-more-sheet", display: "flex")}
       class={mobile_nav_class(@tab, @highlight)}
     >
-      <span class="text-2xl">☰</span>
-      <span class="text-sm leading-tight text-center">More</span>
+      <span class="text-base">☰</span>
+      <span class="text-xs leading-tight text-center">More</span>
     </button>
     """
   end
@@ -460,13 +460,13 @@ defmodule TugasWeb.Layouts do
     ~H"""
     <%= if @current? do %>
       <div id={@meta.id} class={mobile_nav_class(@tab, @highlight)}>
-        <span class="text-2xl">{@meta.icon}</span>
-        <span class="text-sm leading-tight text-center">{@meta.label}</span>
+        <span class="text-base">{@meta.icon}</span>
+        <span class="text-xs leading-tight text-center">{@meta.label}</span>
       </div>
     <% else %>
       <.link id={@meta.id} navigate={@href} class={mobile_nav_class(@tab, @highlight)}>
-        <span class="text-2xl">{@meta.icon}</span>
-        <span class="text-sm leading-tight text-center">{@meta.label}</span>
+        <span class="text-base">{@meta.icon}</span>
+        <span class="text-xs leading-tight text-center">{@meta.label}</span>
       </.link>
     <% end %>
     """
@@ -478,7 +478,7 @@ defmodule TugasWeb.Layouts do
 
   defp mobile_nav_class(tab, highlight) do
     [
-      "flex flex-col items-center gap-1 py-3 active:bg-base-200 w-full",
+      "flex flex-col items-center justify-center gap-0.5 py-1 active:bg-base-200 w-full h-full",
       tab == highlight && "text-primary",
       tab != highlight && "text-base-content/60"
     ]
