@@ -10,7 +10,7 @@ defmodule TugasWeb.DashboardLive.CalendarHelpers do
   @max_someday_chips 10
 
   def max_chips_per_day, do: @max_chips_per_day
-  def max_chips_per_day(:mobile), do: 2
+  def max_chips_per_day(:mobile), do: 3
   def max_chips_per_day(:desktop), do: @max_chips_per_day
   def max_chips_per_day(_), do: @max_chips_per_day
 

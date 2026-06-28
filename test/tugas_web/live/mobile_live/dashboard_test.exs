@@ -5,7 +5,9 @@ defmodule TugasWeb.MobileLive.DashboardTest do
   import Tugas.DutiesFixtures
 
   alias Tugas.Duties
+  alias Tugas.Duties.Urgency
   alias Tugas.Todos
+  alias TugasWeb.DashboardLive.CalendarHelpers
 
   @mobile_ua "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)"
 
@@ -132,7 +134,7 @@ defmodule TugasWeb.MobileLive.DashboardTest do
     type = type_fixture(manager.entity)
     due = ~D[2026-06-22]
 
-    for title <- ["One", "Two", "Three"] do
+    for title <- ["One", "Two", "Three", "Four"] do
       {:ok, _duty} =
         Duties.create_duty(manager, %{
           title: title,
@@ -196,6 +198,23 @@ defmodule TugasWeb.MobileLive.DashboardTest do
     assert has_element?(view, "#m-dashboard-go-calendar", "calendar")
     assert has_element?(view, "#m-dashboard-go-todos", "todo")
     assert has_element?(view, "#m-dashboard-go-calendar.tab-active")
+  end
+
+  test "calendar body grid uses equal-height rows for the month", %{conn: conn} do
+    manager = Tugas.EntitiesFixtures.manager_scope_fixture()
+    conn = mobile_conn(conn, manager)
+
+    {:ok, view, html} = live(conn, ~p"/m/#{manager.entity.slug}")
+
+    today = Urgency.today_for(manager.entity.timezone)
+    {year, month} = CalendarHelpers.current_month(today)
+    grid = CalendarHelpers.build_month_grid(year, month, today)
+    weeks = length(grid.weeks)
+
+    assert has_element?(view, "#calendar-body-grid")
+    assert has_element?(view, "#calendar-week-0")
+    assert has_element?(view, "#calendar-week-#{weeks - 1}")
+    refute html =~ "calendar-week-#{weeks}"
   end
 
   defp dashboard_open_todo_ids(view) do

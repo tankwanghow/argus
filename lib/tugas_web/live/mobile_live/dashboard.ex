@@ -8,7 +8,7 @@ defmodule TugasWeb.MobileLive.Dashboard do
   def render(assigns) do
     ~H"""
     <Layouts.mobile_app flash={@flash} current_scope={@current_scope} nav_context={:calendar}>
-      <div class="flex h-[calc(100dvh-2.5rem)] min-h-0 flex-col">
+      <div class="flex h-[calc(100dvh-4.5rem-env(safe-area-inset-bottom,0px))] min-h-0 flex-col">
         <div class="sticky top-0 z-30 shrink-0 px-4 pt-3 bg-base-100/95 backdrop-blur space-y-1">
           <h1 class="flex items-center gap-2 text-lg font-semibold truncate">
             <.brand_logo class="size-9" /> Calendar -
@@ -95,10 +95,10 @@ defmodule TugasWeb.MobileLive.Dashboard do
             </button>
           </div>
 
-          <div id="m-dashboard-panels" class="relative min-h-0 flex-1">
+          <div id="m-dashboard-panels" class="relative flex min-h-0 flex-1 flex-col">
             <div
               data-dashboard-panel="0"
-              class="hidden h-full min-h-0 overflow-y-auto pr-2"
+              class="hidden min-h-0 flex-1 overflow-y-auto pr-2"
             >
               <.mobile_someday_panel
                 rows={@someday_rows}
@@ -109,7 +109,7 @@ defmodule TugasWeb.MobileLive.Dashboard do
 
             <div
               data-dashboard-panel="1"
-              class="flex h-full min-h-0 flex-col overflow-hidden px-1"
+              class="flex min-h-0 flex-1 flex-col overflow-hidden px-1"
             >
               <.duty_calendar
                 variant={:mobile}
@@ -127,7 +127,7 @@ defmodule TugasWeb.MobileLive.Dashboard do
 
             <div
               data-dashboard-panel="2"
-              class="hidden h-full min-h-0 overflow-y-auto pl-2"
+              class="hidden min-h-0 flex-1 overflow-y-auto pl-2"
             >
               <.dashboard_todos_panel
                 variant={:mobile}

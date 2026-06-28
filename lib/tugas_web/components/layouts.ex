@@ -371,7 +371,7 @@ defmodule TugasWeb.Layouts do
       id="tugas-shell"
       phx-window-keydown="close_modal_on_escape"
       phx-key="Escape"
-      class="min-h-screen bg-base-100 pb-10"
+      class="min-h-dvh bg-base-100 pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))]"
     >
       <.doc_preview_modal />
       {render_slot(@inner_block)}
@@ -412,8 +412,8 @@ defmodule TugasWeb.Layouts do
       |> assign(:cols, cols)
 
     ~H"""
-    <nav class="fixed bottom-0 inset-x-0 z-30 bg-base-100 border-t border-base-300 pb-[env(safe-area-inset-bottom)]">
-      <ul class={["grid", nav_grid_class(@cols)]}>
+    <nav class="fixed bottom-0 inset-x-0 z-30 h-[calc(4.5rem+env(safe-area-inset-bottom,0px))] bg-base-100 border-t border-base-300 pb-[env(safe-area-inset-bottom,0px)]">
+      <ul class={["grid h-full", nav_grid_class(@cols)]}>
         <li :for={tab <- @tabs}>
           <.mobile_nav_item tab={tab} slug={@slug} highlight={@highlight} />
         </li>

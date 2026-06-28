@@ -28,7 +28,6 @@ defmodule TugasWeb.DutyCalendar do
       |> assign(:max_chips, CalendarHelpers.max_chips_per_day(assigns.variant))
       |> assign(:max_someday, CalendarHelpers.max_someday_chips(assigns.variant))
       |> assign(:mobile?, assigns.variant == :mobile)
-      |> assign(:week_count, length(assigns.grid.weeks))
       |> assign(:show_someday_strip?, !assigns.hide_someday_strip? && assigns.someday_rows != [])
 
     ~H"""
@@ -39,11 +38,8 @@ defmodule TugasWeb.DutyCalendar do
             <div class="grid shrink-0 grid-cols-7 gap-px">
               <.weekday_headers mobile?={@mobile?} />
             </div>
-            <div class={[
-              "grid min-h-0 flex-1 grid-cols-7 gap-px",
-              calendar_body_rows_class(@week_count)
-            ]}>
-              <.calendar_day_cells
+            <div id="calendar-body-grid" class="flex min-h-0 flex-1 flex-col gap-px">
+              <.calendar_week_rows
                 grid={@grid}
                 grouped={@grouped}
                 slug={@slug}
@@ -167,40 +163,82 @@ defmodule TugasWeb.DutyCalendar do
   attr :mobile?, :boolean, required: true
   attr :max_chips, :integer, required: true
 
-  defp calendar_day_cells(assigns) do
+  defp calendar_week_rows(assigns) do
     ~H"""
     <div
+      :for={{week, week_idx} <- Enum.with_index(@grid.weeks)}
+      id={"calendar-week-#{week_idx}"}
+      class="grid min-h-0 flex-1 basis-0 grid-cols-7 gap-px"
+    >
+      <.calendar_day_cell
+        :for={cell <- week}
+        cell={cell}
+        grouped={@grouped}
+        slug={@slug}
+        variant={@variant}
+        mobile?={@mobile?}
+        max_chips={@max_chips}
+      />
+    </div>
+    """
+  end
+
+  defp calendar_day_cells(assigns) do
+    ~H"""
+    <.calendar_day_cell
       :for={cell <- @grid.weeks |> List.flatten()}
-      id={"calendar-day-#{cell.date}"}
+      cell={cell}
+      grouped={@grouped}
+      slug={@slug}
+      variant={@variant}
+      mobile?={@mobile?}
+      max_chips={@max_chips}
+    />
+    """
+  end
+
+  attr :cell, :map, required: true
+  attr :grouped, :map, required: true
+  attr :slug, :string, required: true
+  attr :variant, :atom, required: true
+  attr :mobile?, :boolean, required: true
+  attr :max_chips, :integer, required: true
+
+  defp calendar_day_cell(assigns) do
+    ~H"""
+    <div
+      id={"calendar-day-#{@cell.date}"}
       class={[
         "bg-base-100 p-1 space-y-0.5 min-w-0 overflow-hidden",
         cell_class(@mobile?),
-        !cell.in_month? && "bg-base-200/40 text-base-content/40",
-        cell.holidays != [] && cell.in_month? && "bg-info/10",
-        cell.today? && "ring-2 ring-inset ring-primary/40"
+        !@cell.in_month? && "bg-base-200/40 text-base-content/40",
+        @cell.holidays != [] && @cell.in_month? && "bg-info/10",
+        @cell.today? && "ring-2 ring-inset ring-primary/40"
       ]}
     >
-      <div class={[
-        "font-medium px-0.5",
-        @mobile? && "text-[10px]",
-        !@mobile? && "text-xs",
-        date_accent_class(cell)
-      ]}>
-        {cell.date.day}
+      <div class="flex min-w-0 items-baseline gap-0.5 px-0.5">
+        <span class={[
+          "shrink-0 font-medium",
+          @mobile? && "text-[10px]",
+          !@mobile? && "text-xs",
+          date_accent_class(@cell)
+        ]}>
+          {@cell.date.day}
+        </span>
+        <span
+          :for={holiday <- Enum.take(@cell.holidays, 1)}
+          id={"calendar-holiday-#{@cell.date}"}
+          class={[
+            "min-w-0 truncate font-medium text-info",
+            @mobile? && "text-[9px] leading-tight",
+            !@mobile? && "text-[10px] leading-tight"
+          ]}
+          title={holiday.label}
+        >
+          {holiday.label}
+        </span>
       </div>
-      <p
-        :for={holiday <- Enum.take(cell.holidays, 1)}
-        id={"calendar-holiday-#{cell.date}"}
-        class={[
-          "truncate px-0.5 font-medium text-info",
-          @mobile? && "text-[9px] leading-tight",
-          !@mobile? && "text-[10px] leading-tight"
-        ]}
-        title={holiday.label}
-      >
-        {holiday.label}
-      </p>
-      <%= for {row, idx} <- Enum.with_index(Map.get(@grouped, cell.date, [])) do %>
+      <%= for {row, idx} <- Enum.with_index(Map.get(@grouped, @cell.date, [])) do %>
         <.duty_chip
           :if={idx < @max_chips}
           row={row}
@@ -209,13 +247,13 @@ defmodule TugasWeb.DutyCalendar do
           layout={:calendar}
         />
       <% end %>
-      <%= if length(Map.get(@grouped, cell.date, [])) > @max_chips do %>
-        <% extra = length(Map.get(@grouped, cell.date, [])) - @max_chips %>
+      <%= if length(Map.get(@grouped, @cell.date, [])) > @max_chips do %>
+        <% extra = length(Map.get(@grouped, @cell.date, [])) - @max_chips %>
         <button
           type="button"
-          id={"calendar-day-more-#{cell.date}"}
+          id={"calendar-day-more-#{@cell.date}"}
           phx-click="open_day_modal"
-          phx-value-date={Date.to_iso8601(cell.date)}
+          phx-value-date={Date.to_iso8601(@cell.date)}
           class={[
             "text-primary hover:underline px-0.5",
             @mobile? && "text-[10px]",
@@ -330,13 +368,7 @@ defmodule TugasWeb.DutyCalendar do
   defp calendar_grid_wrapper_class(true), do: "min-h-0 flex-1"
   defp calendar_grid_wrapper_class(false), do: "min-h-0 flex-1"
 
-  defp calendar_body_rows_class(weeks) when weeks > 0 do
-    "grid-rows-[repeat(#{weeks},minmax(0,1fr))]"
-  end
-
-  defp calendar_body_rows_class(_), do: ""
-
-  defp cell_class(true), do: "min-h-0"
+  defp cell_class(true), do: "h-full min-h-0"
   defp cell_class(false), do: "min-h-24"
 
   defp date_accent_class(cell) do
