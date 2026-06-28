@@ -72,6 +72,9 @@ config :tugas, TugasWeb.Endpoint,
 # Enable dev routes for dashboard and mailbox
 config :tugas, dev_routes: true
 
+# Pre-fetch public holidays into the ETS cache on mix phx.server boot.
+config :tugas, :warm_holiday_cache, true
+
 # Do not include metadata nor timestamps in development logs
 config :logger, :default_formatter, format: "[$level] $message\n"
 

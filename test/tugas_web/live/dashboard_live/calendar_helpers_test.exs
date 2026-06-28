@@ -16,7 +16,9 @@ defmodule TugasWeb.DashboardLive.CalendarHelpersTest do
       |> List.flatten()
       |> Enum.filter(& &1.today?)
 
-    assert today_cells == [%{date: ~D[2026-06-15], in_month?: true, today?: true}]
+    assert today_cells == [
+             %{date: ~D[2026-06-15], in_month?: true, today?: true, holidays: []}
+           ]
 
     june_cells =
       grid.weeks
@@ -30,6 +32,23 @@ defmodule TugasWeb.DashboardLive.CalendarHelpersTest do
 
   test "month_range returns first and last day of month" do
     assert CalendarHelpers.month_range(2026, 6) == {~D[2026-06-01], ~D[2026-06-30]}
+  end
+
+  test "annotate_holidays adds holiday labels to matching cells" do
+    grid = CalendarHelpers.build_month_grid(2026, 8, ~D[2026-08-15])
+
+    holidays_by_date = %{
+      ~D[2026-08-31] => [%{date: ~D[2026-08-31], label: "Hari Merdeka"}]
+    }
+
+    grid = CalendarHelpers.annotate_holidays(grid, holidays_by_date)
+
+    cell =
+      grid.weeks
+      |> List.flatten()
+      |> Enum.find(&(&1.date == ~D[2026-08-31]))
+
+    assert cell.holidays == [%{date: ~D[2026-08-31], label: "Hari Merdeka"}]
   end
 
   test "group_by_date buckets rows by duty.due_by" do

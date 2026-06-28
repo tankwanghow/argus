@@ -18,6 +18,7 @@ defmodule TugasWeb.DutyCalendar do
   attr :variant, :atom, default: :desktop
   attr :day_modal_date, :any, default: nil
   attr :day_modal_rows, :list, default: []
+  attr :day_modal_holidays, :list, default: []
   attr :someday_modal_open?, :boolean, default: false
   attr :hide_someday_strip?, :boolean, default: false
 
@@ -50,12 +51,25 @@ defmodule TugasWeb.DutyCalendar do
               "bg-base-100 p-1 space-y-0.5 min-w-0 overflow-hidden",
               cell_class(@mobile?),
               !cell.in_month? && "bg-base-200/40 text-base-content/40",
+              cell.holidays != [] && cell.in_month? && "bg-info/10",
               cell.today? && "ring-2 ring-inset ring-primary/40"
             ]}
           >
             <div class={["font-medium px-0.5", @mobile? && "text-[10px]", !@mobile? && "text-xs"]}>
               {cell.date.day}
             </div>
+            <p
+              :for={holiday <- Enum.take(cell.holidays, 1)}
+              id={"calendar-holiday-#{cell.date}"}
+              class={[
+                "truncate px-0.5 font-medium text-info",
+                @mobile? && "text-[9px] leading-tight",
+                !@mobile? && "text-[10px] leading-tight"
+              ]}
+              title={holiday.label}
+            >
+              {holiday.label}
+            </p>
             <%= for {row, idx} <- Enum.with_index(Map.get(@grouped, cell.date, [])) do %>
               <.duty_chip
                 :if={idx < @max_chips}
@@ -119,6 +133,7 @@ defmodule TugasWeb.DutyCalendar do
         :if={@day_modal_date}
         date={@day_modal_date}
         rows={@day_modal_rows}
+        holidays={@day_modal_holidays}
         slug={@slug}
         variant={@variant}
       />
@@ -220,6 +235,7 @@ defmodule TugasWeb.DutyCalendar do
 
   attr :date, :any, required: true
   attr :rows, :list, required: true
+  attr :holidays, :list, default: []
   attr :slug, :string, required: true
   attr :variant, :atom, default: :desktop
 
@@ -230,6 +246,9 @@ defmodule TugasWeb.DutyCalendar do
         <h3 class="font-bold text-lg">
           {Calendar.strftime(@date, "%A, %B %-d")}
         </h3>
+        <ul :if={@holidays != []} class="mt-2 space-y-1 text-sm text-info">
+          <li :for={holiday <- @holidays}>{holiday.label}</li>
+        </ul>
         <ul class="mt-3 space-y-2 max-h-[70vh] overflow-y-auto">
           <li :for={row <- @rows}>
             <.duty_chip

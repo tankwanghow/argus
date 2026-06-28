@@ -144,7 +144,9 @@ defmodule TugasWeb.EntityLive.Select do
       %{
         "name" => entity.name,
         "slug" => entity.slug,
-        "timezone" => entity.timezone
+        "timezone" => entity.timezone,
+        "country_code" => entity.country_code,
+        "holiday_region" => entity.holiday_region
       },
       as: "edit_entity"
     )

@@ -71,6 +71,7 @@ defmodule TugasWeb.DashboardLive.Index do
               slug={@current_scope.entity.slug}
               day_modal_date={@day_modal_date}
               day_modal_rows={@day_modal_rows}
+              day_modal_holidays={@day_modal_holidays}
               someday_modal_open?={@someday_modal_open?}
             />
           </div>

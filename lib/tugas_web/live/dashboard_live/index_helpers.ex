@@ -27,6 +27,7 @@ defmodule TugasWeb.DashboardLive.IndexHelpers do
       |> assign(:month, month)
       |> assign(:day_modal_date, nil)
       |> assign(:day_modal_rows, [])
+      |> assign(:day_modal_holidays, [])
       |> assign(:someday_modal_open?, false)
       |> assign(:row_effects, %{})
       |> DutiesFilter.assign_filters(session)
@@ -70,14 +71,15 @@ defmodule TugasWeb.DashboardLive.IndexHelpers do
   def handle_open_day_modal(socket, iso) do
     date = Date.from_iso8601!(iso)
     rows = Map.get(socket.assigns.grouped, date, [])
+    holidays = Map.get(socket.assigns.holidays_by_date, date, [])
 
     socket
-    |> assign(day_modal_date: date, day_modal_rows: rows)
+    |> assign(day_modal_date: date, day_modal_rows: rows, day_modal_holidays: holidays)
     |> assign(:someday_modal_open?, false)
   end
 
   def handle_close_day_modal(socket) do
-    assign(socket, day_modal_date: nil, day_modal_rows: [])
+    assign(socket, day_modal_date: nil, day_modal_rows: [], day_modal_holidays: [])
   end
 
   def handle_open_someday_modal(socket) do
@@ -148,11 +150,21 @@ defmodule TugasWeb.DashboardLive.IndexHelpers do
 
     month_rows = Calendar.load_month_rows(scope, today, mine?, year, month)
     someday_rows = Calendar.load_someday_rows(scope, today, mine?)
-    grid = Calendar.build_month_grid(year, month, today)
+    holidays_by_date = Calendar.load_holidays_by_date(scope, year, month)
+
+    grid =
+      Calendar.build_month_grid(year, month, today)
+      |> Calendar.annotate_holidays(holidays_by_date)
+
     grouped = Calendar.group_by_date(month_rows)
 
     socket
-    |> assign(grid: grid, grouped: grouped, someday_rows: someday_rows)
+    |> assign(
+      grid: grid,
+      grouped: grouped,
+      someday_rows: someday_rows,
+      holidays_by_date: holidays_by_date
+    )
     |> load_todos()
   end
 

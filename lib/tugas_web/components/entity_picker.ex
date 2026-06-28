@@ -81,6 +81,20 @@ defmodule TugasWeb.EntityPicker do
               id={"edit-entity-timezone-#{entity.id}"}
               options={timezone_options()}
             />
+            <.input
+              field={@edit_form[:country_code]}
+              type="select"
+              label="Public holidays (country)"
+              id={"edit-entity-country-#{entity.id}"}
+              options={country_options()}
+            />
+            <.input
+              field={@edit_form[:holiday_region]}
+              type="select"
+              label="State / territory (Malaysia)"
+              id={"edit-entity-holiday-region-#{entity.id}"}
+              options={malaysia_region_options()}
+            />
             <div class="flex gap-2">
               <button type="button" class="btn btn-ghost btn-sm" phx-click="cancel_edit">
                 Cancel
@@ -137,4 +151,8 @@ defmodule TugasWeb.EntityPicker do
       {"America/New_York", "America/New_York"}
     ]
   end
+
+  defp country_options, do: Tugas.Entities.Country.options()
+
+  defp malaysia_region_options, do: Tugas.Entities.MalaysiaRegion.options()
 end

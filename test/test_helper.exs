@@ -1,3 +1,5 @@
 ExUnit.start()
 Ecto.Adapters.SQL.Sandbox.mode(Tugas.Repo, :manual)
 TugasWeb.DutiesFilter.Store.init()
+Tugas.Holidays.Store.init()
+Tugas.Holidays.Countries.init()

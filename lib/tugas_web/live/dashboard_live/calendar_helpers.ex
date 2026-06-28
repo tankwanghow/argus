@@ -3,6 +3,7 @@ defmodule TugasWeb.DashboardLive.CalendarHelpers do
 
   alias Tugas.Accounts.Scope
   alias Tugas.Duties
+  alias Tugas.Holidays
   alias TugasWeb.DutyLive.IndexHelpers, as: Index
 
   @max_chips_per_day 3
@@ -25,9 +26,7 @@ defmodule TugasWeb.DashboardLive.CalendarHelpers do
   end
 
   def build_month_grid(year, month, today) do
-    {month_start, month_end} = month_range(year, month)
-    grid_start = start_of_week(month_start)
-    grid_end = end_of_week(month_end)
+    {grid_start, grid_end} = grid_date_bounds(year, month)
 
     weeks =
       Date.range(grid_start, grid_end)
@@ -37,12 +36,41 @@ defmodule TugasWeb.DashboardLive.CalendarHelpers do
           %{
             date: date,
             in_month?: date.month == month,
-            today?: Date.compare(date, today) == :eq
+            today?: Date.compare(date, today) == :eq,
+            holidays: []
           }
         end)
       end)
 
     %{year: year, month: month, weeks: weeks}
+  end
+
+  def grid_date_bounds(year, month) do
+    {month_start, month_end} = month_range(year, month)
+    {start_of_week(month_start), end_of_week(month_end)}
+  end
+
+  def load_holidays_by_date(%Scope{} = scope, year, month) do
+    {grid_start, grid_end} = grid_date_bounds(year, month)
+    locale = scope.user.locale || "en"
+
+    Holidays.list_for_range(scope.entity, grid_start, grid_end)
+    |> Enum.map(fn holiday ->
+      Map.put(holiday, :label, Holidays.label(holiday, locale))
+    end)
+    |> Holidays.group_by_date()
+  end
+
+  def annotate_holidays(%{weeks: weeks} = grid, holidays_by_date) do
+    weeks =
+      Enum.map(weeks, fn week ->
+        Enum.map(week, fn cell ->
+          holidays = Map.get(holidays_by_date, cell.date, [])
+          %{cell | holidays: holidays}
+        end)
+      end)
+
+    %{grid | weeks: weeks}
   end
 
   def group_by_date(rows) do

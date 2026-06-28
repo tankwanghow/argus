@@ -44,3 +44,17 @@ config :phoenix,
   sort_verified_routes_query_params: true
 
 config :tugas, :uploads_dir, Path.join(System.tmp_dir!(), "tugas_uploads_test")
+
+config :ex_unit, exclude: [external_api: true]
+
+config :tugas, :holidays_fetcher, fn _country, _year, _region -> [] end
+
+config :tugas, :nager_countries_fetcher, fn ->
+  [
+    %{code: "SG", name: "Singapore"},
+    %{code: "JP", name: "Japan"},
+    %{code: "GB", name: "United Kingdom"},
+    %{code: "US", name: "United States"},
+    %{code: "DE", name: "Germany"}
+  ]
+end

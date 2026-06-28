@@ -78,15 +78,18 @@ defmodule TugasWeb.EntityLiveSelectTest do
       "edit_entity" => %{
         "name" => "Renamed Corp",
         "slug" => scope.entity.slug,
-        "timezone" => "Asia/Singapore"
+        "timezone" => "Asia/Singapore",
+        "country_code" => "SG",
+        "holiday_region" => "KUL"
       }
     })
     |> render_submit()
 
     assert render(view) =~ "Renamed Corp"
 
-    assert Entities.get_entity_by_slug_for_user!(scope.entity.slug, scope.user).timezone ==
-             "Asia/Singapore"
+    updated = Entities.get_entity_by_slug_for_user!(scope.entity.slug, scope.user)
+    assert updated.timezone == "Asia/Singapore"
+    assert updated.country_code == "SG"
   end
 
   test "member picker has no edit controls", %{conn: conn} do
@@ -112,7 +115,9 @@ defmodule TugasWeb.EntityLiveSelectTest do
       "edit_entity" => %{
         "name" => "Mobile Renamed",
         "slug" => scope.entity.slug,
-        "timezone" => "UTC"
+        "timezone" => "UTC",
+        "country_code" => scope.entity.country_code,
+        "holiday_region" => scope.entity.holiday_region
       }
     })
     |> render_submit()

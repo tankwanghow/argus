@@ -8,7 +8,14 @@ defmodule TugasWeb.DashboardLiveTest do
   alias Tugas.Duties.Urgency
   alias Tugas.Todos
 
+  alias Tugas.Holidays.Store
+
   setup :register_and_log_in_user
+
+  setup do
+    Store.clear()
+    :ok
+  end
 
   test "renders calendar with nav links", %{conn: conn} do
     scope = Tugas.EntitiesFixtures.manager_scope_fixture()
@@ -21,6 +28,25 @@ defmodule TugasWeb.DashboardLiveTest do
     assert has_element?(view, "#dashboard-todos")
     assert html =~ "📅 Dashboard"
     assert html =~ "💼 Duties"
+  end
+
+  test "public holiday appears on its calendar day", %{conn: conn} do
+    manager = Tugas.EntitiesFixtures.manager_scope_fixture(%{country_code: "MY"})
+    conn = log_in_user(conn, manager.user)
+    today = Urgency.today_for(manager.entity.timezone)
+    holiday_date = Date.end_of_month(today)
+
+    stub_holidays(fn _country, _year, _region ->
+      [%{date: holiday_date, name: "Independence Day", local_name: "Hari Merdeka"}]
+    end)
+
+    {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}")
+
+    assert has_element?(
+             view,
+             "#calendar-holiday-#{holiday_date}",
+             "Independence Day"
+           )
   end
 
   test "duty appears on its due date cell", %{conn: conn} do
@@ -173,6 +199,16 @@ defmodule TugasWeb.DashboardLiveTest do
     assert MapSet.new(open_ids_after)
            |> MapSet.difference(MapSet.new(open_ids_before))
            |> MapSet.size() == 1
+  end
+
+  defp stub_holidays(fun) do
+    Store.clear()
+    Application.put_env(:tugas, :holidays_fetcher, fun)
+
+    on_exit(fn ->
+      Application.delete_env(:tugas, :holidays_fetcher)
+      Store.clear()
+    end)
   end
 
   defp dashboard_open_todo_ids(view) do
