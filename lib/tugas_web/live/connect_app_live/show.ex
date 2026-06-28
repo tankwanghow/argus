@@ -19,7 +19,7 @@ defmodule TugasWeb.ConnectAppLive.Show do
         pairing_code: code
       })
 
-    qr_svg = payload |> EQRCode.encode() |> EQRCode.svg(width: 240)
+    qr_svg = payload |> EQRCode.encode() |> EQRCode.svg(width: 360)
 
     socket
     |> assign(:pairing_code, code)
