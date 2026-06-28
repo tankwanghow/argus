@@ -26,10 +26,13 @@ defmodule TugasWeb.Router do
     get "/locale/:locale", LocaleController, :update
   end
 
-  # Other scopes may use custom stacks.
-  # scope "/api", TugasWeb do
-  #   pipe_through :api
-  # end
+  # App API (token-authenticated). The pairing exchange is added in its own
+  # unauthenticated scope above this one (see Task 6).
+  scope "/api", TugasWeb.Api, as: :api do
+    pipe_through [:api, TugasWeb.Plugs.ApiTokenAuth]
+
+    post "/entities/:slug/todos", TodoController, :create
+  end
 
   # Enable Swoosh mailbox preview in development
   if Application.compile_env(:tugas, :dev_routes) do
