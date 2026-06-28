@@ -116,6 +116,9 @@ defmodule TugasWeb.DashboardLiveTest do
              view,
              "#day-modal-duty-chip-#{duty.id}[href='/entities/#{manager.entity.slug}/duties/#{duty.id}']"
            )
+
+    duty = Duties.get_duty!(manager, duty.id)
+    assert has_element?(view, "#day-modal-duty-chip-#{duty.id}", duty.duty_type.name)
   end
 
   test "clicking a calendar day with no duties opens empty day modal", %{conn: conn} do
@@ -389,6 +392,9 @@ defmodule TugasWeb.DashboardLiveTest do
 
     view |> element("#someday-more") |> render_click()
     assert has_element?(view, "#someday-modal #someday-modal-duty-chip-#{hidden.id}")
+
+    hidden = Duties.get_duty!(manager, hidden.id)
+    assert has_element?(view, "#someday-modal-duty-chip-#{hidden.id}", hidden.duty_type.name)
   end
 
   test "day overflow opens modal with all duties", %{conn: conn} do

@@ -258,6 +258,9 @@ defmodule TugasWeb.DutyCalendar do
         class={chip_class(@variant, @layout, @row.tier)}
       >
         <span class={chip_title_class(@variant, @layout)}>{@row.duty.title}</span>
+        <span :if={@show_type?} class={chip_type_class(@variant, @layout)}>
+          {@row.duty.duty_type.name}
+        </span>
       </.link>
     <% else %>
       <span
@@ -265,6 +268,9 @@ defmodule TugasWeb.DutyCalendar do
         class={chip_class(@variant, @layout, @row.tier)}
       >
         <span class={chip_title_class(@variant, @layout)}>{@row.duty.title}</span>
+        <span :if={@show_type?} class={chip_type_class(@variant, @layout)}>
+          {@row.duty.duty_type.name}
+        </span>
       </span>
     <% end %>
     """
@@ -396,6 +402,9 @@ defmodule TugasWeb.DutyCalendar do
   defp chip_title_class(_, :calendar), do: "font-medium block overflow-hidden whitespace-nowrap"
   defp chip_title_class(_, _), do: "font-medium block truncate"
 
+  defp chip_type_class(:mobile, :list), do: "mt-0.5 block truncate text-sm text-info"
+  defp chip_type_class(_, :list), do: "mt-0.5 block truncate text-xs text-info"
+
   defp chip_tier_border(:mobile, :list, tier), do: ["border-l-4", tier_border(tier)]
   defp chip_tier_border(_, _, tier), do: ["border-l-2", tier_border(tier)]
 
@@ -403,8 +412,8 @@ defmodule TugasWeb.DutyCalendar do
   defp chip_layout_class(:list), do: "block w-full min-w-0"
   defp chip_layout_class(_), do: "block w-full min-w-0"
 
-  defp show_type_name?(:mobile, :calendar), do: false
-  defp show_type_name?(_, _), do: true
+  defp show_type_name?(_, :list), do: true
+  defp show_type_name?(_, _), do: false
 
   defp duty_show_path(:mobile, slug, id), do: ~p"/m/#{slug}/duties/#{id}"
   defp duty_show_path(_, slug, id), do: ~p"/entities/#{slug}/duties/#{id}"

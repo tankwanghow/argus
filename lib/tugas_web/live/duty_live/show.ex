@@ -381,6 +381,10 @@ defmodule TugasWeb.DutyLive.Show do
             class="mt-2"
           >
             <.char_count_input field={@edit_form[:title]} label="Title" max={60} required />
+            <div class="fieldset mb-2">
+              <label class="label mb-1" for="edit-duty-type">Type</label>
+              <p id="edit-duty-type" class="font-medium text-info">{@duty.duty_type.name}</p>
+            </div>
             <.input field={@edit_form[:someday]} type="checkbox" label="No due date (Someday)" />
             <.input
               :if={!someday?(@edit_form)}

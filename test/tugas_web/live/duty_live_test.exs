@@ -688,8 +688,11 @@ defmodule TugasWeb.DutyLiveTest do
     {:ok, view, _html} =
       live(conn, ~p"/entities/#{scope.entity.slug}/duties/#{duty.id}")
 
+    duty = Duties.get_duty!(scope, duty.id)
+
     view |> element("#edit-duty-btn") |> render_click()
     assert has_element?(view, "#edit-duty-form")
+    assert has_element?(view, "#edit-duty-type", duty.duty_type.name)
 
     view
     |> form("#edit-duty-form", %{

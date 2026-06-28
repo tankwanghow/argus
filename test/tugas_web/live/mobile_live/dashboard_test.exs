@@ -74,6 +74,9 @@ defmodule TugasWeb.MobileLive.DashboardTest do
              view,
              "#day-modal-duty-chip-#{duty.id}[href='/m/#{manager.entity.slug}/duties/#{duty.id}']"
            )
+
+    duty = Duties.get_duty!(manager, duty.id)
+    assert has_element?(view, "#day-modal-duty-chip-#{duty.id}", duty.duty_type.name)
   end
 
   test "clicking a calendar day with no duties opens empty day modal", %{conn: conn} do
