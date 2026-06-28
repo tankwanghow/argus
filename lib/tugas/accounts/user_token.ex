@@ -11,6 +11,7 @@ defmodule Tugas.Accounts.UserToken do
   @magic_link_validity_in_minutes 15
   @change_email_validity_in_days 7
   @session_validity_in_days 14
+  @api_pairing_validity_in_minutes 5
 
   schema "users_tokens" do
     field :token, :binary
@@ -153,5 +154,65 @@ defmodule Tugas.Accounts.UserToken do
 
   defp by_token_and_context_query(token, context) do
     from UserToken, where: [token: ^token, context: ^context]
+  end
+
+  ## App API tokens (entity-scoped)
+
+  @doc "Builds a single-use, short-lived pairing code bound to one entity."
+  def build_api_pairing_token(user, entity) do
+    build_entity_hashed_token(user, "api_pairing", entity.id)
+  end
+
+  @doc "Builds a long-lived API token bound to one entity."
+  def build_api_token(user, entity) do
+    build_entity_hashed_token(user, "api", entity.id)
+  end
+
+  defp build_entity_hashed_token(user, context, entity_id) do
+    token = :crypto.strong_rand_bytes(@rand_size)
+    hashed_token = :crypto.hash(@hash_algorithm, token)
+
+    {Base.url_encode64(token, padding: false),
+     %UserToken{
+       token: hashed_token,
+       context: context,
+       user_id: user.id,
+       entity_id: entity_id
+     }}
+  end
+
+  @doc "Verify query for the 5-minute single-use pairing code. Selects `{user, token}`."
+  def verify_api_pairing_token_query(token) do
+    verify_entity_token_query(token, "api_pairing", @api_pairing_validity_in_minutes)
+  end
+
+  @doc "Verify query for the long-lived API token (no expiry). Selects `{user, token}`."
+  def verify_api_token_query(token) do
+    verify_entity_token_query(token, "api", nil)
+  end
+
+  defp verify_entity_token_query(token, context, validity_minutes) do
+    case Base.url_decode64(token, padding: false) do
+      {:ok, decoded_token} ->
+        hashed_token = :crypto.hash(@hash_algorithm, decoded_token)
+
+        query =
+          from token in by_token_and_context_query(hashed_token, context),
+            join: user in assoc(token, :user),
+            select: {user, token}
+
+        query =
+          if validity_minutes do
+            from [token, _user] in query,
+              where: token.inserted_at > ago(^validity_minutes, "minute")
+          else
+            query
+          end
+
+        {:ok, query}
+
+      :error ->
+        :error
+    end
   end
 end
