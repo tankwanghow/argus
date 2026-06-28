@@ -18,6 +18,7 @@ defmodule Tugas.Accounts.UserToken do
     field :sent_to, :string
     field :authenticated_at, :utc_datetime
     belongs_to :user, Tugas.Accounts.User
+    belongs_to :entity, Tugas.Entities.Entity
 
     timestamps(type: :utc_datetime, updated_at: false)
   end
