@@ -14,7 +14,7 @@ defmodule TugasWeb.MobileLive.Dashboard do
             <.brand_logo class="size-9" /> Calendar -
             <span class="text-base-content/50">{@current_scope.entity.slug}</span>
           </h1>
-          <div id="dashboard-scope-toggle" class="flex items-center justify-between gap-2">
+          <div id="dashboard-scope-toggle" class="flex items-center justify-between gap-1">
             <button
               id="dashboard-scope-mine"
               type="button"
@@ -41,7 +41,7 @@ defmodule TugasWeb.MobileLive.Dashboard do
             >
               ‹
             </button>
-            <span id="dashboard-month-label" class="text-xs text-center">
+            <span id="dashboard-month-label" class="font-semibold min-w-20 text-center">
               {Calendar.month_label(@year, @month)}
             </span>
             <button

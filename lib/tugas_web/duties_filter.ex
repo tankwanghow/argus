@@ -33,17 +33,12 @@ defmodule TugasWeb.DutiesFilter do
     filters = Store.get(user_id) |> Map.put(slug, entry)
     Store.put(user_id, filters)
 
-    Phoenix.LiveView.push_event(socket, "store-duties-filter", %{
-      entity_slug: slug,
-      mine: entry["mine"],
-      lifecycle: entry["lifecycle"],
-      query: entry["query"],
-      sort: entry["sort"]
-    })
+    Phoenix.LiveView.push_event(socket, "store-duties-filter", store_event_payload(slug, entry))
   end
 
   def merge_session(existing, slug, params) when is_binary(slug) do
-    Map.put(existing || %{}, slug, session_entry(params))
+    prior = get_in(existing, [slug]) || %{}
+    Map.put(existing || %{}, slug, Map.merge(prior, session_entry(params)))
   end
 
   def put_session(conn, slug, params) when is_binary(slug) do
@@ -79,12 +74,24 @@ defmodule TugasWeb.DutiesFilter do
   end
 
   defp current_entry(socket) do
-    session_entry(%{
+    params = %{
       "mine" => if(socket.assigns.mine?, do: "true", else: "false"),
       "lifecycle" => Atom.to_string(socket.assigns.lifecycle),
       "query" => socket.assigns.query,
       "sort" => Atom.to_string(socket.assigns.sort)
-    })
+    }
+
+    params =
+      if Map.has_key?(socket.assigns, :year) and Map.has_key?(socket.assigns, :month) do
+        Map.merge(params, %{
+          "year" => Integer.to_string(socket.assigns.year),
+          "month" => Integer.to_string(socket.assigns.month)
+        })
+      else
+        params
+      end
+
+    session_entry(params)
   end
 
   defp session_entry(params) do
@@ -94,6 +101,25 @@ defmodule TugasWeb.DutiesFilter do
       "query" => param_query(params["query"]),
       "sort" => param_sort(params["sort"])
     }
+    |> maybe_put_calendar_month(params)
+  end
+
+  defp store_event_payload(slug, entry) do
+    payload = %{
+      entity_slug: slug,
+      mine: entry["mine"],
+      lifecycle: entry["lifecycle"],
+      query: entry["query"],
+      sort: entry["sort"]
+    }
+
+    case {entry["year"], entry["month"]} do
+      {year, month} when is_binary(year) and is_binary(month) ->
+        Map.merge(payload, %{year: year, month: month})
+
+      _ ->
+        payload
+    end
   end
 
   defp merge_saved(%{"mine" => mine, "lifecycle" => lifecycle, "query" => query} = saved, scope) do
@@ -103,7 +129,9 @@ defmodule TugasWeb.DutiesFilter do
       mine?: parse_mine(mine, defaults.mine?),
       lifecycle: Index.parse_lifecycle(lifecycle),
       query: query || "",
-      sort: parse_sort(Map.get(saved, "sort"))
+      sort: parse_sort(Map.get(saved, "sort")),
+      year: parse_year(Map.get(saved, "year")),
+      month: parse_month(Map.get(saved, "month"))
     }
   end
 
@@ -114,7 +142,9 @@ defmodule TugasWeb.DutiesFilter do
       mine?: Index.default_mine?(scope),
       lifecycle: :live,
       query: "",
-      sort: :due_asc
+      sort: :due_asc,
+      year: nil,
+      month: nil
     }
   end
 
@@ -154,4 +184,39 @@ defmodule TugasWeb.DutiesFilter do
   defp parse_sort("urgency"), do: :urgency
   defp parse_sort("someday"), do: :someday
   defp parse_sort(_), do: :due_asc
+
+  defp maybe_put_calendar_month(entry, params) do
+    case {parse_year(params["year"]), parse_month(params["month"])} do
+      {year, month} when not is_nil(year) and not is_nil(month) ->
+        Map.merge(entry, %{
+          "year" => Integer.to_string(year),
+          "month" => Integer.to_string(month)
+        })
+
+      _ ->
+        entry
+    end
+  end
+
+  defp parse_year(year) when is_integer(year) and year >= 1970 and year <= 2100, do: year
+
+  defp parse_year(year) when is_binary(year) do
+    case Integer.parse(year) do
+      {parsed, ""} -> parse_year(parsed)
+      _ -> nil
+    end
+  end
+
+  defp parse_year(_), do: nil
+
+  defp parse_month(month) when is_integer(month) and month in 1..12, do: month
+
+  defp parse_month(month) when is_binary(month) do
+    case Integer.parse(month) do
+      {parsed, ""} -> parse_month(parsed)
+      _ -> nil
+    end
+  end
+
+  defp parse_month(_), do: nil
 end

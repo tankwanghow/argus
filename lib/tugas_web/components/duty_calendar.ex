@@ -33,26 +33,12 @@ defmodule TugasWeb.DutyCalendar do
     ~H"""
     <div id="duty-calendar" class={calendar_root_class(@mobile?)}>
       <div class={calendar_grid_wrapper_class(@mobile?)}>
-        <%= if @mobile? do %>
-          <div class="flex h-full min-h-0 flex-col gap-px rounded-lg overflow-hidden border border-base-300 bg-base-300">
-            <div class="grid shrink-0 grid-cols-7 gap-px">
-              <.weekday_headers mobile?={@mobile?} />
-            </div>
-            <div id="calendar-body-grid" class="flex min-h-0 flex-1 flex-col gap-px">
-              <.calendar_week_rows
-                grid={@grid}
-                grouped={@grouped}
-                slug={@slug}
-                variant={@variant}
-                mobile?={@mobile?}
-                max_chips={@max_chips}
-              />
-            </div>
-          </div>
-        <% else %>
-          <div class="grid h-full grid-cols-7 gap-px rounded-lg overflow-hidden border border-base-300 bg-base-300">
+        <div class="flex h-full min-h-0 flex-col gap-px rounded-lg overflow-hidden border border-base-300 bg-base-300">
+          <div class="grid shrink-0 grid-cols-7 gap-px">
             <.weekday_headers mobile?={@mobile?} />
-            <.calendar_day_cells
+          </div>
+          <div id="calendar-body-grid" class="flex min-h-0 flex-1 flex-col gap-px">
+            <.calendar_week_rows
               grid={@grid}
               grouped={@grouped}
               slug={@slug}
@@ -61,7 +47,7 @@ defmodule TugasWeb.DutyCalendar do
               max_chips={@max_chips}
             />
           </div>
-        <% end %>
+        </div>
       </div>
 
       <section
@@ -183,20 +169,6 @@ defmodule TugasWeb.DutyCalendar do
     """
   end
 
-  defp calendar_day_cells(assigns) do
-    ~H"""
-    <.calendar_day_cell
-      :for={cell <- @grid.weeks |> List.flatten()}
-      cell={cell}
-      grouped={@grouped}
-      slug={@slug}
-      variant={@variant}
-      mobile?={@mobile?}
-      max_chips={@max_chips}
-    />
-    """
-  end
-
   attr :cell, :map, required: true
   attr :grouped, :map, required: true
   attr :slug, :string, required: true
@@ -208,8 +180,10 @@ defmodule TugasWeb.DutyCalendar do
     ~H"""
     <div
       id={"calendar-day-#{@cell.date}"}
+      phx-click="open_day_modal"
+      phx-value-date={Date.to_iso8601(@cell.date)}
       class={[
-        "bg-base-100 p-1 space-y-0.5 min-w-0 overflow-hidden",
+        "bg-base-100 p-1 space-y-0.5 min-w-0 overflow-hidden cursor-pointer active:bg-base-200/80",
         cell_class(@mobile?),
         !@cell.in_month? && "bg-base-200/40 text-base-content/40",
         @cell.holidays != [] && @cell.in_month? && "bg-info/10",
@@ -249,19 +223,16 @@ defmodule TugasWeb.DutyCalendar do
       <% end %>
       <%= if length(Map.get(@grouped, @cell.date, [])) > @max_chips do %>
         <% extra = length(Map.get(@grouped, @cell.date, [])) - @max_chips %>
-        <button
-          type="button"
+        <span
           id={"calendar-day-more-#{@cell.date}"}
-          phx-click="open_day_modal"
-          phx-value-date={Date.to_iso8601(@cell.date)}
           class={[
-            "text-primary hover:underline px-0.5",
+            "px-0.5 text-base-content/60",
             @mobile? && "text-[10px]",
             !@mobile? && "text-xs"
           ]}
         >
           +{extra} more
-        </button>
+        </span>
       <% end %>
     </div>
     """
@@ -274,21 +245,28 @@ defmodule TugasWeb.DutyCalendar do
   attr :layout, :atom, default: :calendar
 
   defp duty_chip(assigns) do
-    assigns = assign(assigns, :show_type?, show_type_name?(assigns.variant, assigns.layout))
+    assigns =
+      assigns
+      |> assign(:show_type?, show_type_name?(assigns.variant, assigns.layout))
+      |> assign(:clickable?, chip_clickable?(assigns.variant, assigns.layout))
 
     ~H"""
-    <.link
-      id={"#{@id_prefix}-#{@row.duty.id}"}
-      navigate={duty_show_path(@variant, @slug, @row.duty.id)}
-      class={[
-        chip_text_class(@variant, @layout),
-        chip_surface_class(@variant, @layout),
-        chip_layout_class(@layout),
-        chip_tier_border(@variant, @layout, @row.tier)
-      ]}
-    >
-      <span class={chip_title_class(@variant, @layout)}>{@row.duty.title}</span>
-    </.link>
+    <%= if @clickable? do %>
+      <.link
+        id={"#{@id_prefix}-#{@row.duty.id}"}
+        navigate={duty_show_path(@variant, @slug, @row.duty.id)}
+        class={chip_class(@variant, @layout, @row.tier)}
+      >
+        <span class={chip_title_class(@variant, @layout)}>{@row.duty.title}</span>
+      </.link>
+    <% else %>
+      <span
+        id={"#{@id_prefix}-#{@row.duty.id}"}
+        class={chip_class(@variant, @layout, @row.tier)}
+      >
+        <span class={chip_title_class(@variant, @layout)}>{@row.duty.title}</span>
+      </span>
+    <% end %>
     """
   end
 
@@ -342,7 +320,10 @@ defmodule TugasWeb.DutyCalendar do
         <ul :if={@holidays != []} class="mt-2 space-y-1 text-sm text-info">
           <li :for={holiday <- @holidays}>{holiday.label}</li>
         </ul>
-        <ul class="mt-3 space-y-2 max-h-[70vh] overflow-y-auto">
+        <p :if={@rows == []} id="day-modal-empty" class="mt-3 text-sm text-base-content/60">
+          No duties on this day.
+        </p>
+        <ul :if={@rows != []} class="mt-3 space-y-2 max-h-[70vh] overflow-y-auto">
           <li :for={row <- @rows}>
             <.duty_chip
               row={row}
@@ -366,10 +347,9 @@ defmodule TugasWeb.DutyCalendar do
   defp calendar_root_class(false), do: "flex h-full min-h-0 flex-col gap-4"
 
   defp calendar_grid_wrapper_class(true), do: "min-h-0 flex-1"
-  defp calendar_grid_wrapper_class(false), do: "min-h-0 flex-1"
+  defp calendar_grid_wrapper_class(false), do: "min-h-[32rem] flex-1"
 
-  defp cell_class(true), do: "h-full min-h-0"
-  defp cell_class(false), do: "min-h-24"
+  defp cell_class(_mobile?), do: "h-full min-h-0"
 
   defp date_accent_class(cell) do
     if sunday_or_holiday?(cell), do: "text-error", else: nil
@@ -382,12 +362,33 @@ defmodule TugasWeb.DutyCalendar do
   defp someday_chips_class(true), do: "flex gap-1 overflow-x-auto flex-nowrap items-center"
   defp someday_chips_class(false), do: "flex flex-wrap gap-1 items-center"
 
+  defp chip_class(variant, layout, tier) do
+    [
+      chip_text_class(variant, layout),
+      chip_surface_class(variant, layout),
+      chip_layout_class(layout),
+      chip_tier_border(variant, layout, tier)
+    ]
+  end
+
+  defp chip_clickable?(_, :calendar), do: false
+  defp chip_clickable?(_, _), do: true
+
   defp chip_text_class(:mobile, :list), do: "block text-base leading-snug"
   defp chip_text_class(:mobile, _), do: "block text-[10px]"
   defp chip_text_class(_, _), do: "block text-xs"
 
   defp chip_surface_class(:mobile, :list),
-    do: "px-3 py-3 min-h-12 rounded-lg border border-base-300 bg-base-100 active:bg-base-200"
+    do: "tugas-duty-chip-hover px-3 py-3 min-h-12 rounded-lg border border-base-300 bg-base-100"
+
+  defp chip_surface_class(_, :calendar),
+    do: "px-1.5 py-0.5 rounded pointer-events-none"
+
+  defp chip_surface_class(_, :someday),
+    do: "tugas-duty-chip-hover px-1.5 py-0.5 rounded border border-base-300 bg-base-100"
+
+  defp chip_surface_class(_, :list),
+    do: "tugas-duty-chip-hover px-3 py-2 rounded-lg border border-base-300 bg-base-100"
 
   defp chip_surface_class(_, _), do: "px-1.5 py-0.5 rounded hover:bg-base-200"
 

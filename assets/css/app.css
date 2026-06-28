@@ -309,6 +309,18 @@
   background: color-mix(in oklch, var(--color-base-200) 50%, transparent);
 }
 
+.tugas-duty-chip-hover {
+  transition: background-color 0.15s ease;
+}
+
+.tugas-duty-chip-hover:hover {
+  background: color-mix(in oklch, var(--color-base-content) 10%, var(--color-base-100));
+}
+
+.tugas-duty-chip-hover:active {
+  background: color-mix(in oklch, var(--color-base-content) 15%, var(--color-base-100));
+}
+
 /* ─────────────────────────────  Landing page  ─────────────────────────────
    Self-contained "cycle ledger" aesthetic for the logged-out marketing page.
    Scoped under .tugas-landing so none of it leaks into the app UI, and it

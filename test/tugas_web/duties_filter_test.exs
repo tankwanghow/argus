@@ -169,5 +169,89 @@ defmodule TugasWeb.DutiesFilterTest do
 
       assert get_in(entry, ["acme", "lifecycle"]) == "live"
     end
+
+    test "stores calendar month per entity slug" do
+      assert DutiesFilter.merge_session(%{}, "acme", %{
+               "mine" => "false",
+               "lifecycle" => "live",
+               "query" => "",
+               "sort" => "due_asc",
+               "year" => "2026",
+               "month" => "5"
+             }) == %{
+               "acme" => %{
+                 "mine" => "false",
+                 "lifecycle" => "live",
+                 "query" => "",
+                 "sort" => "due_asc",
+                 "year" => "2026",
+                 "month" => "5"
+               }
+             }
+    end
+
+    test "merges partial updates without dropping a saved calendar month" do
+      existing = %{
+        "acme" => %{
+          "mine" => "false",
+          "lifecycle" => "live",
+          "query" => "",
+          "sort" => "due_asc",
+          "year" => "2026",
+          "month" => "5"
+        }
+      }
+
+      entry =
+        DutiesFilter.merge_session(existing, "acme", %{
+          "mine" => "true",
+          "lifecycle" => "completed",
+          "query" => "tax",
+          "sort" => "title"
+        })
+
+      assert get_in(entry, ["acme", "year"]) == "2026"
+      assert get_in(entry, ["acme", "month"]) == "5"
+      assert get_in(entry, ["acme", "mine"]) == "true"
+    end
+  end
+
+  describe "calendar month in load/2" do
+    test "restores a saved calendar month" do
+      session = %{
+        "duties_filters" => %{
+          "acme" => %{
+            "mine" => "false",
+            "lifecycle" => "live",
+            "query" => "",
+            "sort" => "due_asc",
+            "year" => "2026",
+            "month" => "5"
+          }
+        }
+      }
+
+      assert %{year: 2026, month: 5} = DutiesFilter.load(session, scope(:manager, "acme"))
+    end
+
+    test "defaults calendar month to nil when not saved" do
+      assert %{year: nil, month: nil} = DutiesFilter.load(%{}, scope(:manager, "acme"))
+    end
+
+    test "rejects invalid calendar month values" do
+      session = %{
+        "duties_filters" => %{
+          "acme" => %{
+            "mine" => "false",
+            "lifecycle" => "live",
+            "query" => "",
+            "year" => "bogus",
+            "month" => "99"
+          }
+        }
+      }
+
+      assert %{year: nil, month: nil} = DutiesFilter.load(session, scope(:manager, "acme"))
+    end
   end
 end

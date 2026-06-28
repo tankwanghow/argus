@@ -40,7 +40,7 @@ defmodule TugasWeb.DashboardLive.Index do
             >
               ‹
             </button>
-            <span id="dashboard-month-label" class="text-sm font-semibold min-w-32 text-center">
+            <span id="dashboard-month-label" class="text-2xl font-semibold min-w-32 text-center">
               {Calendar.month_label(@year, @month)}
             </span>
             <button

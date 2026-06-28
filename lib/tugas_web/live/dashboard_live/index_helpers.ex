@@ -18,22 +18,33 @@ defmodule TugasWeb.DashboardLive.IndexHelpers do
   def mount_dashboard(socket, session) do
     scope = socket.assigns.current_scope
     today = Urgency.today_for(scope.entity.timezone)
-    {year, month} = Calendar.current_month(today)
 
     socket =
       socket
       |> assign(:today, today)
-      |> assign(:year, year)
-      |> assign(:month, month)
       |> assign(:day_modal_date, nil)
       |> assign(:day_modal_rows, [])
       |> assign(:day_modal_holidays, [])
       |> assign(:someday_modal_open?, false)
       |> assign(:row_effects, %{})
       |> DutiesFilter.assign_filters(session)
+      |> assign_calendar_month(session)
       |> load_dashboard()
 
     {:ok, socket}
+  end
+
+  defp assign_calendar_month(socket, session) do
+    filters = DutiesFilter.load(session, socket.assigns.current_scope)
+    {default_year, default_month} = Calendar.current_month(socket.assigns.today)
+
+    {year, month} =
+      case {filters.year, filters.month} do
+        {y, m} when is_integer(y) and is_integer(m) -> {y, m}
+        _ -> {default_year, default_month}
+      end
+
+    assign(socket, year: year, month: month)
   end
 
   def handle_set_scope(socket, mine) do
@@ -49,6 +60,7 @@ defmodule TugasWeb.DashboardLive.IndexHelpers do
     socket
     |> assign(year: year, month: month)
     |> load_dashboard()
+    |> DutiesFilter.persist()
   end
 
   def handle_next_month(socket) do
@@ -57,6 +69,7 @@ defmodule TugasWeb.DashboardLive.IndexHelpers do
     socket
     |> assign(year: year, month: month)
     |> load_dashboard()
+    |> DutiesFilter.persist()
   end
 
   def handle_today(socket) do
@@ -66,6 +79,7 @@ defmodule TugasWeb.DashboardLive.IndexHelpers do
     socket
     |> assign(year: year, month: month)
     |> load_dashboard()
+    |> DutiesFilter.persist()
   end
 
   def handle_open_day_modal(socket, iso) do

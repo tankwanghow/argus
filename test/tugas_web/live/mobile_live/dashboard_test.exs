@@ -47,7 +47,7 @@ defmodule TugasWeb.MobileLive.DashboardTest do
     assert has_element?(view, "#calendar-day-#{due} #duty-chip-#{duty.id}", "Tax filing")
   end
 
-  test "duty chip links to mobile show", %{conn: conn} do
+  test "calendar duty chips are not links; day modal chips link to show", %{conn: conn} do
     manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     conn = mobile_conn(conn, manager)
     type = type_fixture(manager.entity)
@@ -63,10 +63,30 @@ defmodule TugasWeb.MobileLive.DashboardTest do
 
     {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}")
 
-    assert has_element?(
+    refute has_element?(
              view,
              "#duty-chip-#{duty.id}[href='/m/#{manager.entity.slug}/duties/#{duty.id}']"
            )
+
+    view |> element("#calendar-day-#{due}") |> render_click()
+
+    assert has_element?(
+             view,
+             "#day-modal-duty-chip-#{duty.id}[href='/m/#{manager.entity.slug}/duties/#{duty.id}']"
+           )
+  end
+
+  test "clicking a calendar day with no duties opens empty day modal", %{conn: conn} do
+    manager = Tugas.EntitiesFixtures.manager_scope_fixture()
+    conn = mobile_conn(conn, manager)
+    empty_day = ~D[2026-06-03]
+
+    {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}")
+
+    view |> element("#calendar-day-#{empty_day}") |> render_click()
+
+    assert has_element?(view, "#day-modal")
+    assert has_element?(view, "#day-modal-empty", "No duties on this day.")
   end
 
   test "someday duty appears in someday panel", %{conn: conn} do
@@ -128,7 +148,7 @@ defmodule TugasWeb.MobileLive.DashboardTest do
     refute to_complete_id in open_ids_after
   end
 
-  test "day overflow opens modal", %{conn: conn} do
+  test "clicking a calendar day opens modal with all duties", %{conn: conn} do
     manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     conn = mobile_conn(conn, manager)
     type = type_fixture(manager.entity)
@@ -148,8 +168,9 @@ defmodule TugasWeb.MobileLive.DashboardTest do
 
     assert has_element?(view, "#calendar-day-more-#{due}", "+1 more")
 
-    view |> element("#calendar-day-more-#{due}") |> render_click()
+    view |> element("#calendar-day-#{due}") |> render_click()
     assert has_element?(view, "#day-modal")
+    assert render(view) =~ "Four"
   end
 
   test "someday panel lists all duties without overflow chip", %{conn: conn} do
@@ -182,6 +203,24 @@ defmodule TugasWeb.MobileLive.DashboardTest do
                duty.title
              )
     end
+  end
+
+  test "calendar month persists when returning to the dashboard", %{conn: conn} do
+    manager = Tugas.EntitiesFixtures.manager_scope_fixture()
+    conn = mobile_conn(conn, manager)
+    today = Urgency.today_for(manager.entity.timezone)
+    {year, month} = CalendarHelpers.shift_month(today.year, today.month, -1)
+    label = CalendarHelpers.month_label(year, month)
+
+    {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}")
+
+    view |> element("#dashboard-prev-month") |> render_click()
+    assert has_element?(view, "#dashboard-month-label", label)
+
+    {:ok, _view, _html} = live(conn, ~p"/m/#{manager.entity.slug}/todos")
+    {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}")
+
+    assert has_element?(view, "#dashboard-month-label", label)
   end
 
   test "tab panels render someday, calendar, and todos views", %{conn: conn} do

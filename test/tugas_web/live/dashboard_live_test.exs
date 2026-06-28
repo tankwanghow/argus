@@ -7,6 +7,7 @@ defmodule TugasWeb.DashboardLiveTest do
   alias Tugas.Duties
   alias Tugas.Duties.Urgency
   alias Tugas.Todos
+  alias TugasWeb.DashboardLive.CalendarHelpers
 
   alias Tugas.Holidays.Store
 
@@ -88,6 +89,65 @@ defmodule TugasWeb.DashboardLiveTest do
     assert has_element?(view, "#calendar-day-#{due} #duty-chip-#{duty.id}", "Tax filing")
   end
 
+  test "calendar duty chips are not links; day modal chips link to show", %{conn: conn} do
+    manager = Tugas.EntitiesFixtures.manager_scope_fixture()
+    conn = log_in_user(conn, manager.user)
+    type = type_fixture(manager.entity)
+    due = ~D[2026-06-18]
+
+    {:ok, duty} =
+      Duties.create_duty(manager, %{
+        title: "Desktop link",
+        duty_type_id: type.id,
+        due_by: due,
+        open_note: "open"
+      })
+
+    {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}")
+
+    refute has_element?(
+             view,
+             "#duty-chip-#{duty.id}[href='/entities/#{manager.entity.slug}/duties/#{duty.id}']"
+           )
+
+    view |> element("#calendar-day-#{due}") |> render_click()
+
+    assert has_element?(
+             view,
+             "#day-modal-duty-chip-#{duty.id}[href='/entities/#{manager.entity.slug}/duties/#{duty.id}']"
+           )
+  end
+
+  test "clicking a calendar day with no duties opens empty day modal", %{conn: conn} do
+    manager = Tugas.EntitiesFixtures.manager_scope_fixture()
+    conn = log_in_user(conn, manager.user)
+    empty_day = ~D[2026-06-03]
+
+    {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}")
+
+    view |> element("#calendar-day-#{empty_day}") |> render_click()
+
+    assert has_element?(view, "#day-modal")
+    assert has_element?(view, "#day-modal-empty", "No duties on this day.")
+  end
+
+  test "calendar body grid uses equal-height rows for the month", %{conn: conn} do
+    manager = Tugas.EntitiesFixtures.manager_scope_fixture()
+    conn = log_in_user(conn, manager.user)
+
+    {:ok, view, html} = live(conn, ~p"/entities/#{manager.entity.slug}")
+
+    today = Urgency.today_for(manager.entity.timezone)
+    {year, month} = CalendarHelpers.current_month(today)
+    grid = CalendarHelpers.build_month_grid(year, month, today)
+    weeks = length(grid.weeks)
+
+    assert has_element?(view, "#calendar-body-grid")
+    assert has_element?(view, "#calendar-week-0")
+    assert has_element?(view, "#calendar-week-#{weeks - 1}")
+    refute html =~ "calendar-week-#{weeks}"
+  end
+
   test "overdue duty chip has error border class", %{conn: conn} do
     manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     conn = log_in_user(conn, manager.user)
@@ -149,6 +209,48 @@ defmodule TugasWeb.DashboardLiveTest do
 
     view |> element("#dashboard-scope-team") |> render_click()
     assert has_element?(view, "#duty-chip-#{duty.id}")
+  end
+
+  test "calendar month persists across remounts", %{conn: conn} do
+    manager = Tugas.EntitiesFixtures.manager_scope_fixture()
+    conn = log_in_user(conn, manager.user)
+    today = Urgency.today_for(manager.entity.timezone)
+    {year, month} = CalendarHelpers.shift_month(today.year, today.month, -1)
+    label = CalendarHelpers.month_label(year, month)
+
+    {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}")
+
+    view |> element("#dashboard-prev-month") |> render_click()
+    assert has_element?(view, "#dashboard-month-label", label)
+
+    {:ok, _view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}/todos")
+    {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}")
+
+    assert has_element?(view, "#dashboard-month-label", label)
+  end
+
+  test "restores calendar month from the session", %{conn: conn} do
+    manager = Tugas.EntitiesFixtures.manager_scope_fixture()
+    label = CalendarHelpers.month_label(2026, 5)
+
+    conn =
+      conn
+      |> log_in_user(manager.user)
+      |> init_test_session(%{})
+      |> Plug.Conn.put_session(:duties_filters, %{
+        manager.entity.slug => %{
+          "mine" => "false",
+          "lifecycle" => "live",
+          "query" => "",
+          "sort" => "due_asc",
+          "year" => "2026",
+          "month" => "5"
+        }
+      })
+
+    {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}")
+
+    assert has_element?(view, "#dashboard-month-label", label)
   end
 
   test "prev month navigation updates duties shown", %{conn: conn} do
@@ -309,7 +411,7 @@ defmodule TugasWeb.DashboardLiveTest do
 
     assert has_element?(view, "#calendar-day-more-#{due}", "+1 more")
 
-    view |> element("#calendar-day-more-#{due}") |> render_click()
+    view |> element("#calendar-day-#{due}") |> render_click()
     assert has_element?(view, "#day-modal")
     assert render(view) =~ "Four"
   end
