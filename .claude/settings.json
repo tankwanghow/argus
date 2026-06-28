@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -E \"DB_NAME|DB_USER|DOCKER_CONTAINER_NAME|IMAGE_NAME\" deploy.conf)",
+      "Bash(grep -n -A3 -B1 \"migrate\" deploy_to_linode/deploy.sh deploy_to_linode/deploy_at_server.sh)",
+      "Bash(chmod +x reset_db_at_server.sh)",
+      "Bash(bash -n reset_db_at_server.sh)"
+    ]
+  }
+}
