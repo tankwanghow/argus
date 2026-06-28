@@ -89,6 +89,16 @@ defmodule TugasWeb.Router do
       live "/m/:entity_slug/invite-session/:role", MobileLive.InviteSession, :show
     end
 
+    live_session :entity_connect_app,
+      on_mount: [
+        {TugasWeb.UserAuth, :require_authenticated},
+        {TugasWeb.UserAuth, :require_entity},
+        {TugasWeb.UserAuth, :require_sudo_mode},
+        {TugasWeb.Locale, :default}
+      ] do
+      live "/entities/:entity_slug/connect-app", ConnectAppLive.Show, :show
+    end
+
     post "/users/update-password", UserSessionController, :update_password
     post "/session/duties-filter", DutiesFilterController, :update
 

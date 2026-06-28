@@ -290,6 +290,14 @@ defmodule TugasWeb.Layouts do
             <.icon name="hero-clipboard-document-list-micro" class="size-4 text-base-content/50" />
             Todo team log
           </.link>
+          <.link
+            :if={entity_scope?(@current_scope)}
+            navigate={~p"/entities/#{@current_scope.entity.slug}/connect-app"}
+            class="flex items-center gap-2 px-3 py-2 text-sm hover:bg-base-200 rounded transition-colors"
+          >
+            <.icon name="hero-device-phone-mobile-micro" class="size-4 text-base-content/50" />
+            Connect app
+          </.link>
         </div>
 
         <div class="border-t border-base-200 py-1">
