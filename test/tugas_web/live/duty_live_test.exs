@@ -342,7 +342,7 @@ defmodule TugasWeb.DutyLiveTest do
     view |> element("#open-completion-slot-receipt") |> render_click()
 
     # Slot is now satisfied: file shown, select button gone.
-    duty = Duties.get_duty!(manager, duty.id)
+    duty = Duties.load_duty_show!(manager, duty.id)
     [open_event] = Enum.filter(duty.events, &(&1.status == "open"))
     document = hd(open_event.documents)
 
@@ -885,7 +885,7 @@ defmodule TugasWeb.DutyLiveTest do
     {:ok, view, _html} =
       live(conn, ~p"/entities/#{manager.entity.slug}/duties/#{duty.id}")
 
-    duty = Duties.get_duty!(manager, duty.id)
+    duty = Duties.load_duty_show!(manager, duty.id)
     [open_event] = Enum.filter(duty.events, &(&1.status == "open"))
     doc = hd(open_event.documents)
 

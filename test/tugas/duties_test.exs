@@ -1304,6 +1304,67 @@ defmodule Tugas.DutiesTest do
     end
   end
 
+  describe "list_calendar_duties/2" do
+    test "returns live duties in a due-date range without assignee preload" do
+      scope = manager_scope_fixture()
+      type = type_fixture(scope.entity)
+      member = member_fixture(scope.entity)
+
+      {:ok, in_month} =
+        Duties.create_duty(scope, %{
+          title: "In month",
+          duty_type_id: type.id,
+          primary_assignee_id: member.id,
+          due_by: ~D[2026-06-10],
+          open_note: "open"
+        })
+
+      {:ok, _out_of_month} =
+        Duties.create_duty(scope, %{
+          title: "Later",
+          duty_type_id: type.id,
+          due_by: ~D[2026-08-01],
+          open_note: "open"
+        })
+
+      duties =
+        Duties.list_calendar_duties(scope,
+          status: :live,
+          due_after: ~D[2026-06-01],
+          due_before: ~D[2026-06-30]
+        )
+
+      assert [only] = duties
+      assert only.id == in_month.id
+      assert only.duty_type.id == type.id
+      assert Ecto.assoc_loaded?(only.duty_type)
+      refute Ecto.assoc_loaded?(only.primary_assignee)
+    end
+  end
+
+  describe "load_duty_show!/2" do
+    test "attaches cycle documents to events in one query path" do
+      {scope, duty} = manager_duty_scope_fixture()
+      [event | _] = Duties.list_events(duty)
+
+      upload = %Plug.Upload{
+        path: Path.join(System.tmp_dir!(), "duty-show-doc.txt"),
+        filename: "proof.txt",
+        content_type: "text/plain"
+      }
+
+      File.write!(upload.path, "ok")
+
+      assert {:ok, doc} = Duties.add_document(scope, duty, event, upload, nil)
+
+      loaded = Duties.load_duty_show!(scope, duty.id)
+      event = Enum.find(loaded.events, &(&1.id == event.id))
+
+      assert [attached] = event.documents
+      assert attached.id == doc.id
+    end
+  end
+
   describe "series_neighbors/1" do
     test "returns nil neighbors for a standalone cycle" do
       {_scope, duty} = manager_duty_scope_fixture()

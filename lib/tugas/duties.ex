@@ -107,12 +107,48 @@ defmodule Tugas.Duties do
       :duty_type,
       :primary_assignee,
       [collaborators: :user],
-      [events: [:documents, :status_by]]
+      [events: :status_by]
     ])
     |> Repo.one!()
   end
 
   def get_duty!(_scope, _id), do: raise(Ecto.NoResultsError, queryable: Duty)
+
+  @doc """
+  Loads a duty for the show page: events (no nested document preload), cycle
+  documents in one query, events sorted chronologically.
+  """
+  def load_duty_show!(%Scope{} = scope, id) do
+    scope
+    |> get_duty!(id)
+    |> prepare_duty_show()
+  end
+
+  def prepare_duty_show(%Duty{} = duty) do
+    duty
+    |> attach_cycle_documents()
+    |> Map.update!(:events, fn events ->
+      Enum.sort_by(events, & &1.inserted_at, DateTime)
+    end)
+  end
+
+  @doc """
+  Attaches cycle documents to each event from a single `list_cycle_documents/1`
+  query instead of nested preloads on `get_duty!/2`.
+  """
+  def attach_cycle_documents(%Duty{} = duty) do
+    by_event =
+      duty
+      |> list_cycle_documents()
+      |> Enum.group_by(& &1.duty_event_id)
+
+    events =
+      Enum.map(duty.events, fn event ->
+        %{event | documents: Map.get(by_event, event.id, [])}
+      end)
+
+    %{duty | events: events}
+  end
 
   def change_duty(%Duty{} = duty, attrs \\ %{}) do
     Duty.changeset(duty, attrs)
@@ -183,6 +219,33 @@ defmodule Tugas.Duties do
   end
 
   def list_duties(_, _), do: :not_authorise
+
+  @doc """
+  Live duties for the dashboard calendar — SQL date bounds, assignee scope, and
+  only `duty_type` preloaded (no event summaries).
+  """
+  def list_calendar_duties(scope, opts \\ [])
+
+  def list_calendar_duties(%Scope{entity: %_{} = entity, user: %_{} = user}, opts) do
+    status = Keyword.get(opts, :status, :live)
+
+    unless status in @status_filters do
+      raise ArgumentError, "invalid status filter #{inspect(status)}"
+    end
+
+    Duty
+    |> where([o], o.entity_id == ^entity.id)
+    |> scope_to_assignee(status, user)
+    |> apply_status_filter(status)
+    |> apply_due_bound(:before, Keyword.get(opts, :due_before))
+    |> apply_due_bound(:after, Keyword.get(opts, :due_after))
+    |> apply_dateless_filter(Keyword.get(opts, :dateless))
+    |> apply_list_order(status)
+    |> preload([:duty_type])
+    |> Repo.all()
+  end
+
+  def list_calendar_duties(_, _), do: :not_authorise
 
   defp scope_to_assignee(query, status, user)
        when status in [:my_live, :my_completed, :my_skipped, :my_all] do
@@ -420,7 +483,7 @@ defmodule Tugas.Duties do
   def list_series(series_id) do
     Duty
     |> where([o], o.series_id == ^series_id)
-    |> series_order()
+    |> series_order(:asc)
     |> Repo.all()
   end
 
@@ -432,36 +495,83 @@ defmodule Tugas.Duties do
   with minimal `Duty` structs (`id`, `due_by` only).
   """
   def series_neighbors(%Duty{series_id: series_id, entity_id: entity_id} = duty) do
-    rows =
+    base =
       Duty
       |> where([o], o.series_id == ^series_id and o.entity_id == ^entity_id)
-      |> series_order()
-      |> select([o], %{id: o.id, due_by: o.due_by})
-      |> Repo.all()
 
-    case Enum.find_index(rows, &(&1.id == duty.id)) do
-      nil ->
-        %{previous: nil, next: nil}
-
-      idx ->
-        %{
-          previous: series_neighbor_at(rows, idx - 1),
-          next: series_neighbor_at(rows, idx + 1)
-        }
-    end
+    %{
+      previous: fetch_series_neighbor(base, duty, :previous),
+      next: fetch_series_neighbor(base, duty, :next)
+    }
   end
 
-  defp series_order(query),
+  defp fetch_series_neighbor(base, duty, :previous) do
+    base
+    |> series_before(duty)
+    |> series_order(:desc)
+    |> select([o], %{id: o.id, due_by: o.due_by})
+    |> limit(1)
+    |> Repo.one()
+    |> series_neighbor_struct()
+  end
+
+  defp fetch_series_neighbor(base, duty, :next) do
+    base
+    |> series_after(duty)
+    |> series_order(:asc)
+    |> select([o], %{id: o.id, due_by: o.due_by})
+    |> limit(1)
+    |> Repo.one()
+    |> series_neighbor_struct()
+  end
+
+  defp series_neighbor_struct(nil), do: nil
+  defp series_neighbor_struct(%{id: id, due_by: due_by}), do: %Duty{id: id, due_by: due_by}
+
+  defp series_before(query, %Duty{due_by: %Date{} = d, inserted_at: ins, id: id}) do
+    where(
+      query,
+      [o],
+      o.due_by < ^d or
+        (o.due_by == ^d and o.inserted_at < ^ins) or
+        (o.due_by == ^d and o.inserted_at == ^ins and o.id < ^id)
+    )
+  end
+
+  defp series_before(query, %Duty{inserted_at: ins, id: id}) do
+    where(
+      query,
+      [o],
+      is_nil(o.due_by) and
+        (o.inserted_at < ^ins or (o.inserted_at == ^ins and o.id < ^id))
+    )
+  end
+
+  defp series_after(query, %Duty{due_by: %Date{} = d, inserted_at: ins, id: id}) do
+    where(
+      query,
+      [o],
+      o.due_by > ^d or
+        (o.due_by == ^d and o.inserted_at > ^ins) or
+        (o.due_by == ^d and o.inserted_at == ^ins and o.id > ^id) or
+        is_nil(o.due_by)
+    )
+  end
+
+  defp series_after(query, %Duty{inserted_at: ins, id: id}) do
+    where(
+      query,
+      [o],
+      is_nil(o.due_by) and
+        (o.inserted_at > ^ins or (o.inserted_at == ^ins and o.id > ^id))
+    )
+  end
+
+  defp series_order(query, :asc),
     do: order_by(query, [o], asc_nulls_last: o.due_by, asc: o.inserted_at, asc: o.id)
 
-  defp series_neighbor_at(_rows, index) when index < 0, do: nil
-
-  defp series_neighbor_at(rows, index) do
-    case Enum.at(rows, index) do
-      nil -> nil
-      %{id: id, due_by: due_by} -> %Duty{id: id, due_by: due_by}
-    end
-  end
+  defp series_order(query, :desc),
+    do: order_by(query, [o], desc_nulls_first: o.due_by, desc: o.inserted_at, desc: o.id)
 
   def list_events(%Duty{} = duty) do
     Event

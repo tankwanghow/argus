@@ -82,7 +82,7 @@ defmodule TugasWeb.DashboardLive.CalendarHelpers do
     status = Index.status_atom(mine?, :live)
 
     duties =
-      case Duties.list_duties(scope,
+      case Duties.list_calendar_duties(scope,
              status: status,
              due_after: Date.add(month_start, -1),
              due_before: month_end
@@ -91,7 +91,7 @@ defmodule TugasWeb.DashboardLive.CalendarHelpers do
         list -> list
       end
 
-    Index.build_rows(duties, today)
+    Index.build_calendar_rows(duties, today)
     |> Enum.sort_by(fn %{duty: duty} -> {duty.due_by, String.downcase(duty.title)} end)
   end
 
@@ -99,12 +99,12 @@ defmodule TugasWeb.DashboardLive.CalendarHelpers do
     status = Index.status_atom(mine?, :live)
 
     duties =
-      case Duties.list_duties(scope, status: status, dateless: true) do
+      case Duties.list_calendar_duties(scope, status: status, dateless: true) do
         :not_authorise -> []
         list -> list
       end
 
-    Index.build_rows(duties, today)
+    Index.build_calendar_rows(duties, today)
     |> Enum.sort_by(fn %{duty: duty} -> String.downcase(duty.title) end)
   end
 

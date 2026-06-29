@@ -276,7 +276,7 @@ defmodule TugasWeb.DocumentControllerTest do
 
       assert json_response(conn, 200)["ok"] == true
 
-      duty = Duties.get_duty!(manager, duty.id)
+      duty = Duties.load_duty_show!(manager, duty.id)
       event = Enum.find(duty.events, &(&1.id == open_event.id))
 
       assert Enum.any?(event.documents, &(&1.file["original"] == "notes.pdf"))

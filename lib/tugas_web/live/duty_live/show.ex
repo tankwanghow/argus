@@ -656,10 +656,7 @@ defmodule TugasWeb.DutyLive.Show do
   def mount(%{"id" => id}, _session, socket) do
     scope = socket.assigns.current_scope
 
-    duty =
-      scope
-      |> Duties.get_duty!(id)
-      |> Map.update!(:events, fn events -> Enum.sort_by(events, & &1.inserted_at, DateTime) end)
+    duty = Duties.load_duty_show!(scope, id)
 
     today = Urgency.today_for(scope.entity.timezone)
 
@@ -690,7 +687,7 @@ defmodule TugasWeb.DutyLive.Show do
      |> assign(:cycle_status, Index.cycle_status(duty))
      |> assign(:live?, live?)
      |> assign(:member_options, member_options(scope))
-     |> assign_duty(duty)
+     |> assign_duty(duty, audit: true, series: true)
      |> assign_done_form(duty)
      |> assign_progress_form()
      |> assign_skip_form(duty)
@@ -781,7 +778,7 @@ defmodule TugasWeb.DutyLive.Show do
         case Duties.update_collaborators(scope, updated, collaborator_ids) do
           {:ok, _} ->
             {:noreply,
-             reload(socket)
+             reload(socket, audit: true, series: true)
              |> assign(:show_edit_modal, false)
              |> put_flash(:info, "Duty updated.")}
 
@@ -831,7 +828,7 @@ defmodule TugasWeb.DutyLive.Show do
         case Duties.edit_note(scope, event, %{note: note}) do
           {:ok, _} ->
             {:noreply,
-             reload(socket)
+             reload(socket, audit: true)
              |> assign(:editing_note_id, nil)
              |> assign(:note_form, nil)
              |> put_flash(:info, "Note updated.")}
@@ -1014,11 +1011,11 @@ defmodule TugasWeb.DutyLive.Show do
     supporting
   end
 
-  defp reload(socket) do
+  defp reload(socket, opts \\ []) do
     scope = socket.assigns.current_scope
-    duty = Duties.get_duty!(scope, socket.assigns.duty.id)
+    duty = Duties.load_duty_show!(scope, socket.assigns.duty.id)
 
-    socket = assign_duty(socket, duty)
+    socket = assign_duty(socket, duty, opts)
 
     case socket.assigns.step_files_modal_event_id do
       nil ->
@@ -1029,7 +1026,9 @@ defmodule TugasWeb.DutyLive.Show do
     end
   end
 
-  defp assign_duty(socket, duty) do
+  defp assign_duty(socket, duty, opts) do
+    refresh_audit? = Keyword.get(opts, :audit, false)
+    refresh_series? = Keyword.get(opts, :series, false)
     doc_slots = parse_slots(duty.complete_documents)
 
     {slot_rows, _voided} =
@@ -1037,7 +1036,20 @@ defmodule TugasWeb.DutyLive.Show do
 
     scope = socket.assigns.current_scope
 
-    %{previous: series_previous, next: series_next} = Duties.series_neighbors(duty)
+    {series_previous, series_next} =
+      if refresh_series? do
+        %{previous: previous, next: next} = Duties.series_neighbors(duty)
+        {previous, next}
+      else
+        {socket.assigns[:series_previous], socket.assigns[:series_next]}
+      end
+
+    audit_logs =
+      cond do
+        refresh_audit? -> Duties.list_audit_logs(duty)
+        is_list(socket.assigns[:audit_logs]) -> socket.assigns.audit_logs
+        true -> Duties.list_audit_logs(duty)
+      end
 
     socket
     |> assign(:duty, duty)
@@ -1047,7 +1059,7 @@ defmodule TugasWeb.DutyLive.Show do
     |> assign(:required_docs, slot_rows)
     |> assign(:docs_complete?, Enum.all?(slot_rows, fn {_slot, live} -> live end))
     |> assign(:void_reason_required?, Duties.document_void_reason_required?(duty))
-    |> assign(:audit_logs, Duties.list_audit_logs(duty))
+    |> assign(:audit_logs, audit_logs)
     |> assign(:can_add_document?, can_add_document?(scope, duty))
     |> assign(
       :correctable?,

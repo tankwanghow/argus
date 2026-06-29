@@ -7,6 +7,7 @@ defmodule TugasWeb.DutyLive.IndexHelpers do
   @lifecycles ~w(live completed skipped all)a
   @page_size 25
   @urgency_window_days 365
+  @urgency_rank_limit 500
   @urgency_rank %{overdue: 0, due_soon: 1, ok: 2}
 
   @doc "Lifecycle options for the status dropdown, as `{value, label}` pairs."
@@ -119,6 +120,7 @@ defmodule TugasWeb.DutyLive.IndexHelpers do
 
   # In-memory urgency ranking over the dated rows due within the window
   # (`due_before` excludes nulls, so dateless rows never enter the window).
+  # Capped at @urgency_rank_limit so "Most urgent" never loads an unbounded set.
   defp serve_window(scope, today, status, window_end, query, offset) do
     ranked =
       case Duties.list_duties_page(
@@ -127,7 +129,7 @@ defmodule TugasWeb.DutyLive.IndexHelpers do
              query: query,
              sort: :due_asc,
              due_before: window_end,
-             limit: :all
+             limit: @urgency_rank_limit
            ) do
         :not_authorise -> []
         page -> Map.fetch!(page, :rows)
@@ -200,6 +202,20 @@ defmodule TugasWeb.DutyLive.IndexHelpers do
         tier: Urgency.tier(duty.duty_type, duty.due_by, today),
         event_count: event_count,
         latest_event: latest_event
+      }
+    end)
+  end
+
+  @doc """
+  Dashboard calendar rows — urgency tier only; skips event summary queries.
+  """
+  def build_calendar_rows(duties, today) do
+    Enum.map(duties, fn duty ->
+      %{
+        duty: duty,
+        cycle_status: :live,
+        urgency: Urgency.classify(duty.duty_type, duty.due_by, today),
+        tier: Urgency.tier(duty.duty_type, duty.due_by, today)
       }
     end)
   end
