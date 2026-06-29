@@ -9,7 +9,12 @@ defmodule TugasWeb.MembershipLive.IndexHelpers do
   alias Tugas.Authorization
   alias Tugas.Entities
 
-  @roles [{"Admin", "admin"}, {"Manager", "manager"}, {"Member", "member"}]
+  @roles [
+    {"Admin", "admin"},
+    {"Manager", "manager"},
+    {"Coordinator", "coordinator"},
+    {"Member", "member"}
+  ]
 
   def roles, do: @roles
 

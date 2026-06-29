@@ -40,7 +40,9 @@ defmodule TugasWeb.DutySeriesNav do
         navigate={duty_show_path(@variant, @entity_slug, @next.id)}
         class={[series_link_class(@variant), "text-right"]}
       >
-        <span class="text-primary/70">next.</span><span class="font-semibold text-primary">{sibling_label(@next)}</span>
+        <span class="text-primary/70">next.</span><span class="font-semibold text-primary">{sibling_label(
+          @next
+        )}</span>
       </.link>
     </header>
     """

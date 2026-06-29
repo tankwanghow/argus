@@ -65,8 +65,8 @@ defmodule TugasWeb.DutyLiveTest do
     {:ok, member_view, _html} =
       live(member_conn, ~p"/entities/#{manager.entity.slug}/duties")
 
-    # member defaults to Mine + Live
-    assert has_element?(member_view, "#scope-mine.tab-active")
+    # all roles default to Team + Live
+    assert has_element?(member_view, "#scope-team.tab-active")
     assert has_element?(member_view, "#duty-row-#{live_duty.id}")
 
     member_view |> form("#duty-status-filter", %{lifecycle: "completed"}) |> render_change()

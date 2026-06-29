@@ -44,6 +44,48 @@ defmodule Tugas.AuthorizationTest do
     end
   end
 
+  describe "coordinator role" do
+    test "can create and edit duties" do
+      scope = coordinator_scope_fixture()
+      assert Authorization.can?(scope, :create_duty)
+      assert Authorization.can?(scope, :edit_duty)
+    end
+
+    test "cannot manage types, entity, or manager-only duty actions" do
+      scope = coordinator_scope_fixture()
+
+      refute Authorization.can?(scope, :manage_types)
+      refute Authorization.can?(scope, :manage_entity)
+      refute Authorization.can?(scope, :skip)
+      refute Authorization.can?(scope, :end_series)
+      refute Authorization.can?(scope, :void_document)
+      refute Authorization.can?(scope, :mark_completed_in_error)
+    end
+
+    test "can manage todos" do
+      scope = coordinator_scope_fixture()
+      assert Authorization.can?(scope, :create_todo)
+      assert Authorization.can?(scope, :view_todos)
+    end
+
+    test "work permissions match member — primary assignee marks done, any member on unassigned" do
+      scope = coordinator_scope_fixture()
+      other = user_fixture()
+
+      assigned = %Duty{primary_assignee_id: scope.user.id, collaborators: []}
+      unassigned = %Duty{primary_assignee_id: nil, collaborators: []}
+      others = %Duty{primary_assignee_id: other.id, collaborators: []}
+
+      assert Authorization.can?(scope, :mark_done, assigned)
+      refute Authorization.can?(scope, :mark_done, unassigned)
+      refute Authorization.can?(scope, :mark_done, others)
+
+      assert Authorization.can?(scope, :start_progress, unassigned)
+      assert Authorization.can?(scope, :start_progress, assigned)
+      refute Authorization.can?(scope, :start_progress, others)
+    end
+  end
+
   describe "can?/3" do
     test "collaborator cannot mark done" do
       {scope, duty} = collaborator_scope_fixture()
@@ -70,6 +112,17 @@ defmodule Tugas.AuthorizationTest do
       }
 
       refute Authorization.can?(scope, :start_progress, duty)
+    end
+
+    test "any member can start progress on unassigned duty" do
+      scope = member_scope_fixture()
+
+      duty = %Duty{
+        primary_assignee_id: nil,
+        collaborators: []
+      }
+
+      assert Authorization.can?(scope, :start_progress, duty)
     end
 
     test "member cannot mark done on unassigned duty" do

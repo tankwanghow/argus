@@ -220,7 +220,7 @@ defmodule TugasWeb.MobileLiveTest do
 
     {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}/duties")
 
-    # member defaults to Mine; switch the status dropdown to Completed
+    # member defaults to Team; switch the status dropdown to Completed
     view |> form("#m-duty-status-filter", %{lifecycle: "completed"}) |> render_change()
     assert has_element?(view, "#m-ob-#{completed.id}")
     refute has_element?(view, "#m-duties-empty")

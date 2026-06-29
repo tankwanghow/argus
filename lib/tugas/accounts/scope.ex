@@ -25,6 +25,7 @@ defmodule Tugas.Accounts.Scope do
 
   defp role_atom!("admin"), do: :admin
   defp role_atom!("manager"), do: :manager
+  defp role_atom!("coordinator"), do: :coordinator
   defp role_atom!("member"), do: :member
 
   @doc "True if the scope carries an accepted membership in an entity."

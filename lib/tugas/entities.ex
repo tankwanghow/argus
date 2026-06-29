@@ -173,8 +173,8 @@ defmodule Tugas.Entities do
   end
 
   @doc """
-  Opens a reusable, admin-supervised invite session for `role` ("manager" or
-  "member"). Auto-expires 30 minutes from now; close early with
+  Opens a reusable, admin-supervised invite session for `role` ("manager",
+  "coordinator", or "member"). Auto-expires 30 minutes from now; close early with
   `close_invite_session/2`.
   """
   def open_invite_session(%Scope{user: inviter, entity: entity} = scope, role) do
@@ -182,7 +182,7 @@ defmodule Tugas.Entities do
       not Authorization.can?(scope, :manage_entity) ->
         :not_authorise
 
-      role not in ["manager", "member"] ->
+      role not in ["manager", "coordinator", "member"] ->
         {:error, :invalid_role}
 
       true ->

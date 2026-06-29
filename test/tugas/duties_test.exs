@@ -8,7 +8,12 @@ defmodule Tugas.DutiesTest do
   alias Tugas.Accounts.Scope
 
   import Tugas.EntitiesFixtures,
-    only: [entity_scope_fixture: 0, manager_scope_fixture: 0, member_scope_fixture: 0]
+    only: [
+      coordinator_scope_fixture: 0,
+      entity_scope_fixture: 0,
+      manager_scope_fixture: 0,
+      member_scope_fixture: 0
+    ]
 
   import Tugas.DutiesFixtures
 
@@ -102,6 +107,23 @@ defmodule Tugas.DutiesTest do
       }
 
       assert :not_authorise = Duties.create_duty(scope, attrs)
+    end
+
+    test "coordinator can create a duty" do
+      scope = coordinator_scope_fixture()
+      type = type_fixture(scope.entity)
+      assignee = member_fixture(scope.entity)
+
+      attrs = %{
+        title: "Clerk filing",
+        duty_type_id: type.id,
+        primary_assignee_id: assignee.id,
+        due_by: ~D[2026-06-20],
+        open_note: "Requested by supervisor"
+      }
+
+      assert {:ok, duty} = Duties.create_duty(scope, attrs)
+      assert duty.title == "Clerk filing"
     end
 
     test "allows creating without a primary assignee" do
@@ -233,6 +255,27 @@ defmodule Tugas.DutiesTest do
         Duties.complete(scope, duty, %{note: "Done", next_due_by: ~D[2026-02-15]})
 
       assert {:error, :not_live} = Duties.start_progress(scope, done, %{note: "Too late"})
+    end
+
+    test "allows any member to update progress on an unassigned duty" do
+      manager = manager_scope_fixture()
+      member_scope = member_scope_on_entity(manager.entity)
+      type = type_fixture(manager.entity)
+
+      {:ok, duty} =
+        Duties.create_duty(manager, %{
+          title: "Unassigned filing",
+          duty_type_id: type.id,
+          primary_assignee_id: nil,
+          due_by: ~D[2026-06-20],
+          open_note: "Needs an owner"
+        })
+
+      assert {:ok, event} =
+               Duties.start_progress(member_scope, duty, %{note: "Picking this up"})
+
+      assert event.status == "in_progress"
+      assert event.note == "Picking this up"
     end
   end
 

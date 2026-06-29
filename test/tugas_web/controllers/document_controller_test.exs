@@ -218,11 +218,13 @@ defmodule TugasWeb.DocumentControllerTest do
     test "returns 403 when the member is not allowed to add documents", %{conn: conn} do
       manager = manager_scope_fixture()
       member = member_fixture(manager.entity)
+      assignee = member_fixture(manager.entity)
 
       {:ok, duty} =
         Duties.create_duty(manager, %{
           title: "EPF",
           duty_type_id: type_fixture(manager.entity).id,
+          primary_assignee_id: assignee.id,
           due_by: ~D[2026-06-30],
           open_note: "open"
         })

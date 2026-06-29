@@ -17,7 +17,7 @@ defmodule Tugas.Entities.Invitation do
     timestamps(updated_at: false)
   end
 
-  @roles ~w(admin manager member)
+  @roles ~w(admin manager coordinator member)
 
   @doc """
   Encodes a raw binary token into a URL-safe string for invite links.

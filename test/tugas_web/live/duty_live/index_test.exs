@@ -8,7 +8,7 @@ defmodule TugasWeb.DutyLive.IndexTest do
 
   setup :register_and_log_in_user
 
-  test "member defaults to the Mine scope", %{conn: conn} do
+  test "member defaults to the Team scope", %{conn: conn} do
     {scope, _duty} = assigned_member_scope_fixture()
 
     conn = log_in_user(conn, scope.user)
@@ -16,8 +16,8 @@ defmodule TugasWeb.DutyLive.IndexTest do
     {:ok, view, _html} =
       live(conn, ~p"/entities/#{scope.entity.slug}/duties")
 
-    assert has_element?(view, "#scope-mine.tab-active")
-    refute has_element?(view, "#scope-team.tab-active")
+    assert has_element?(view, "#scope-team.tab-active")
+    refute has_element?(view, "#scope-mine.tab-active")
   end
 
   test "manager defaults to the Team scope", %{conn: conn} do

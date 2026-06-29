@@ -205,7 +205,8 @@ defmodule TugasWeb.DashboardLiveTest do
 
     {:ok, view, _html} = live(conn, ~p"/entities/#{member.entity.slug}")
 
-    refute has_element?(view, "#duty-chip-#{duty.id}")
+    # all roles default to Team, so the unassigned duty is visible on load
+    assert has_element?(view, "#duty-chip-#{duty.id}")
 
     view |> element("#dashboard-scope-mine") |> render_click()
     refute has_element?(view, "#duty-chip-#{duty.id}")

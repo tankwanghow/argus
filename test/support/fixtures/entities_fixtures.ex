@@ -45,6 +45,23 @@ defmodule Tugas.EntitiesFixtures do
     Scope.put_entity(Scope.for_user(manager), admin_scope.entity, membership)
   end
 
+  def coordinator_scope_fixture(attrs \\ %{}) do
+    admin_scope = entity_scope_fixture(attrs)
+    coordinator = user_fixture()
+
+    %Tugas.Entities.Membership{
+      user_id: coordinator.id,
+      entity_id: admin_scope.entity.id,
+      role: "coordinator",
+      accepted_at: DateTime.utc_now(:second)
+    }
+    |> Tugas.Entities.Membership.changeset(%{})
+    |> Tugas.Repo.insert!()
+
+    membership = Entities.get_membership!(coordinator, admin_scope.entity)
+    Scope.put_entity(Scope.for_user(coordinator), admin_scope.entity, membership)
+  end
+
   def member_scope_fixture(attrs \\ %{}) do
     admin_scope = entity_scope_fixture(attrs)
     member = user_fixture()

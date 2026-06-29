@@ -447,6 +447,12 @@ defmodule Tugas.EntitiesTest do
       u = username_user_fixture()
       assert {:error, :closed} = Entities.accept_invitation(u, inv.token)
     end
+
+    test "admin can open a coordinator invite session" do
+      admin = Tugas.EntitiesFixtures.entity_scope_fixture()
+      assert {:ok, inv} = Entities.open_invite_session(admin, "coordinator")
+      assert inv.role == "coordinator"
+    end
   end
 
   defp add_admin(entity) do

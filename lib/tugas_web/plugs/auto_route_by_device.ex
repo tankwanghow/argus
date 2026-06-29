@@ -169,5 +169,5 @@ defmodule TugasWeb.Plugs.AutoRouteByDevice do
   defp duty_show?(tail), do: String.match?(tail, ~r{^/duties/[0-9a-f-]+$})
 
   defp invite_session?(tail),
-    do: String.match?(tail, ~r{^/invite-session/(manager|member)$})
+    do: String.match?(tail, ~r{^/invite-session/(manager|coordinator|member)$})
 end

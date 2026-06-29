@@ -29,8 +29,8 @@ defmodule TugasWeb.DutiesFilterTest do
                DutiesFilter.load(%{}, scope(:manager, "acme"))
     end
 
-    test "members default to Mine" do
-      assert %{mine?: true, lifecycle: :live, query: ""} =
+    test "members default to Team" do
+      assert %{mine?: false, lifecycle: :live, query: ""} =
                DutiesFilter.load(%{}, scope(:member, "acme"))
     end
 
@@ -101,7 +101,7 @@ defmodule TugasWeb.DutiesFilterTest do
         }
       }
 
-      assert %{mine?: true, lifecycle: :live, query: "find me"} =
+      assert %{mine?: false, lifecycle: :live, query: "find me"} =
                DutiesFilter.load(session, scope(:member, "acme"))
     end
 

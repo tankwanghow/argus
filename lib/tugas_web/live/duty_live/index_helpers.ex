@@ -1,7 +1,6 @@
 defmodule TugasWeb.DutyLive.IndexHelpers do
   @moduledoc false
 
-  alias Tugas.Accounts.Scope
   alias Tugas.Duties
   alias Tugas.Duties.{Duty, Urgency}
 
@@ -13,8 +12,7 @@ defmodule TugasWeb.DutyLive.IndexHelpers do
   @doc "Lifecycle options for the status dropdown, as `{value, label}` pairs."
   def lifecycles, do: Enum.map(@lifecycles, &{Atom.to_string(&1), lifecycle_label(&1)})
 
-  @doc "Whether the list defaults to the current user's own work."
-  def default_mine?(%Scope{role: :member}), do: true
+  @doc "Whether the list defaults to the current user's own work. All roles default to Team."
   def default_mine?(_scope), do: false
 
   def parse_lifecycle("completed"), do: :completed

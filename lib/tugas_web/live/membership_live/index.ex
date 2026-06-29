@@ -130,6 +130,12 @@ defmodule TugasWeb.MembershipLive.Index do
               <.icon name="hero-qr-code" class="size-4" /> Manager QR
             </.link>
             <.link
+              navigate={~p"/entities/#{@current_scope.entity.slug}/invite-session/coordinator"}
+              class="btn btn-outline btn-sm"
+            >
+              <.icon name="hero-qr-code" class="size-4" /> Coordinator QR
+            </.link>
+            <.link
               navigate={~p"/entities/#{@current_scope.entity.slug}/invite-session/member"}
               class="btn btn-outline btn-sm"
             >

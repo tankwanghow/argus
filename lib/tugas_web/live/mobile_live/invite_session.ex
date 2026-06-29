@@ -16,7 +16,7 @@ defmodule TugasWeb.MobileLive.InviteSession do
           <h1 class="font-semibold text-sm">Invite members</h1>
           <div class="flex gap-1">
             <.link
-              :for={r <- ~w[manager member]}
+              :for={r <- ~w[manager coordinator member]}
               navigate={~p"/m/#{@current_scope.entity.slug}/invite-session/#{r}"}
               class={[
                 "btn btn-xs capitalize",

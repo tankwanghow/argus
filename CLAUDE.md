@@ -117,22 +117,24 @@ assigns). Contexts take `scope`/`current_scope` as their first argument; authori
 |------|-----|
 | admin | everything |
 | manager | create/edit duties, manage types, mark Done on **any** duty, **skip** a cycle (close without completing; spawns successor when recurring), **end series**, **mark completed-in-error** (spawn replacement) |
-| member | view assigned work, add notes/docs while in progress, mark Done **only if primary assignee** |
+| coordinator | **create/edit duties** (the only two manager powers it shares — `@coordinator_duty_actions = [:create_duty, :edit_duty]`), plus everything a member can do. **Cannot** manage types, manage the entity, skip, end series, void documents, or mark-completed-in-error. Work permissions (mark Done / start progress) are **identical to member** — Done only if primary assignee. |
+| member | view assigned work, add notes/docs while in progress, mark Done **only if primary assignee**; **start progress on / add docs to any *unassigned* live duty** (`member_can_start_progress?` allows the assignee, a collaborator, **or** an unassigned cycle) |
 
 Collaborators (join table) can move an duty to `in_progress` and add notes/docs, but
 **cannot** mark Done. Only the **primary assignee** or a manager/admin marks Done.
 
-The role table above governs **duties**. **Todos are flat:** every role (member/manager/admin)
+The role table above governs **duties**. **Todos are flat:** every role (member/coordinator/manager/admin)
 can view, create, edit, complete/reopen, delete, and cancel todos (`@todo_actions` in
 `Tugas.Authorization`). The one gated todo action is **escalate-to-duty**, which requires
-`can?(scope, :create_duty)` (manager/admin) since it creates an duty.
+`can?(scope, :create_duty)` (coordinator/manager/admin) since it creates an duty.
 
 **Duties may be unassigned.** `primary_assignee_id` is **nullable** — an duty can be
 created without a primary assignee and assigned later (`Duties.list_unassigned/1` surfaces
 these; the title search matches the literal `"unassigned"`). An unassigned cycle has **no member
-who can mark it Done** — only a manager/admin can (or after a primary assignee is set). The
-`mark_done` / `start_progress` authorization checks guard `nil` before comparing
-`primary_assignee_id` to the user.
+who can mark it Done** — only a manager/admin can (or after a primary assignee is set) — but **any
+member/coordinator may *start progress* on (and add docs to) an unassigned live cycle** so unowned
+work can still be picked up. `mark_done` guards `nil` (a `nil` assignee never equals a user, so no
+member marks it Done); `start_progress` instead **treats `nil` as open to all** (`member_can_start_progress?`).
 
 **Every state transition requires a note.** Creating an duty (the `open_note`),
 `start_progress`, **skip**, and end-series all reject a blank note via
@@ -280,9 +282,8 @@ dashboard is where overdue/due-soon work surfaces, computed at render time:
   offered only on Live, can't leak to other lifecycles). The controls + search **persist per-entity**
   (`TugasWeb.DashboardFilter`: ETS store + session snapshot + `POST /session/dashboard-filter`, cleared
   on logout) and survive remounts. The **Skipped** lifecycle selects `closed_at IS NOT NULL` (covers
-  both skipped and series-ended cycles; their badges differentiate). Defaults are role-based via
-  `default_mine?/1` — members land on **Mine + Live**, managers/admins on **Team + Live**; sort
-  defaults to `Due soonest`.
+  both skipped and series-ended cycles; their badges differentiate). **All roles default to Team +
+  Live** (`default_mine?/1` returns `false` for every role); sort defaults to `Due soonest`.
 - **Someday = duties with no due date, surfaced by a sort (not a filter).** `due_by` is **nullable**;
   a duty created with the "No due date (Someday)" toggle (a virtual `:someday` changeset field that
   force-nils `due_by` and drops the `due_by` requirement) has `due_by IS NULL`. Dateless duties live

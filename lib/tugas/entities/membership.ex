@@ -17,7 +17,7 @@ defmodule Tugas.Entities.Membership do
     timestamps()
   end
 
-  @roles ~w(admin manager member)
+  @roles ~w(admin manager coordinator member)
 
   @doc """
   Composable query restricting to *active* memberships: accepted and not
