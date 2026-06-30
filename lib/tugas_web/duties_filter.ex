@@ -31,9 +31,10 @@ defmodule TugasWeb.DutiesFilter do
   def persist(socket) do
     %Scope{user: %{id: user_id}, entity: %{slug: slug}} = socket.assigns.current_scope
 
-    entry = current_entry(socket)
-    filters = Store.get(user_id) |> Map.put(slug, entry)
-    Store.put(user_id, filters)
+    store = Store.get(user_id)
+    prior = Map.get(store, slug, %{})
+    entry = Map.merge(prior, current_entry(socket))
+    Store.put(user_id, Map.put(store, slug, entry))
 
     Phoenix.LiveView.push_event(socket, "store-duties-filter", store_event_payload(slug, entry))
   end

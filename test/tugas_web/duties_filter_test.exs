@@ -216,6 +216,38 @@ defmodule TugasWeb.DutiesFilterTest do
     end
   end
 
+  describe "persist/1" do
+    defp socket(assigns) do
+      base = %{__changed__: %{}, current_scope: scope(:manager, "acme")}
+
+      %Phoenix.LiveView.Socket{
+        assigns: Map.merge(base, assigns),
+        private: %{live_temp: %{}}
+      }
+    end
+
+    test "a list-page persist (no year/month) keeps the saved calendar month" do
+      # Calendar saves a month...
+      socket(%{mine?: false, lifecycle: :live, query: "", sort: :due_asc, year: 2026, month: 5})
+      |> DutiesFilter.persist()
+
+      # ...then the duty list (which has no year/month assigns) persists a filter change.
+      socket(%{mine?: true, lifecycle: :completed, query: "tax", sort: :title})
+      |> DutiesFilter.persist()
+
+      assert %{
+               "acme" => %{
+                 "mine" => "true",
+                 "lifecycle" => "completed",
+                 "query" => "tax",
+                 "sort" => "title",
+                 "year" => "2026",
+                 "month" => "5"
+               }
+             } = Store.get(@user_id)
+    end
+  end
+
   describe "calendar month in load/2" do
     test "restores a saved calendar month" do
       session = %{
