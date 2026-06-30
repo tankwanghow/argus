@@ -4,6 +4,7 @@ defmodule TugasWeb.DutyLive.Index do
   alias Tugas.Authorization
   alias Tugas.Duties.Urgency
   alias TugasWeb.DutiesFilter
+  alias TugasWeb.DutyLive.FormComponent
   alias TugasWeb.DutyLive.IndexHelpers, as: Index
 
   @impl true
@@ -15,13 +16,15 @@ defmodule TugasWeb.DutyLive.Index do
           <.header>
             Duties
             <:actions>
-              <.link
+              <button
                 :if={Authorization.can?(@current_scope, :create_duty)}
-                navigate={~p"/entities/#{@current_scope.entity.slug}/duties/new"}
+                id="duty-new"
+                type="button"
+                phx-click="open_create_duty"
                 class="btn btn-primary btn-sm"
               >
                 + New duty
-              </.link>
+              </button>
             </:actions>
           </.header>
 
@@ -110,6 +113,14 @@ defmodule TugasWeb.DutyLive.Index do
             {Index.empty_message(@mine?, @lifecycle)}
           </div>
         </div>
+
+        <.live_component
+          :if={@create_duty_open?}
+          module={FormComponent}
+          id="duty-form-modal"
+          current_scope={@current_scope}
+          from_todo_id={@create_duty_from_todo_id}
+        />
       </div>
     </Layouts.app>
     """
@@ -169,6 +180,8 @@ defmodule TugasWeb.DutyLive.Index do
     {:ok,
      socket
      |> assign(:today, today)
+     |> assign(:create_duty_open?, false)
+     |> assign(:create_duty_from_todo_id, nil)
      |> DutiesFilter.assign_filters(session)
      |> load_first_page()}
   end
@@ -239,7 +252,29 @@ defmodule TugasWeb.DutyLive.Index do
      |> assign(cursor: cursor, end?: end?)}
   end
 
-  def handle_event("close_modal_on_escape", _params, socket), do: {:noreply, socket}
+  def handle_event("open_create_duty", _params, socket) do
+    {:noreply, assign(socket, :create_duty_open?, true)}
+  end
+
+  def handle_event("close_create_duty", _params, socket) do
+    {:noreply, assign(socket, :create_duty_open?, false)}
+  end
+
+  def handle_event("close_modal_on_escape", _params, socket) do
+    {:noreply, assign(socket, :create_duty_open?, false)}
+  end
+
+  @impl true
+  def handle_info({:duty_created, _duty, from_todo_id}, socket) do
+    {:noreply,
+     socket
+     |> assign(:create_duty_open?, false)
+     |> put_flash(:info, duty_created_message(from_todo_id))
+     |> load_first_page()}
+  end
+
+  defp duty_created_message(nil), do: "Duty created."
+  defp duty_created_message(_from_todo_id), do: "Duty created and todo escalated."
 
   defp load_first_page(socket) do
     %{

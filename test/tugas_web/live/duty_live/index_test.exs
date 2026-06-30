@@ -144,17 +144,43 @@ defmodule TugasWeb.DutyLive.IndexTest do
     refute has_element?(view, "#scope-team.tab-active")
   end
 
-  test "manager sees the New duty button", %{conn: conn} do
+  test "manager's New duty button opens the create-duty modal", %{conn: conn} do
     {scope, _duty} = manager_duty_scope_fixture()
     conn = log_in_user(conn, scope.user)
 
     {:ok, view, _html} = live(conn, ~p"/entities/#{scope.entity.slug}/duties")
 
-    assert has_element?(
-             view,
-             "a[href='/entities/#{scope.entity.slug}/duties/new']",
-             "New duty"
-           )
+    assert has_element?(view, "button#duty-new", "New duty")
+    refute has_element?(view, "#duty-form-modal")
+
+    view |> element("#duty-new") |> render_click()
+    assert has_element?(view, "#duty-form-modal")
+  end
+
+  test "creating a duty from the listing modal closes it and shows the new duty", %{conn: conn} do
+    {scope, _duty} = manager_duty_scope_fixture()
+    conn = log_in_user(conn, scope.user)
+    type = type_fixture(scope.entity)
+    today = Tugas.Duties.Urgency.today_for(scope.entity.timezone)
+
+    {:ok, view, _html} = live(conn, ~p"/entities/#{scope.entity.slug}/duties")
+
+    view |> element("#duty-new") |> render_click()
+
+    view
+    |> form("#duty-create-form",
+      duty: %{
+        title: "Listing modal duty",
+        duty_type_id: type.id,
+        due_by: Date.to_iso8601(Date.add(today, 5)),
+        open_note: "from listing"
+      }
+    )
+    |> render_submit()
+
+    refute has_element?(view, "#duty-form-modal")
+    assert render(view) =~ "Duty created."
+    assert render(view) =~ "Listing modal duty"
   end
 
   test "overdue duty renders with an overdue badge", %{conn: conn} do
