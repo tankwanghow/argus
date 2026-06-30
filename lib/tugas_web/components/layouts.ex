@@ -410,7 +410,7 @@ defmodule TugasWeb.Layouts do
   end
 
   @mobile_nav_sets %{
-    calendar: [:new_todo, :todos, :new_duty, :duties, :more],
+    calendar: [:dash_new_todo, :todos, :new_duty, :duties, :more],
     todos: [:new_todo, :duties, :calendar, :more],
     duties: [:new_duty, :todos, :calendar, :more],
     other: [:todos, :duties, :calendar, :more]
@@ -447,6 +447,22 @@ defmodule TugasWeb.Layouts do
   attr :tab, :atom, required: true
   attr :slug, :string, required: true
   attr :highlight, :atom, default: nil
+
+  # Calendar (dashboard) context: open the in-place new-todo modal on the dashboard
+  # instead of navigating away to the todos page.
+  defp mobile_nav_item(%{tab: :dash_new_todo} = assigns) do
+    ~H"""
+    <button
+      type="button"
+      id="m-nav-new-todo"
+      phx-click="open_new_todo"
+      class={mobile_nav_class(@tab, @highlight)}
+    >
+      <span class="text-base">✚</span>
+      <span class="text-xs leading-tight text-center">Todo</span>
+    </button>
+    """
+  end
 
   defp mobile_nav_item(%{tab: :more} = assigns) do
     ~H"""

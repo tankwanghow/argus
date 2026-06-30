@@ -18,12 +18,18 @@ defmodule TugasWeb.MobileLive.NavTest do
 
     {:ok, view, _html} = live(conn, ~p"/m/#{slug}")
 
-    assert has_element?(view, "#m-nav-new-todo[href='/m/#{slug}/todos/new']")
+    # ✚ Todo opens the in-place dashboard modal (stays on the page), not a link.
+    assert has_element?(view, "button#m-nav-new-todo[phx-click='open_new_todo']")
+    refute has_element?(view, "#m-nav-new-todo[href]")
     assert has_element?(view, "#m-nav-todos[href='/m/#{slug}/todos']")
     assert has_element?(view, "#m-nav-new-duty[href='/m/#{slug}/duties/new']")
     assert has_element?(view, "#m-nav-duties[href='/m/#{slug}/duties']")
     refute has_element?(view, "#m-nav-calendar")
     assert has_element?(view, "#m-nav-more")
+
+    # Clicking it opens the create-todo modal on the dashboard.
+    view |> element("#m-nav-new-todo") |> render_click()
+    assert has_element?(view, "#new-todo-modal")
   end
 
   test "todos context omits todos tab", %{conn: conn} do
