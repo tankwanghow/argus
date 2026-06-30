@@ -1,9 +1,10 @@
-// Mobile dashboard: tab strip switches Someday | Calendar | Todos panels.
+// Mobile dashboard: tab strip switches Someday | Urgent | Calendar | Todos panels.
 // Horizontal swipes change the calendar month (right = previous, left = next).
 export const DashboardSwipe = {
   mounted() {
     this.panelsEl = this.el.querySelector("#m-dashboard-panels")
-    this.panelIndex = 1
+    this.calendarIndex = Number(this.el.dataset.dashboardCalendar ?? 1)
+    this.panelIndex = this.calendarIndex
     this.touchStartX = null
     this.touchStartY = null
     this.swipeThreshold = 50
@@ -60,7 +61,7 @@ export const DashboardSwipe = {
 
     if (Math.abs(dx) < this.swipeThreshold) return
     if (Math.abs(dx) < Math.abs(dy)) return
-    if (this.panelIndex !== 1) return
+    if (this.panelIndex !== this.calendarIndex) return
 
     if (dx > 0) {
       this.pushEvent("prev_month", {})

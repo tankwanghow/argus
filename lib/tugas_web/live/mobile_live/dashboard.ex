@@ -62,6 +62,7 @@ defmodule TugasWeb.MobileLive.Dashboard do
         <div
           id="m-dashboard"
           phx-hook="DashboardSwipe"
+          data-dashboard-calendar="2"
           class="flex min-h-0 flex-1 flex-col px-1 py-1 gap-1"
         >
           <div id="m-dashboard-swipe-hint" class="tabs tabs-box w-full shrink-0">
@@ -75,8 +76,16 @@ defmodule TugasWeb.MobileLive.Dashboard do
             </button>
             <button
               type="button"
-              id="m-dashboard-go-calendar"
+              id="m-dashboard-go-urgent"
               data-dashboard-go="1"
+              class="tab flex-1 min-h-8 text-sm"
+            >
+              urgent
+            </button>
+            <button
+              type="button"
+              id="m-dashboard-go-calendar"
+              data-dashboard-go="2"
               class="tab flex-1 min-h-8 text-sm tab-active font-bold"
             >
               calendar
@@ -84,7 +93,7 @@ defmodule TugasWeb.MobileLive.Dashboard do
             <button
               type="button"
               id="m-dashboard-go-todos"
-              data-dashboard-go="2"
+              data-dashboard-go="3"
               class="tab flex-1 min-h-8 text-sm"
             >
               todo
@@ -105,6 +114,17 @@ defmodule TugasWeb.MobileLive.Dashboard do
 
             <div
               data-dashboard-panel="1"
+              class="hidden min-h-0 flex-1 overflow-y-auto pr-2"
+            >
+              <.urgent_panel
+                rows={@urgent_rows}
+                slug={@current_scope.entity.slug}
+                variant={:mobile}
+              />
+            </div>
+
+            <div
+              data-dashboard-panel="2"
               class="flex min-h-0 flex-1 flex-col overflow-hidden px-1"
             >
               <.duty_calendar
@@ -122,7 +142,7 @@ defmodule TugasWeb.MobileLive.Dashboard do
             </div>
 
             <div
-              data-dashboard-panel="2"
+              data-dashboard-panel="3"
               class="hidden min-h-0 flex-1 overflow-y-auto pl-2"
             >
               <.dashboard_todos_panel

@@ -245,6 +245,29 @@ defmodule TugasWeb.MobileLive.DashboardTest do
     assert has_element?(view, "#m-dashboard-go-calendar.tab-active")
   end
 
+  test "urgent tab and panel render left of the calendar", %{conn: conn} do
+    manager = Tugas.EntitiesFixtures.manager_scope_fixture()
+    conn = mobile_conn(conn, manager)
+    type = type_fixture(manager.entity, reminder_offsets: "7")
+    today = Urgency.today_for(manager.entity.timezone)
+
+    {:ok, urgent} =
+      Duties.create_duty(manager, %{
+        title: "Overdue task",
+        duty_type_id: type.id,
+        due_by: Date.add(today, -1),
+        open_note: "open"
+      })
+
+    {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}")
+
+    assert has_element?(view, "#m-dashboard-go-urgent", "urgent")
+    assert has_element?(view, "[data-dashboard-go='1']", "urgent")
+    assert has_element?(view, "[data-dashboard-go='2']", "calendar")
+    assert has_element?(view, "[data-dashboard-panel='1'] #m-dashboard-urgent")
+    assert has_element?(view, "#m-dashboard-urgent #urgent-panel-duty-chip-#{urgent.id}")
+  end
+
   test "calendar body grid uses equal-height rows for the month", %{conn: conn} do
     manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     conn = mobile_conn(conn, manager)
