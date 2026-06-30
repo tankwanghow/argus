@@ -59,7 +59,10 @@ defmodule TugasWeb.DashboardLiveTest do
   test "sunday dates render in red on the calendar", %{conn: conn} do
     manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     conn = log_in_user(conn, manager.user)
-    sunday = ~D[2026-06-07]
+    today = Urgency.today_for(manager.entity.timezone)
+    {year, month} = CalendarHelpers.current_month(today)
+    first = Date.new!(year, month, 1)
+    sunday = Date.add(first, rem(8 - Date.day_of_week(first, :sunday), 7))
 
     {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}")
 
@@ -74,7 +77,9 @@ defmodule TugasWeb.DashboardLiveTest do
     manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     conn = log_in_user(conn, manager.user)
     type = type_fixture(manager.entity)
-    due = ~D[2026-06-18]
+    today = Urgency.today_for(manager.entity.timezone)
+    {year, month} = CalendarHelpers.current_month(today)
+    due = Date.new!(year, month, 15)
 
     {:ok, duty} =
       Duties.create_duty(manager, %{
@@ -93,7 +98,9 @@ defmodule TugasWeb.DashboardLiveTest do
     manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     conn = log_in_user(conn, manager.user)
     type = type_fixture(manager.entity)
-    due = ~D[2026-06-18]
+    today = Urgency.today_for(manager.entity.timezone)
+    {year, month} = CalendarHelpers.current_month(today)
+    due = Date.new!(year, month, 15)
 
     {:ok, duty} =
       Duties.create_duty(manager, %{
@@ -124,7 +131,9 @@ defmodule TugasWeb.DashboardLiveTest do
   test "clicking a calendar day with no duties opens empty day modal", %{conn: conn} do
     manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     conn = log_in_user(conn, manager.user)
-    empty_day = ~D[2026-06-03]
+    today = Urgency.today_for(manager.entity.timezone)
+    {year, month} = CalendarHelpers.current_month(today)
+    empty_day = Date.new!(year, month, 3)
 
     {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}")
 
@@ -156,7 +165,8 @@ defmodule TugasWeb.DashboardLiveTest do
     conn = log_in_user(conn, manager.user)
     type = type_fixture(manager.entity, reminder_offsets: "7,1")
     today = Urgency.today_for(manager.entity.timezone)
-    due = Date.add(today, -3)
+    {year, month} = CalendarHelpers.shift_month(today.year, today.month, -1)
+    due = Date.new!(year, month, 15)
 
     {:ok, duty} =
       Duties.create_duty(manager, %{
@@ -167,6 +177,8 @@ defmodule TugasWeb.DashboardLiveTest do
       })
 
     {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}")
+
+    view |> element("#dashboard-prev-month") |> render_click()
 
     assert has_element?(view, "#duty-chip-#{duty.id}.border-error")
   end
@@ -194,12 +206,14 @@ defmodule TugasWeb.DashboardLiveTest do
     member = member_scope_on_entity(manager.entity)
     conn = log_in_user(conn, member.user)
     type = type_fixture(manager.entity)
+    today = Urgency.today_for(manager.entity.timezone)
+    {year, month} = CalendarHelpers.current_month(today)
 
     {:ok, duty} =
       Duties.create_duty(manager, %{
         title: "Team only duty",
         duty_type_id: type.id,
-        due_by: ~D[2026-06-20],
+        due_by: Date.new!(year, month, 15),
         open_note: "open"
       })
 
@@ -260,12 +274,13 @@ defmodule TugasWeb.DashboardLiveTest do
     conn = log_in_user(conn, manager.user)
     type = type_fixture(manager.entity)
     today = Urgency.today_for(manager.entity.timezone)
+    {year, month} = CalendarHelpers.shift_month(today.year, today.month, -1)
 
     {:ok, duty} =
       Duties.create_duty(manager, %{
         title: "Last month duty",
         duty_type_id: type.id,
-        due_by: Date.add(today, -40),
+        due_by: Date.new!(year, month, 15),
         open_note: "open"
       })
 
@@ -578,7 +593,9 @@ defmodule TugasWeb.DashboardLiveTest do
     manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     conn = log_in_user(conn, manager.user)
     type = type_fixture(manager.entity)
-    due = ~D[2026-06-22]
+    today = Urgency.today_for(manager.entity.timezone)
+    {year, month} = CalendarHelpers.current_month(today)
+    due = Date.new!(year, month, 22)
 
     for title <- ["One", "Two", "Three", "Four"] do
       {:ok, _duty} =

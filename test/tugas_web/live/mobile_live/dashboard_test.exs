@@ -32,7 +32,8 @@ defmodule TugasWeb.MobileLive.DashboardTest do
     manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     conn = mobile_conn(conn, manager)
     type = type_fixture(manager.entity)
-    due = ~D[2026-06-18]
+    today = Urgency.today_for(manager.entity.timezone)
+    due = %{today | day: 18}
 
     {:ok, duty} =
       Duties.create_duty(manager, %{
@@ -51,7 +52,8 @@ defmodule TugasWeb.MobileLive.DashboardTest do
     manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     conn = mobile_conn(conn, manager)
     type = type_fixture(manager.entity)
-    due = ~D[2026-06-18]
+    today = Urgency.today_for(manager.entity.timezone)
+    due = %{today | day: 18}
 
     {:ok, duty} =
       Duties.create_duty(manager, %{
@@ -82,7 +84,8 @@ defmodule TugasWeb.MobileLive.DashboardTest do
   test "clicking a calendar day with no duties opens empty day modal", %{conn: conn} do
     manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     conn = mobile_conn(conn, manager)
-    empty_day = ~D[2026-06-03]
+    today = Urgency.today_for(manager.entity.timezone)
+    empty_day = %{today | day: 3}
 
     {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}")
 
@@ -157,7 +160,8 @@ defmodule TugasWeb.MobileLive.DashboardTest do
     manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     conn = mobile_conn(conn, manager)
     type = type_fixture(manager.entity)
-    due = ~D[2026-06-22]
+    today = Urgency.today_for(manager.entity.timezone)
+    due = %{today | day: 22}
 
     for title <- ["One", "Two", "Three", "Four"] do
       {:ok, _duty} =
