@@ -310,6 +310,12 @@ dashboard is where overdue/due-soon work surfaces, computed at render time:
   **Recurrence requires a date:** `complete`/`skip` only require `next_due_by` / spawn a successor
   when the cycle had a `due_by` (`should_spawn_next?`/`validate_next_due` guard `not is_nil(due_by)`);
   a dateless duty completes as a one-off even for a recurring type, and recurrence resumes if dated.
+- **Most Urgent listing.** A focused column **left of the calendar** (desktop 3-col grid
+  `[Urgent 15% | Calendar 1fr | Todos 15%]`; mobile a `someday | urgent | calendar | todo`
+  swipe deck) lists live duties flagged for attention — `urgency in [:overdue, :due_soon]`,
+  ranked overdue→due_soon then by `due_by`, via `CalendarHelpers.load_urgent_rows/3` (reuses
+  `build_calendar_rows` + `Urgency.classify`, 1-year horizon, excludes dateless). Desktop caps
+  at 10 chips with a `+N more` → `urgent-modal`; mobile scrolls. The Someday strip is unchanged.
 - **The list is server-paginated, never a full load.** `Duties.list_duties_page/2`
   filters (SQL `ILIKE` on title / joined type name / joined assignee email + the literal
   `"unassigned"`), sorts, and pages by **keyset cursor** (sort column + `id`, opaque
