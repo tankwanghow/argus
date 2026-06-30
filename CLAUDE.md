@@ -333,6 +333,11 @@ dashboard is where overdue/due-soon work surfaces, computed at render time:
   (`toggle_panel` event, `phx-value-panel` = `urgent|todos|someday`); collapse state is a `@collapsed`
   map **persisted per-browser** in the filter store (alongside the filters/month), so it survives
   navigation and reload.
+- **The calendar dashboard is Team-only — no Mine/Team toggle.** Both dashboards always load Team
+  data (`load_dashboard/1` hardcodes `mine? = false`); Mine/Team scoping lives only on the duties
+  **listing** (`DutyLive.Index` / `MobileLive.DutyIndex`). `@mine?` is still loaded into dashboard
+  assigns purely so `DutiesFilter.persist/1` round-trips the listing's saved Mine/Team value
+  unchanged (the dashboard and listing share one per-browser store entry).
 - **The list is server-paginated, never a full load.** `Duties.list_duties_page/2`
   filters (SQL `ILIKE` on title / joined type name / joined assignee email + the literal
   `"unassigned"`), sorts, and pages by **keyset cursor** (sort column + `id`, opaque

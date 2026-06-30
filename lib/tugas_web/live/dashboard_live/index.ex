@@ -10,27 +10,6 @@ defmodule TugasWeb.DashboardLive.Index do
     <Layouts.app flash={@flash} current_scope={@current_scope} container_class="max-w-7xl">
       <div id="dashboard" class="tugas-page space-y-4">
         <div class="flex flex-wrap items-center gap-2">
-          <div id="dashboard-scope-toggle" class="tabs tabs-box">
-            <button
-              id="dashboard-scope-mine"
-              type="button"
-              phx-click="set_scope"
-              phx-value-mine="true"
-              class={["tab", @mine? && "tab-active font-bold"]}
-            >
-              Mine
-            </button>
-            <button
-              id="dashboard-scope-team"
-              type="button"
-              phx-click="set_scope"
-              phx-value-mine="false"
-              class={["tab", !@mine? && "tab-active font-bold"]}
-            >
-              Team
-            </button>
-          </div>
-
           <div class="flex items-center gap-1">
             <button
               id="dashboard-prev-month"
@@ -99,10 +78,6 @@ defmodule TugasWeb.DashboardLive.Index do
   def mount(_params, session, socket), do: Dashboard.mount_dashboard(socket, session)
 
   @impl true
-  def handle_event("set_scope", %{"mine" => mine}, socket) do
-    {:noreply, Dashboard.handle_set_scope(socket, mine)}
-  end
-
   def handle_event("prev_month", _params, socket) do
     {:noreply, Dashboard.handle_prev_month(socket)}
   end

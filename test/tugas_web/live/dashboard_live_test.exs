@@ -189,7 +189,7 @@ defmodule TugasWeb.DashboardLiveTest do
     assert has_element?(view, "#someday-strip #duty-chip-#{duty.id}")
   end
 
-  test "mine scope hides other members' unassigned duties", %{conn: conn} do
+  test "dashboard always shows Team data (no Mine/Team toggle)", %{conn: conn} do
     manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     member = member_scope_on_entity(manager.entity)
     conn = log_in_user(conn, member.user)
@@ -205,14 +205,10 @@ defmodule TugasWeb.DashboardLiveTest do
 
     {:ok, view, _html} = live(conn, ~p"/entities/#{member.entity.slug}")
 
-    # all roles default to Team, so the unassigned duty is visible on load
+    # Another member's unassigned duty is visible because the dashboard is Team-only.
     assert has_element?(view, "#duty-chip-#{duty.id}")
-
-    view |> element("#dashboard-scope-mine") |> render_click()
-    refute has_element?(view, "#duty-chip-#{duty.id}")
-
-    view |> element("#dashboard-scope-team") |> render_click()
-    assert has_element?(view, "#duty-chip-#{duty.id}")
+    refute has_element?(view, "#dashboard-scope-mine")
+    refute has_element?(view, "#dashboard-scope-team")
   end
 
   test "calendar month persists across remounts", %{conn: conn} do

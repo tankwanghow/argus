@@ -47,13 +47,6 @@ defmodule TugasWeb.DashboardLive.IndexHelpers do
     assign(socket, year: year, month: month)
   end
 
-  def handle_set_scope(socket, mine) do
-    socket
-    |> assign(:mine?, mine == "true")
-    |> load_dashboard()
-    |> DutiesFilter.persist()
-  end
-
   def handle_prev_month(socket) do
     {year, month} = Calendar.shift_month(socket.assigns.year, socket.assigns.month, -1)
 
@@ -155,8 +148,12 @@ defmodule TugasWeb.DashboardLive.IndexHelpers do
   end
 
   defp load_dashboard(socket) do
-    %{current_scope: scope, today: today, mine?: mine?, year: year, month: month} =
-      socket.assigns
+    %{current_scope: scope, today: today, year: year, month: month} = socket.assigns
+
+    # The dashboard always shows Team data — Mine/Team scoping lives on the duties
+    # listing, not here. (@mine? stays in assigns so the shared per-browser filter
+    # store round-trips the listing's preference unchanged.)
+    mine? = false
 
     month_rows = Calendar.load_month_rows(scope, today, mine?, year, month)
     someday_rows = Calendar.load_someday_rows(scope, today, mine?)

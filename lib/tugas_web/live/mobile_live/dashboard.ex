@@ -10,25 +10,7 @@ defmodule TugasWeb.MobileLive.Dashboard do
     <Layouts.mobile_app flash={@flash} current_scope={@current_scope} nav_context={:calendar}>
       <div class="flex h-[calc(100dvh-3.5rem-env(safe-area-inset-bottom,0px))] min-h-0 flex-col">
         <div class="sticky top-0 z-30 shrink-0 px-4 pt-3 bg-base-100/95 backdrop-blur space-y-1">
-          <div id="dashboard-scope-toggle" class="flex items-center justify-between gap-1">
-            <button
-              id="dashboard-scope-mine"
-              type="button"
-              phx-click="set_scope"
-              phx-value-mine="true"
-              class={["border border-base-300 rounded-lg px-2 py-1", @mine? && "border-2 font-bold"]}
-            >
-              Mine
-            </button>
-            <button
-              id="dashboard-scope-team"
-              type="button"
-              phx-click="set_scope"
-              phx-value-mine="false"
-              class={["border border-base-300 rounded-lg px-2 py-1", !@mine? && "border-2 font-bold"]}
-            >
-              Team
-            </button>
+          <div id="dashboard-toolbar" class="flex items-center justify-between gap-1">
             <button
               id="dashboard-prev-month"
               type="button"
@@ -163,10 +145,6 @@ defmodule TugasWeb.MobileLive.Dashboard do
   def mount(_params, session, socket), do: Dashboard.mount_dashboard(socket, session)
 
   @impl true
-  def handle_event("set_scope", %{"mine" => mine}, socket) do
-    {:noreply, Dashboard.handle_set_scope(socket, mine)}
-  end
-
   def handle_event("prev_month", _params, socket) do
     {:noreply, Dashboard.handle_prev_month(socket)}
   end
