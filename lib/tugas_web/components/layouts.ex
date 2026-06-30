@@ -412,7 +412,7 @@ defmodule TugasWeb.Layouts do
   @mobile_nav_sets %{
     calendar: [:dash_new_todo, :todos, :new_duty, :duties, :more],
     todos: [:new_todo, :duties, :calendar, :more],
-    duties: [:new_duty, :todos, :calendar, :more],
+    duties: [:idx_new_duty, :todos, :calendar, :more],
     other: [:todos, :duties, :calendar, :more]
   }
 
@@ -460,6 +460,20 @@ defmodule TugasWeb.Layouts do
     >
       <span class="text-base">✚</span>
       <span class="text-xs leading-tight text-center">Todo</span>
+    </button>
+    """
+  end
+
+  defp mobile_nav_item(%{tab: :idx_new_duty} = assigns) do
+    ~H"""
+    <button
+      type="button"
+      id="m-nav-new-duty"
+      phx-click="open_create_duty"
+      class={mobile_nav_class(@tab, @highlight)}
+    >
+      <span class="text-base">✚</span>
+      <span class="text-xs leading-tight text-center">Duty</span>
     </button>
     """
   end

@@ -53,9 +53,15 @@ defmodule TugasWeb.MobileLive.NavTest do
     {:ok, view, _html} = live(conn, ~p"/m/#{slug}/duties")
 
     refute has_element?(view, "#m-nav-duties")
-    assert has_element?(view, "#m-nav-new-duty[href='/m/#{slug}/duties/new']")
+    # ✚ Duty opens the in-place create modal (stays on the duties index), not a link.
+    assert has_element?(view, "button#m-nav-new-duty[phx-click='open_create_duty']")
+    refute has_element?(view, "#m-nav-new-duty[href]")
     assert has_element?(view, "#m-nav-todos[href='/m/#{slug}/todos']")
     assert has_element?(view, "#m-nav-calendar[href='/m/#{slug}']")
+
+    # Clicking it opens the create-duty modal without leaving the duties index.
+    view |> element("#m-nav-new-duty") |> render_click()
+    assert has_element?(view, "#duty-form-modal")
   end
 
   test "other context shows navigation tabs without create shortcuts", %{conn: conn} do

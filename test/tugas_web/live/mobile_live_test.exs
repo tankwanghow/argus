@@ -556,10 +556,11 @@ defmodule TugasWeb.MobileLiveTest do
 
     {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}/duties")
 
-    assert has_element?(
-             view,
-             "#m-nav-new-duty[href='/m/#{manager.entity.slug}/duties/new']"
-           )
+    # ✚ Duty opens the create modal in place on the duties index, not a link.
+    assert has_element?(view, "button#m-nav-new-duty[phx-click='open_create_duty']")
+
+    view |> element("#m-nav-new-duty") |> render_click()
+    assert has_element?(view, "#duty-form-modal")
   end
 
   test "mobile sort dropdown reorders and infinite scroll appends", %{conn: conn} do
