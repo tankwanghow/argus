@@ -201,6 +201,50 @@ defmodule TugasWeb.DashboardLiveTest do
     assert has_element?(view, "#someday-strip #duty-chip-#{duty.id}")
   end
 
+  test "shows yellow attention dots when urgent, todos, and someday lists have items",
+       %{conn: conn} do
+    manager = Tugas.EntitiesFixtures.manager_scope_fixture()
+    conn = log_in_user(conn, manager.user)
+    type = type_fixture(manager.entity, reminder_offsets: "7")
+    today = Urgency.today_for(manager.entity.timezone)
+
+    {:ok, _overdue} =
+      Duties.create_duty(manager, %{
+        title: "Overdue task",
+        duty_type_id: type.id,
+        due_by: Date.add(today, -1),
+        open_note: "open"
+      })
+
+    {:ok, _someday} =
+      Duties.create_duty(manager, %{
+        title: "Someday task",
+        duty_type_id: type.id,
+        someday: true,
+        open_note: "open"
+      })
+
+    {:ok, _todo} = Todos.create_todo(manager, %{title: "Buy milk"})
+
+    {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}")
+
+    assert has_element?(view, "#urgent-panel span.bg-warning")
+    assert has_element?(view, "#dashboard-todos span.bg-warning")
+    assert has_element?(view, "#someday-strip span.bg-warning")
+  end
+
+  test "hides attention dots when urgent, todos, and someday lists are empty", %{conn: conn} do
+    manager = Tugas.EntitiesFixtures.manager_scope_fixture()
+    conn = log_in_user(conn, manager.user)
+
+    {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}")
+
+    refute has_element?(view, "#urgent-panel span.bg-warning")
+    refute has_element?(view, "#dashboard-todos span.bg-warning")
+    # The someday strip is omitted entirely when there are no someday duties.
+    refute has_element?(view, "#someday-strip")
+  end
+
   test "dashboard always shows Team data (no Mine/Team toggle)", %{conn: conn} do
     manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     member = member_scope_on_entity(manager.entity)

@@ -33,11 +33,14 @@ defmodule TugasWeb.DashboardTodosPanel do
         aria-expanded="false"
       >
         <span class="text-xs leading-none">«</span>
+        <.attention_dot :if={@todos != []} />
         <span class="text-sm font-semibold [writing-mode:vertical-rl] rotate-180">Todos</span>
       </button>
 
       <div :if={@mobile? or !@collapsed?} class="flex shrink-0 items-center gap-2 pb-2">
-        <h2 class="text-lg font-semibold">Todos</h2>
+        <h2 class="flex items-center gap-1.5 text-lg font-semibold">
+          Todos <.attention_dot :if={!@mobile? and @todos != []} />
+        </h2>
         <.link navigate={todos_index_path(@variant, @slug)} class="text-sm link link-primary">
           View all →
         </.link>
@@ -202,6 +205,12 @@ defmodule TugasWeb.DashboardTodosPanel do
 
   defp empty_class(true), do: "text-sm text-base-content/60"
   defp empty_class(false), do: "flex-1 text-sm text-base-content/60"
+
+  defp attention_dot(assigns) do
+    ~H"""
+    <span class="inline-block size-2 shrink-0 rounded-full bg-warning" aria-hidden="true"></span>
+    """
+  end
 
   defp todos_index_path(:mobile, slug), do: ~p"/m/#{slug}/todos"
   defp todos_index_path(_, slug), do: ~p"/entities/#{slug}/todos"

@@ -56,7 +56,9 @@ defmodule TugasWeb.DutyCalendar do
         class="shrink-0 rounded-lg border border-base-300 bg-base-200/40 p-3 space-y-2"
       >
         <div class="flex items-center justify-between">
-          <h3 class="text-sm font-semibold text-base-content/70">Someday</h3>
+          <h3 class="flex items-center gap-1.5 text-sm font-semibold text-base-content/70">
+            Someday <.attention_dot :if={@someday_rows != []} />
+          </h3>
           <.collapse_toggle panel="someday" collapsed?={@someday_collapsed?} label="Someday" />
         </div>
         <div :if={!@someday_collapsed?} class={someday_chips_class(@mobile?)}>
@@ -148,7 +150,13 @@ defmodule TugasWeb.DutyCalendar do
 
     ~H"""
     <section id={urgent_panel_id(@mobile?)} class={urgent_panel_class(@mobile?, @collapsed?)}>
-      <.collapsed_rail :if={!@mobile? and @collapsed?} panel="urgent" label="Urgent" side={:left} />
+      <.collapsed_rail
+        :if={!@mobile? and @collapsed?}
+        panel="urgent"
+        label="Urgent"
+        side={:left}
+        dot?={@rows != []}
+      />
 
       <.panel_header
         :if={@mobile? or !@collapsed?}
@@ -156,6 +164,7 @@ defmodule TugasWeb.DutyCalendar do
         mobile?={@mobile?}
         panel="urgent"
         collapsed?={@collapsed?}
+        dot?={@rows != []}
       />
 
       <div :if={@mobile? or !@collapsed?} class="flex min-h-0 flex-1 flex-col">
@@ -213,6 +222,7 @@ defmodule TugasWeb.DutyCalendar do
   attr :mobile?, :boolean, required: true
   attr :panel, :string, required: true
   attr :collapsed?, :boolean, default: false
+  attr :dot?, :boolean, default: false
 
   defp panel_header(%{mobile?: true} = assigns) do
     ~H"""
@@ -223,15 +233,24 @@ defmodule TugasWeb.DutyCalendar do
   defp panel_header(%{mobile?: false} = assigns) do
     ~H"""
     <div class="flex shrink-0 items-center justify-between pb-2">
-      <h3 class="text-sm font-semibold text-base-content/70">{@title}</h3>
+      <h3 class="flex items-center gap-1.5 text-sm font-semibold text-base-content/70">
+        {@title} <.attention_dot :if={@dot?} />
+      </h3>
       <.collapse_toggle panel={@panel} collapsed?={@collapsed?} label={@title} />
     </div>
+    """
+  end
+
+  defp attention_dot(assigns) do
+    ~H"""
+    <span class="inline-block size-2 shrink-0 rounded-full bg-warning" aria-hidden="true"></span>
     """
   end
 
   attr :panel, :string, required: true
   attr :label, :string, required: true
   attr :side, :atom, default: :left
+  attr :dot?, :boolean, default: false
 
   defp collapsed_rail(assigns) do
     ~H"""
@@ -245,6 +264,7 @@ defmodule TugasWeb.DutyCalendar do
       aria-expanded="false"
     >
       <span class="text-xs leading-none">{if @side == :left, do: "»", else: "«"}</span>
+      <.attention_dot :if={@dot?} />
       <span class="text-sm font-semibold [writing-mode:vertical-rl] rotate-180">
         {@label}
       </span>
