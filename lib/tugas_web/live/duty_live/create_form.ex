@@ -124,7 +124,14 @@ defmodule TugasWeb.DutyLive.CreateForm do
   defp type_options(scope) do
     case Duties.list_types(scope) do
       :not_authorise -> []
-      types -> Enum.map(types, &{&1.name, &1.id})
+      types -> Enum.map(types, &{type_option_label(&1), &1.id})
+    end
+  end
+
+  defp type_option_label(type) do
+    case type.reminder_offsets do
+      offsets when offsets in [nil, ""] -> type.name
+      offsets -> "#{type.name} (#{offsets}d)"
     end
   end
 

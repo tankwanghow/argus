@@ -54,7 +54,7 @@ defmodule TugasWeb.MobileLive.DutyShow do
                 Skipped
               </div> --%>
             </div>
-            <div class="flex flex-wrap items-center gap-1.5">
+            <div class="flex flex-wrap items-center justify-between">
               <span
                 :if={is_nil(@duty.primary_assignee)}
                 id="m-assignees-unassigned"
@@ -103,6 +103,9 @@ defmodule TugasWeb.MobileLive.DutyShow do
                     </span>
                   </li>
                 </ul>
+              </div>
+              <div :if={@duty.duty_type.reminder_offsets not in [nil, ""]} class="text-xs font-normal">
+                {@duty.duty_type.reminder_offsets}d before
               </div>
             </div>
           </div>

@@ -45,6 +45,9 @@ defmodule TugasWeb.DutyLive.Show do
           >
             <div class="flex flex-wrap items-center gap-1.5 min-w-0">
               <span class="font-medium text-info">{@duty.duty_type.name}</span>
+              <span :if={@duty.duty_type.reminder_offsets not in [nil, ""]} class="text-xs">
+                reminders: {@duty.duty_type.reminder_offsets} days before due
+              </span>
             </div>
             <div class="flex flex-wrap items-center gap-1.5">
               <span
