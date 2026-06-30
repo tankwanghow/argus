@@ -279,9 +279,21 @@ dashboard is where overdue/due-soon work surfaces, computed at render time:
   `Someday` · `Title A–Z`, plus `Most urgent` **only on Live**), plus title/type/assignee search.
   `IndexHelpers` keeps `mine?` + `lifecycle` + `sort`; `status_atom/2` maps mine → `my_*`, and
   `effective_sort/2` coerces a sort not offered for the current lifecycle to `:due_asc` (so `urgency`,
-  offered only on Live, can't leak to other lifecycles). The controls + search **persist per-entity**
-  (`TugasWeb.DashboardFilter`: ETS store + session snapshot + `POST /session/dashboard-filter`, cleared
-  on logout) and survive remounts. The **Skipped** lifecycle selects `closed_at IS NOT NULL` (covers
+  offered only on Live, can't leak to other lifecycles). The controls + search **persist per-entity**,
+  keyed by entity slug, in a **per-browser server-side ETS store** (`TugasWeb.DutiesFilter` +
+  `TugasWeb.DutiesFilter.Store`, table `:tugas_duties_filters`). The store is **keyed by an opaque
+  `filter_sid`** — a random id set once in the session cookie by `TugasWeb.Plugs.FilterSession` (in the
+  `:browser` pipeline); keying by the browser session, **not `user_id`**, makes filters **per device**
+  even under a shared login (a `user_id` key caused "last filter wins for everyone"). The store is read
+  on **every mount** (`load/2`) — so filters survive **live navigation** between pages in the shared
+  `:entity_scoped` live_session, where the connect-time `session` is frozen and a cookie can't be
+  re-read — and written **synchronously server-side** by `persist/1` (no client round-trip; `persist/1`
+  merges into the prior slug entry so a partial update, e.g. the duty list which has no calendar month,
+  never clobbers the saved month). `assign_sid/2` stashes the sid in assigns for `persist/1`. ETS is
+  in-memory, so filters **reset on server restart**; cleared on logout via `Store.clear/1`. In
+  `LiveViewTest`, seed a stable `filter_sid` in the conn session (e.g.
+  `Plug.Conn.put_session(:filter_sid, sid)`) so both `live/2` connects share one store key. The
+  **Skipped** lifecycle selects `closed_at IS NOT NULL` (covers
   both skipped and series-ended cycles; their badges differentiate). **All roles default to Team +
   Live** (`default_mine?/1` returns `false` for every role); sort defaults to `Due soonest`.
 - **Someday = duties with no due date, surfaced by a sort (not a filter).** `due_by` is **nullable**;

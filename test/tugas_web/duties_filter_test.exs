@@ -7,232 +7,143 @@ defmodule TugasWeb.DutiesFilterTest do
   alias TugasWeb.DutiesFilter
   alias TugasWeb.DutiesFilter.Store
 
-  @user_id "11111111-1111-4111-8111-111111111111"
-
   setup do
-    Store.clear(@user_id)
-    :ok
+    sid = DutiesFilter.new_sid()
+    on_exit(fn -> Store.clear(sid) end)
+    %{sid: sid}
   end
 
   defp scope(role, slug) do
     %Scope{
-      user: %User{id: @user_id},
+      user: %User{id: "11111111-1111-4111-8111-111111111111"},
       entity: %Entity{slug: slug},
       membership: %Membership{role: role},
       role: role
     }
   end
 
+  defp session(sid), do: %{"filter_sid" => sid}
+
   describe "load/2" do
-    test "returns role defaults when session is empty" do
+    test "returns role defaults when nothing is stored", %{sid: sid} do
       assert %{mine?: false, lifecycle: :live, query: ""} =
-               DutiesFilter.load(%{}, scope(:manager, "acme"))
+               DutiesFilter.load(session(sid), scope(:manager, "acme"))
     end
 
-    test "members default to Team" do
+    test "members default to Team", %{sid: sid} do
       assert %{mine?: false, lifecycle: :live, query: ""} =
-               DutiesFilter.load(%{}, scope(:member, "acme"))
+               DutiesFilter.load(session(sid), scope(:member, "acme"))
     end
 
-    test "restores saved filters for the current entity" do
-      session = %{
-        "duties_filters" => %{
-          "acme" => %{
-            "mine" => "true",
-            "lifecycle" => "completed",
-            "query" => "tax"
-          }
-        }
-      }
-
-      assert %{mine?: true, lifecycle: :completed, query: "tax"} =
-               DutiesFilter.load(session, scope(:manager, "acme"))
-    end
-
-    test "prefers the in-memory store over the session snapshot" do
-      Store.put(@user_id, %{
-        "acme" => %{"mine" => "true", "lifecycle" => "skipped", "query" => "store"}
+    test "restores stored filters for the current entity", %{sid: sid} do
+      Store.put(sid, %{
+        "acme" => %{"mine" => "true", "lifecycle" => "completed", "query" => "tax"}
       })
 
-      session = %{
-        "duties_filters" => %{
-          "acme" => %{"mine" => "false", "lifecycle" => "live", "query" => "session"}
-        }
-      }
-
-      assert %{mine?: true, lifecycle: :skipped, query: "store"} =
-               DutiesFilter.load(session, scope(:manager, "acme"))
+      assert %{mine?: true, lifecycle: :completed, query: "tax"} =
+               DutiesFilter.load(session(sid), scope(:manager, "acme"))
     end
 
-    test "restores an explicit Team choice for a member (mine=false)" do
-      session = %{
-        "duties_filters" => %{
-          "acme" => %{"mine" => "false", "lifecycle" => "live", "query" => ""}
-        }
-      }
+    test "restores an explicit Team choice for a member (mine=false)", %{sid: sid} do
+      Store.put(sid, %{"acme" => %{"mine" => "false", "lifecycle" => "live", "query" => ""}})
 
       assert %{mine?: false, lifecycle: :live, query: ""} =
-               DutiesFilter.load(session, scope(:member, "acme"))
+               DutiesFilter.load(session(sid), scope(:member, "acme"))
     end
 
-    test "ignores filters saved for other entities" do
-      session = %{
-        "duties_filters" => %{
-          "other-entity" => %{
-            "mine" => "true",
-            "lifecycle" => "skipped",
-            "query" => "other"
-          }
-        }
-      }
+    test "ignores filters stored for other entities", %{sid: sid} do
+      Store.put(sid, %{
+        "other-entity" => %{"mine" => "true", "lifecycle" => "skipped", "query" => "other"}
+      })
 
       assert %{mine?: false, lifecycle: :live, query: ""} =
-               DutiesFilter.load(session, scope(:manager, "acme"))
+               DutiesFilter.load(session(sid), scope(:manager, "acme"))
     end
 
-    test "falls back to defaults for invalid lifecycle values" do
-      session = %{
-        "duties_filters" => %{
-          "acme" => %{
-            "mine" => "not-a-boolean",
-            "lifecycle" => "bogus",
-            "query" => "find me"
-          }
-        }
-      }
+    test "is per-browser: another sid's filters are not visible", %{sid: sid} do
+      other = DutiesFilter.new_sid()
+      on_exit(fn -> Store.clear(other) end)
+
+      Store.put(other, %{"acme" => %{"mine" => "true", "lifecycle" => "skipped", "query" => "x"}})
+
+      assert %{mine?: false, lifecycle: :live, query: ""} =
+               DutiesFilter.load(session(sid), scope(:manager, "acme"))
+    end
+
+    test "falls back to defaults for invalid values", %{sid: sid} do
+      Store.put(sid, %{
+        "acme" => %{"mine" => "not-a-boolean", "lifecycle" => "bogus", "query" => "find me"}
+      })
 
       assert %{mine?: false, lifecycle: :live, query: "find me"} =
-               DutiesFilter.load(session, scope(:member, "acme"))
+               DutiesFilter.load(session(sid), scope(:member, "acme"))
     end
 
-    test "restores a saved sort and defaults to due_asc" do
-      session = %{
-        "duties_filters" => %{
-          "acme" => %{"mine" => "false", "lifecycle" => "live", "query" => "", "sort" => "title"}
-        }
-      }
+    test "restores a stored sort and defaults to due_asc", %{sid: sid} do
+      Store.put(sid, %{
+        "acme" => %{"mine" => "false", "lifecycle" => "live", "query" => "", "sort" => "title"}
+      })
 
-      assert %{sort: :title} = DutiesFilter.load(session, scope(:manager, "acme"))
-      assert %{sort: :due_asc} = DutiesFilter.load(%{}, scope(:manager, "beta"))
+      assert %{sort: :title} = DutiesFilter.load(session(sid), scope(:manager, "acme"))
+      assert %{sort: :due_asc} = DutiesFilter.load(session(sid), scope(:manager, "beta"))
     end
 
-    test "rejects a bogus sort value" do
-      session = %{
-        "duties_filters" => %{
-          "acme" => %{"mine" => "false", "lifecycle" => "live", "query" => "", "sort" => "bogus"}
-        }
-      }
+    test "rejects a bogus sort value", %{sid: sid} do
+      Store.put(sid, %{
+        "acme" => %{"mine" => "false", "lifecycle" => "live", "query" => "", "sort" => "bogus"}
+      })
 
-      assert %{sort: :due_asc} = DutiesFilter.load(session, scope(:manager, "acme"))
+      assert %{sort: :due_asc} = DutiesFilter.load(session(sid), scope(:manager, "acme"))
     end
 
-    test "restores a saved someday sort" do
-      session = %{
-        "duties_filters" => %{
-          "acme" => %{
-            "mine" => "false",
-            "lifecycle" => "completed",
-            "query" => "",
-            "sort" => "someday"
-          }
-        }
-      }
-
-      assert %{sort: :someday} = DutiesFilter.load(session, scope(:manager, "acme"))
-    end
-  end
-
-  describe "merge_session/3" do
-    test "stores normalized filter values per entity slug" do
-      assert DutiesFilter.merge_session(%{}, "acme", %{
-               "mine" => true,
-               "lifecycle" => "completed",
-               "query" => "tax",
-               "sort" => "title"
-             }) == %{
-               "acme" => %{
-                 "mine" => "true",
-                 "lifecycle" => "completed",
-                 "query" => "tax",
-                 "sort" => "title"
-               }
-             }
-    end
-
-    test "rejects invalid lifecycle values" do
-      entry =
-        DutiesFilter.merge_session(%{}, "acme", %{
-          "mine" => "true",
-          "lifecycle" => "bogus",
-          "query" => "tax"
-        })
-
-      assert get_in(entry, ["acme", "lifecycle"]) == "live"
-    end
-
-    test "stores calendar month per entity slug" do
-      assert DutiesFilter.merge_session(%{}, "acme", %{
-               "mine" => "false",
-               "lifecycle" => "live",
-               "query" => "",
-               "sort" => "due_asc",
-               "year" => "2026",
-               "month" => "5"
-             }) == %{
-               "acme" => %{
-                 "mine" => "false",
-                 "lifecycle" => "live",
-                 "query" => "",
-                 "sort" => "due_asc",
-                 "year" => "2026",
-                 "month" => "5"
-               }
-             }
-    end
-
-    test "merges partial updates without dropping a saved calendar month" do
-      existing = %{
+    test "restores a stored calendar month", %{sid: sid} do
+      Store.put(sid, %{
         "acme" => %{
           "mine" => "false",
           "lifecycle" => "live",
           "query" => "",
-          "sort" => "due_asc",
           "year" => "2026",
           "month" => "5"
         }
-      }
+      })
 
-      entry =
-        DutiesFilter.merge_session(existing, "acme", %{
-          "mine" => "true",
-          "lifecycle" => "completed",
-          "query" => "tax",
-          "sort" => "title"
-        })
+      assert %{year: 2026, month: 5} = DutiesFilter.load(session(sid), scope(:manager, "acme"))
+    end
 
-      assert get_in(entry, ["acme", "year"]) == "2026"
-      assert get_in(entry, ["acme", "month"]) == "5"
-      assert get_in(entry, ["acme", "mine"]) == "true"
+    test "defaults calendar month to nil when not stored", %{sid: sid} do
+      assert %{year: nil, month: nil} = DutiesFilter.load(session(sid), scope(:manager, "acme"))
+    end
+
+    test "rejects invalid calendar month values", %{sid: sid} do
+      Store.put(sid, %{
+        "acme" => %{
+          "mine" => "false",
+          "lifecycle" => "live",
+          "query" => "",
+          "year" => "bogus",
+          "month" => "99"
+        }
+      })
+
+      assert %{year: nil, month: nil} = DutiesFilter.load(session(sid), scope(:manager, "acme"))
     end
   end
 
   describe "persist/1" do
-    defp socket(assigns) do
-      base = %{__changed__: %{}, current_scope: scope(:manager, "acme")}
-
-      %Phoenix.LiveView.Socket{
-        assigns: Map.merge(base, assigns),
-        private: %{live_temp: %{}}
-      }
+    defp socket(sid, assigns) do
+      base = %{__changed__: %{}, current_scope: scope(:manager, "acme"), filter_sid: sid}
+      %Phoenix.LiveView.Socket{assigns: Map.merge(base, assigns)}
     end
 
-    test "a list-page persist (no year/month) keeps the saved calendar month" do
-      # Calendar saves a month...
-      socket(%{mine?: false, lifecycle: :live, query: "", sort: :due_asc, year: 2026, month: 5})
-      |> DutiesFilter.persist()
-
-      # ...then the duty list (which has no year/month assigns) persists a filter change.
-      socket(%{mine?: true, lifecycle: :completed, query: "tax", sort: :title})
+    test "writes the current filter values to the store", %{sid: sid} do
+      socket(sid, %{
+        mine?: true,
+        lifecycle: :completed,
+        query: "tax",
+        sort: :title,
+        year: 2026,
+        month: 5
+      })
       |> DutiesFilter.persist()
 
       assert %{
@@ -244,46 +155,35 @@ defmodule TugasWeb.DutiesFilterTest do
                  "year" => "2026",
                  "month" => "5"
                }
-             } = Store.get(@user_id)
-    end
-  end
-
-  describe "calendar month in load/2" do
-    test "restores a saved calendar month" do
-      session = %{
-        "duties_filters" => %{
-          "acme" => %{
-            "mine" => "false",
-            "lifecycle" => "live",
-            "query" => "",
-            "sort" => "due_asc",
-            "year" => "2026",
-            "month" => "5"
-          }
-        }
-      }
-
-      assert %{year: 2026, month: 5} = DutiesFilter.load(session, scope(:manager, "acme"))
+             } = Store.get(sid)
     end
 
-    test "defaults calendar month to nil when not saved" do
-      assert %{year: nil, month: nil} = DutiesFilter.load(%{}, scope(:manager, "acme"))
-    end
+    test "a list-page persist (no year/month) keeps the stored calendar month", %{sid: sid} do
+      # Calendar saves a month...
+      socket(sid, %{
+        mine?: false,
+        lifecycle: :live,
+        query: "",
+        sort: :due_asc,
+        year: 2026,
+        month: 5
+      })
+      |> DutiesFilter.persist()
 
-    test "rejects invalid calendar month values" do
-      session = %{
-        "duties_filters" => %{
-          "acme" => %{
-            "mine" => "false",
-            "lifecycle" => "live",
-            "query" => "",
-            "year" => "bogus",
-            "month" => "99"
-          }
-        }
-      }
+      # ...then the duty list (which has no year/month assigns) persists a filter change.
+      socket(sid, %{mine?: true, lifecycle: :completed, query: "tax", sort: :title})
+      |> DutiesFilter.persist()
 
-      assert %{year: nil, month: nil} = DutiesFilter.load(session, scope(:manager, "acme"))
+      assert %{
+               "acme" => %{
+                 "mine" => "true",
+                 "lifecycle" => "completed",
+                 "query" => "tax",
+                 "sort" => "title",
+                 "year" => "2026",
+                 "month" => "5"
+               }
+             } = Store.get(sid)
     end
   end
 end

@@ -5,12 +5,22 @@ defmodule TugasWeb.DutiesFilter do
   alias TugasWeb.DutiesFilter.Store
   alias TugasWeb.DutyLive.IndexHelpers, as: Index
 
-  @session_key "duties_filters"
+  @sid_key "filter_sid"
   @lifecycles ~w(live completed skipped all)
   @sorts ~w(due_asc due_desc title urgency someday)
 
+  @doc "Generate an opaque per-browser filter session id."
+  def new_sid, do: 16 |> :crypto.strong_rand_bytes() |> Base.url_encode64(padding: false)
+
   def assign_filters(socket, session) do
-    assign_from_filters(socket, load(session, socket.assigns.current_scope))
+    socket
+    |> assign_sid(session)
+    |> assign_from_filters(load(session, socket.assigns.current_scope))
+  end
+
+  @doc "Stash the per-browser filter session id in assigns so `persist/1` can write to it."
+  def assign_sid(socket, session) do
+    Phoenix.Component.assign(socket, :filter_sid, sid(session))
   end
 
   def assign_from_filters(socket, filters) do
@@ -21,60 +31,27 @@ defmodule TugasWeb.DutiesFilter do
     |> Phoenix.Component.assign(:sort, filters.sort)
   end
 
-  def load(session, %Scope{user: %{id: user_id}, entity: %{slug: slug}} = scope) do
-    case Map.get(filters_for_user(user_id, session), slug) do
-      %{} = saved -> merge_saved(saved, scope)
+  def load(session, %Scope{entity: %{slug: slug}} = scope) do
+    saved = session |> sid() |> Store.get() |> Map.get(slug)
+
+    case saved do
+      %{} = entry -> merge_saved(entry, scope)
       _ -> defaults(scope)
     end
   end
 
   def persist(socket) do
-    %Scope{user: %{id: user_id}, entity: %{slug: slug}} = socket.assigns.current_scope
+    %{filter_sid: sid, current_scope: %Scope{entity: %{slug: slug}}} = socket.assigns
 
-    store = Store.get(user_id)
+    store = Store.get(sid)
     prior = Map.get(store, slug, %{})
     entry = Map.merge(prior, current_entry(socket))
-    Store.put(user_id, Map.put(store, slug, entry))
+    Store.put(sid, Map.put(store, slug, entry))
 
-    Phoenix.LiveView.push_event(socket, "store-duties-filter", store_event_payload(slug, entry))
+    socket
   end
 
-  def merge_session(existing, slug, params) when is_binary(slug) do
-    prior = get_in(existing, [slug]) || %{}
-    Map.put(existing || %{}, slug, Map.merge(prior, session_entry(params)))
-  end
-
-  def put_session(conn, slug, params) when is_binary(slug) do
-    filters =
-      conn
-      |> Plug.Conn.get_session(:duties_filters)
-      |> merge_session(slug, params)
-
-    conn = Plug.Conn.put_session(conn, :duties_filters, filters)
-
-    if user_id = user_id(conn) do
-      Store.put(user_id, filters)
-    end
-
-    conn
-  end
-
-  defp filters_for_user(user_id, session) do
-    store = Store.get(user_id)
-    session_filters = get_in(session, [@session_key]) || %{}
-
-    cond do
-      store != %{} ->
-        store
-
-      session_filters != %{} ->
-        Store.put(user_id, session_filters)
-        session_filters
-
-      true ->
-        %{}
-    end
-  end
+  defp sid(session), do: get_in(session, [@sid_key])
 
   defp current_entry(socket) do
     params = %{
@@ -107,24 +84,6 @@ defmodule TugasWeb.DutiesFilter do
     |> maybe_put_calendar_month(params)
   end
 
-  defp store_event_payload(slug, entry) do
-    payload = %{
-      entity_slug: slug,
-      mine: entry["mine"],
-      lifecycle: entry["lifecycle"],
-      query: entry["query"],
-      sort: entry["sort"]
-    }
-
-    case {entry["year"], entry["month"]} do
-      {year, month} when is_binary(year) and is_binary(month) ->
-        Map.merge(payload, %{year: year, month: month})
-
-      _ ->
-        payload
-    end
-  end
-
   defp merge_saved(%{"mine" => mine, "lifecycle" => lifecycle, "query" => query} = saved, scope) do
     defaults = defaults(scope)
 
@@ -150,9 +109,6 @@ defmodule TugasWeb.DutiesFilter do
       month: nil
     }
   end
-
-  defp user_id(%Plug.Conn{assigns: %{current_scope: %Scope{user: %{id: id}}}}), do: id
-  defp user_id(_), do: nil
 
   defp parse_mine(value, default) do
     case parse_mine(value) do

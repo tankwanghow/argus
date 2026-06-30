@@ -12,6 +12,7 @@ defmodule TugasWeb.Router do
     plug :protect_from_forgery
     plug :put_secure_browser_headers
     plug :fetch_current_scope_for_user
+    plug TugasWeb.Plugs.FilterSession
     plug TugasWeb.Locale
   end
 
@@ -100,7 +101,6 @@ defmodule TugasWeb.Router do
     end
 
     post "/users/update-password", UserSessionController, :update_password
-    post "/session/duties-filter", DutiesFilterController, :update
 
     get "/view-mode", ViewModeController, :set
     get "/set-view", ViewModeController, :set

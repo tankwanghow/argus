@@ -5,6 +5,7 @@ defmodule TugasWeb.DutyLive.IndexTest do
   import Tugas.DutiesFixtures
 
   alias Tugas.Duties
+  alias TugasWeb.DutiesFilter.Store
 
   setup :register_and_log_in_user
 
@@ -46,7 +47,8 @@ defmodule TugasWeb.DutyLive.IndexTest do
 
   test "changing filters persists for the session across remounts", %{conn: conn} do
     {scope, _} = manager_duty_scope_fixture()
-    conn = log_in_user(conn, scope.user)
+    sid = "sid-#{System.unique_integer([:positive])}"
+    conn = conn |> log_in_user(scope.user) |> Plug.Conn.put_session(:filter_sid, sid)
 
     {:ok, view, _html} = live(conn, ~p"/entities/#{scope.entity.slug}/duties")
 
@@ -54,6 +56,8 @@ defmodule TugasWeb.DutyLive.IndexTest do
     view |> form("#duty-status-filter", %{lifecycle: "completed"}) |> render_change()
     view |> element("#duty-search") |> render_keyup(%{"value" => "tax"})
 
+    # The per-browser server store is written by persist/1; reconnecting with the
+    # same filter_sid restores it (no client round-trip needed).
     {:ok, view, _html} = live(conn, ~p"/entities/#{scope.entity.slug}/duties")
 
     assert has_element?(view, "#scope-mine.tab-active")
@@ -63,20 +67,15 @@ defmodule TugasWeb.DutyLive.IndexTest do
     assert html =~ ~s(value="completed" selected)
   end
 
-  test "restores duties filters from the session", %{conn: conn} do
+  test "restores duties filters from the store", %{conn: conn} do
     {scope, _} = manager_duty_scope_fixture()
+    sid = "sid-#{System.unique_integer([:positive])}"
 
-    conn =
-      conn
-      |> log_in_user(scope.user)
-      |> init_test_session(%{})
-      |> Plug.Conn.put_session(:duties_filters, %{
-        scope.entity.slug => %{
-          "mine" => "true",
-          "lifecycle" => "completed",
-          "query" => "tax"
-        }
-      })
+    Store.put(sid, %{
+      scope.entity.slug => %{"mine" => "true", "lifecycle" => "completed", "query" => "tax"}
+    })
+
+    conn = conn |> log_in_user(scope.user) |> Plug.Conn.put_session(:filter_sid, sid)
 
     {:ok, view, _html} = live(conn, ~p"/entities/#{scope.entity.slug}/duties")
 

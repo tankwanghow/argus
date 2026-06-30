@@ -72,17 +72,6 @@ topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})
 window.addEventListener("phx:page-loading-start", _info => topbar.show(300))
 window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
 
-window.addEventListener("phx:store-duties-filter", event => {
-  fetch("/session/duties-filter", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      "X-CSRF-Token": csrfToken,
-    },
-    body: new URLSearchParams(event.detail),
-  })
-})
-
 // Close daisyUI checkbox-driven modals (e.g. mobile "More" sheet) on Escape.
 document.addEventListener("keydown", e => {
   if (e.key === "Escape") {

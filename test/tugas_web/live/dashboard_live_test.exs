@@ -217,7 +217,8 @@ defmodule TugasWeb.DashboardLiveTest do
 
   test "calendar month persists across remounts", %{conn: conn} do
     manager = Tugas.EntitiesFixtures.manager_scope_fixture()
-    conn = log_in_user(conn, manager.user)
+    sid = "sid-#{System.unique_integer([:positive])}"
+    conn = conn |> log_in_user(manager.user) |> Plug.Conn.put_session(:filter_sid, sid)
     today = Urgency.today_for(manager.entity.timezone)
     {year, month} = CalendarHelpers.shift_month(today.year, today.month, -1)
     label = CalendarHelpers.month_label(year, month)
@@ -227,30 +228,31 @@ defmodule TugasWeb.DashboardLiveTest do
     view |> element("#dashboard-prev-month") |> render_click()
     assert has_element?(view, "#dashboard-month-label", label)
 
+    # The per-browser server store persists the month; reconnecting with the same
+    # filter_sid restores it across live navigation.
     {:ok, _view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}/todos")
     {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}")
 
     assert has_element?(view, "#dashboard-month-label", label)
   end
 
-  test "restores calendar month from the session", %{conn: conn} do
+  test "restores calendar month from the store", %{conn: conn} do
     manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     label = CalendarHelpers.month_label(2026, 5)
+    sid = "sid-#{System.unique_integer([:positive])}"
 
-    conn =
-      conn
-      |> log_in_user(manager.user)
-      |> init_test_session(%{})
-      |> Plug.Conn.put_session(:duties_filters, %{
-        manager.entity.slug => %{
-          "mine" => "false",
-          "lifecycle" => "live",
-          "query" => "",
-          "sort" => "due_asc",
-          "year" => "2026",
-          "month" => "5"
-        }
-      })
+    TugasWeb.DutiesFilter.Store.put(sid, %{
+      manager.entity.slug => %{
+        "mine" => "false",
+        "lifecycle" => "live",
+        "query" => "",
+        "sort" => "due_asc",
+        "year" => "2026",
+        "month" => "5"
+      }
+    })
+
+    conn = conn |> log_in_user(manager.user) |> Plug.Conn.put_session(:filter_sid, sid)
 
     {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}")
 

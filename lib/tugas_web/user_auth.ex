@@ -52,13 +52,10 @@ defmodule TugasWeb.UserAuth do
     user_token = get_session(conn, :user_token)
 
     if user_token do
-      case Accounts.get_user_by_session_token(user_token) do
-        {user, _} -> DutiesFilterStore.clear(user.id)
-        nil -> :ok
-      end
-
       Accounts.delete_user_session_token(user_token)
     end
+
+    DutiesFilterStore.clear(get_session(conn, :filter_sid))
 
     if live_socket_id = get_session(conn, :live_socket_id) do
       TugasWeb.Endpoint.broadcast(live_socket_id, "disconnect", %{})

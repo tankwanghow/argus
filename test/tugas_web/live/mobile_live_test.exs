@@ -15,20 +15,15 @@ defmodule TugasWeb.MobileLiveTest do
     conn |> log_in_user(scope.user) |> put_req_header("user-agent", @mobile_ua)
   end
 
-  test "mobile duty list restores filters saved in the session", %{conn: conn} do
+  test "mobile duty list restores filters saved in the store", %{conn: conn} do
     {scope, _} = manager_duty_scope_fixture()
+    sid = "sid-#{System.unique_integer([:positive])}"
 
-    conn =
-      conn
-      |> mobile_conn(scope)
-      |> init_test_session(%{})
-      |> Plug.Conn.put_session(:duties_filters, %{
-        scope.entity.slug => %{
-          "mine" => "true",
-          "lifecycle" => "skipped",
-          "query" => "audit"
-        }
-      })
+    TugasWeb.DutiesFilter.Store.put(sid, %{
+      scope.entity.slug => %{"mine" => "true", "lifecycle" => "skipped", "query" => "audit"}
+    })
+
+    conn = conn |> mobile_conn(scope) |> Plug.Conn.put_session(:filter_sid, sid)
 
     {:ok, view, _html} = live(conn, ~p"/m/#{scope.entity.slug}/duties")
 

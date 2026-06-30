@@ -28,6 +28,7 @@ defmodule TugasWeb.DashboardLive.IndexHelpers do
       |> assign(:day_modal_holidays, [])
       |> assign(:someday_modal_open?, false)
       |> assign(:row_effects, %{})
+      |> DutiesFilter.assign_sid(session)
       |> DutiesFilter.assign_from_filters(filters)
       |> assign_calendar_month(filters, today)
       |> load_dashboard()

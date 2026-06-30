@@ -210,7 +210,8 @@ defmodule TugasWeb.MobileLive.DashboardTest do
 
   test "calendar month persists when returning to the dashboard", %{conn: conn} do
     manager = Tugas.EntitiesFixtures.manager_scope_fixture()
-    conn = mobile_conn(conn, manager)
+    sid = "sid-#{System.unique_integer([:positive])}"
+    conn = conn |> mobile_conn(manager) |> Plug.Conn.put_session(:filter_sid, sid)
     today = Urgency.today_for(manager.entity.timezone)
     {year, month} = CalendarHelpers.shift_month(today.year, today.month, -1)
     label = CalendarHelpers.month_label(year, month)
@@ -220,6 +221,8 @@ defmodule TugasWeb.MobileLive.DashboardTest do
     view |> element("#dashboard-prev-month") |> render_click()
     assert has_element?(view, "#dashboard-month-label", label)
 
+    # The per-browser server store persists the month; reconnecting with the same
+    # filter_sid restores it across live navigation.
     {:ok, _view, _html} = live(conn, ~p"/m/#{manager.entity.slug}/todos")
     {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}")
 
