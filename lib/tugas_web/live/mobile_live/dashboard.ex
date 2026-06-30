@@ -40,23 +40,6 @@ defmodule TugasWeb.MobileLive.Dashboard do
             >
               Today
             </button>
-            <button
-              :if={Authorization.can?(@current_scope, :create_duty)}
-              id="dashboard-new-duty"
-              type="button"
-              class="btn btn-primary btn-sm"
-              phx-click="open_create_duty"
-            >
-              + Duty
-            </button>
-            <button
-              id="dashboard-new-todo"
-              type="button"
-              class="btn btn-secondary btn-sm"
-              phx-click="open_new_todo"
-            >
-              + Todo
-            </button>
           </div>
         </div>
 

@@ -410,7 +410,7 @@ defmodule TugasWeb.Layouts do
   end
 
   @mobile_nav_sets %{
-    calendar: [:todos, :duties, :more],
+    calendar: [:new_todo, :todos, :new_duty, :duties, :more],
     todos: [:new_todo, :duties, :calendar, :more],
     duties: [:new_duty, :todos, :calendar, :more],
     other: [:todos, :duties, :calendar, :more]

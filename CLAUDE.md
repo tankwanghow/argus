@@ -49,13 +49,16 @@ applies here too. Headlines:
   (`DutyLive.FormComponent`, a `live_component`) — there is no standalone create page. It reuses
   `DutyLive.CreateForm` (`load_form`/`validate`/`create`; `create/2` does not navigate) and notifies
   its host LiveView with `{:duty_created, duty, from_todo_id}` so the host closes the modal, flashes,
-  and reloads (no redirect to the new duty). Hosts: the dashboards (a centered **+ Duty** button beside
-  Today, plus a **+ Todo** button opening the shared `TugasWeb.TodoFormModal.todo_form_modal/1`
-  — the same changeset-backed create/edit todo modal the Todos pages use, parameterized by ids +
-  change/submit/cancel event names) and the duties listing **+ New
-  duty** button open it in place; the URL `/{m/}entities/:slug/duties/new` (`:new` live_action on the
-  dashboards) also opens it (used by the mobile bottom-nav ✚ Duty tab and todo escalation's
-  `?from_todo=`), gated by `Authorization.can?(:create_duty)`.
+  and reloads (no redirect to the new duty). Hosts: the **desktop** dashboard (a centered **+ Duty**
+  button beside Today, plus a **+ Todo** button opening the shared
+  `TugasWeb.TodoFormModal.todo_form_modal/1` — the same changeset-backed create/edit todo modal the
+  Todos pages use, parameterized by ids + change/submit/cancel event names) and the duties listing
+  **+ New duty** button open it in place. On **mobile** there are no create buttons in the dashboard
+  top toolbar — the bottom-nav `:calendar` set carries the create shortcuts (**✚ Todo · 📑 Todos ·
+  ✚ Duty · 💼 Duties · ☰ More**). The URL `/{m/}entities/:slug/duties/new` (`:new` live_action on the
+  dashboards) opens the modal (used by the mobile bottom-nav ✚ Duty tab and todo escalation's
+  `?from_todo=`), gated by `Authorization.can?(:create_duty)`; the ✚ Todo tab navigates to
+  `/m/:slug/todos/new`.
   **There is no separate duty index page** — the **dashboard is the duty list** on both
   UIs (`DashboardLive.Index` at `/entities/:slug`, `MobileLive.Dashboard` at `/m/:slug`). It's a
   flat, filtered, **server-paginated** list (scope/status/sort controls + search), not a grouped

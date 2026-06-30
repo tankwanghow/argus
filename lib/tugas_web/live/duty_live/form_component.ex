@@ -56,15 +56,15 @@ defmodule TugasWeb.DutyLive.FormComponent do
           phx-submit="save"
         >
           <.char_count_input field={@form[:title]} label="Title" max={60} required />
-            <.input
-              field={@form[:duty_type_id]}
-              type="select"
-              label="Type"
-              options={@type_options}
-              prompt="Choose a type"
-              required
-            />
-            <div class="flex items-center gap-4">
+          <.input
+            field={@form[:duty_type_id]}
+            type="select"
+            label="Type"
+            options={@type_options}
+            prompt="Choose a type"
+            required
+          />
+          <div class="flex items-center gap-4">
             <div class="mt-6">
               <.input field={@form[:someday]} type="checkbox" label="No due date (Someday)" />
             </div>
