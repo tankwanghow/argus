@@ -666,20 +666,18 @@ defmodule TugasWeb.MobileLiveTest do
     refute has_element?(view, "#m-end-series-modal")
   end
 
-  test "mobile: new-duty form creates and redirects to the mobile show page", %{conn: conn} do
+  test "mobile: new-duty opens the create-duty modal and creates a duty", %{conn: conn} do
     manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     conn = mobile_conn(conn, manager)
     type = type_fixture(manager.entity)
 
+    # /m/.../duties/new opens the shared create-duty modal over the mobile dashboard.
     {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}/duties/new")
 
-    assert has_element?(view, "#m-duty-form", "New duty")
-
-    # The mobile shell binds a global Escape keydown; the form must not crash on it.
-    assert view |> element("#tugas-shell") |> render_keydown() =~ "New duty"
+    assert has_element?(view, "#duty-form-modal #duty-create-form")
 
     view
-    |> form("#m-duty-create-form", %{
+    |> form("#duty-create-form", %{
       "duty" => %{
         "title" => "Mobile EPF",
         "duty_type_id" => type.id,
@@ -689,9 +687,8 @@ defmodule TugasWeb.MobileLiveTest do
     })
     |> render_submit()
 
-    {path, _flash} = assert_redirect(view)
-    assert path =~ "/m/#{manager.entity.slug}/duties/"
-    refute path =~ "/new"
+    refute has_element?(view, "#duty-form-modal")
+    assert render(view) =~ "Duty created."
 
     [created] = Tugas.Duties.list_team_overview(manager)
     assert created.title == "Mobile EPF"

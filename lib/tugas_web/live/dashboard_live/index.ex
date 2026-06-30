@@ -107,6 +107,16 @@ defmodule TugasWeb.DashboardLive.Index do
   def mount(_params, session, socket), do: Dashboard.mount_dashboard(socket, session)
 
   @impl true
+  def handle_params(params, _uri, socket) do
+    if socket.assigns.live_action == :new and
+         Authorization.can?(socket.assigns.current_scope, :create_duty) do
+      {:noreply, Dashboard.handle_open_create_duty(socket, params)}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl true
   def handle_event("prev_month", _params, socket) do
     {:noreply, Dashboard.handle_prev_month(socket)}
   end

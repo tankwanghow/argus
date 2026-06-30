@@ -6,10 +6,7 @@ defmodule TugasWeb.DutyLive.CreateForm do
   loading, validation, and create — lives here. Files are attached later from the
   duty page, not at creation time.
   """
-  use TugasWeb, :verified_routes
-
   import Phoenix.Component, only: [assign: 3, to_form: 2]
-  import Phoenix.LiveView, only: [put_flash: 3, push_navigate: 2]
 
   alias Tugas.Entities
   alias Tugas.Duties
@@ -38,34 +35,6 @@ defmodule TugasWeb.DutyLive.CreateForm do
       |> Map.put(:action, :validate)
 
     {:noreply, assign_form(socket, changeset)}
-  end
-
-  @doc """
-  Creates the duty, then redirects to `redirect_path.(scope, duty)`
-  on success.
-  """
-  def save(socket, params, redirect_path) when is_function(redirect_path, 2) do
-    scope = socket.assigns.current_scope
-
-    case Duties.create_duty(scope, map_create_params(params)) do
-      {:ok, duty} ->
-        socket =
-          socket
-          |> maybe_record_escalation(scope, duty)
-          |> put_flash(:info, flash_message(socket.assigns[:from_todo_id]))
-          |> push_navigate(to: redirect_path.(scope, duty))
-
-        {:noreply, socket}
-
-      {:error, %Ecto.Changeset{} = changeset} ->
-        {:noreply, assign_form(socket, changeset)}
-
-      {:error, :note_required} ->
-        {:noreply, put_flash(socket, :error, "An open note is required.")}
-
-      :not_authorise ->
-        {:noreply, put_flash(socket, :error, "Not authorized.")}
-    end
   end
 
   @doc """
@@ -129,9 +98,6 @@ defmodule TugasWeb.DutyLive.CreateForm do
         socket
     end
   end
-
-  defp flash_message(nil), do: "Duty created."
-  defp flash_message(_), do: "Duty created and todo escalated."
 
   defp truncate_title(title) when is_binary(title) do
     String.slice(title, 0, @duty_title_max)

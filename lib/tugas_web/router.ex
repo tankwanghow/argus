@@ -70,7 +70,7 @@ defmodule TugasWeb.Router do
       ] do
       live "/entities/:entity_slug", DashboardLive.Index, :index
       live "/entities/:entity_slug/duties", DutyLive.Index, :index
-      live "/entities/:entity_slug/duties/new", DutyLive.Form, :new
+      live "/entities/:entity_slug/duties/new", DashboardLive.Index, :new
       live "/entities/:entity_slug/duties/:id", DutyLive.Show, :show
       live "/entities/:entity_slug/duty-types", DutyTypeLive.Index, :index
       live "/entities/:entity_slug/members", MembershipLive.Index, :index
@@ -80,7 +80,7 @@ defmodule TugasWeb.Router do
 
       live "/m/:entity_slug", MobileLive.Dashboard, :index
       live "/m/:entity_slug/duties", MobileLive.DutyIndex, :index
-      live "/m/:entity_slug/duties/new", MobileLive.DutyForm, :new
+      live "/m/:entity_slug/duties/new", MobileLive.Dashboard, :new
       live "/m/:entity_slug/duties/:id", MobileLive.DutyShow, :show
       live "/m/:entity_slug/duty-types", MobileLive.DutyTypes, :index
       live "/m/:entity_slug/todos/team-log", MobileLive.TodoTeamLog, :index

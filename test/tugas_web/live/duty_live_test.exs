@@ -84,11 +84,11 @@ defmodule TugasWeb.DutyLiveTest do
     assignee = member_fixture(scope.entity)
     type = type_fixture(scope.entity)
 
+    # /duties/new opens the create-duty modal over the dashboard.
     {:ok, view, _html} =
       live(conn, ~p"/entities/#{scope.entity.slug}/duties/new")
 
-    # The app shell binds a global Escape keydown; the form must not crash on it.
-    assert view |> element("#tugas-shell") |> render_keydown() =~ "New duty"
+    assert has_element?(view, "#duty-form-modal #duty-create-form")
 
     view
     |> form("#duty-create-form", %{
@@ -102,8 +102,9 @@ defmodule TugasWeb.DutyLiveTest do
     })
     |> render_submit()
 
-    {path, _flash} = assert_redirect(view)
-    assert path =~ "/duties/"
+    refute has_element?(view, "#duty-form-modal")
+    assert render(view) =~ "Duty created."
+    assert Enum.any?(Duties.list_team_overview(scope), &(&1.title == "EPF June"))
   end
 
   test "manager creates duty with collaborators", %{conn: conn} do
@@ -129,7 +130,7 @@ defmodule TugasWeb.DutyLiveTest do
     })
     |> render_submit()
 
-    assert_redirect(view)
+    refute has_element?(view, "#duty-form-modal")
 
     [created] = Duties.list_team_overview(manager)
     duty = Duties.get_duty!(manager, created.id)

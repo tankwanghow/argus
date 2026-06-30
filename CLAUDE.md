@@ -45,9 +45,15 @@ applies here too. Headlines:
   `tugas_view` cookie override. Separate LiveViews + layouts (`Layouts.app/1` navbar — desktop nav is
   **💼 Duties · 📑 Todos · 🏷️ Types**; `Layouts.mobile_app/1` bottom-nav shell — five-tab bottom nav is
   **✚ Todo · 📑 Todos · ✚ Duty · 💼 Duties · ☰ More** (the ✚ Duty tab routes to duty
-  create; everything past the five tabs lives in the More sheet). New-duty has both Desktop
-  (`DutyLive.Form`) and Mobile (`MobileLive.DutyForm`) LiveViews sharing all non-render
-  logic via `DutyLive.CreateForm` (`load_form`/`validate`/`save` with a redirect-path fn).
+  create; everything past the five tabs lives in the More sheet). **New-duty is always a modal**
+  (`DutyLive.FormComponent`, a `live_component`) — there is no standalone create page. It reuses
+  `DutyLive.CreateForm` (`load_form`/`validate`/`create`; `create/2` does not navigate) and notifies
+  its host LiveView with `{:duty_created, duty, from_todo_id}` so the host closes the modal, flashes,
+  and reloads (no redirect to the new duty). Hosts: the dashboards (a centered **+ Duty** button beside
+  Today, plus a **+ Todo** button opening a quick `new_todo_modal`) and the duties listing **+ New
+  duty** button open it in place; the URL `/{m/}entities/:slug/duties/new` (`:new` live_action on the
+  dashboards) also opens it (used by the mobile bottom-nav ✚ Duty tab and todo escalation's
+  `?from_todo=`), gated by `Authorization.can?(:create_duty)`.
   **There is no separate duty index page** — the **dashboard is the duty list** on both
   UIs (`DashboardLive.Index` at `/entities/:slug`, `MobileLive.Dashboard` at `/m/:slug`). It's a
   flat, filtered, **server-paginated** list (scope/status/sort controls + search), not a grouped
@@ -372,9 +378,10 @@ returns, keyset pagination, LiveView streams), and **escalate into** a real duty
   (`validate_action_note`, same rule as duty transitions). The two are mutually exclusive
   (`deletable?` xor `cancelable?`), so the per-row action menu only ever offers one.
 - **Escalate-to-duty.** A manager/admin (`can?(:create_duty)`) escalates an open todo into an
-  duty: the action navigates to the duty create form with `?from_todo=<id>`;
-  `DutyLive.CreateForm` pre-fills the title (truncated to the 60-char duty cap) + an
-  `open_note`, and on successful create calls `Todos.record_escalation/3` to stamp the todo
+  duty: the action navigates to `…/duties/new?from_todo=<id>`, which opens the create-duty modal
+  (`DutyLive.FormComponent`) over the dashboard; `DutyLive.CreateForm` pre-fills the title
+  (truncated to the 60-char duty cap) + an `open_note`, and on successful create calls
+  `Todos.record_escalation/3` (via `CreateForm.create`'s `maybe_record_escalation`) to stamp the todo
   `escalated_*` and cross-link `escalated_duty_id`. Escalated todos show a **"View duty"** link.
   `Todos.get_todo_for_escalation/2` guards that the todo is still escalatable (active, not completed).
 - **Audit trail.** Every mutation writes a `Todos.AuditLog` row (`created`/`updated`/`completed`/
