@@ -20,7 +20,10 @@ defmodule TugasWeb.DutyLive.FormComponent do
 
   @impl true
   def update(assigns, socket) do
-    socket = assign(socket, assigns)
+    socket =
+      socket
+      |> assign(assigns)
+      |> assign_new(:variant, fn -> :desktop end)
 
     if socket.assigns[:loaded?] do
       {:ok, socket}
@@ -39,8 +42,8 @@ defmodule TugasWeb.DutyLive.FormComponent do
   @impl true
   def render(assigns) do
     ~H"""
-    <div id={@id} class="modal modal-open">
-      <div class="modal-box max-w-xl">
+    <div id={@id} class={modal_class(@variant)}>
+      <div class={box_class(@variant)}>
         <h3 class="text-lg font-bold mb-2">New duty</h3>
 
         <p :if={@error} class="alert alert-error text-sm mb-2">{@error}</p>
@@ -129,4 +132,11 @@ defmodule TugasWeb.DutyLive.FormComponent do
   end
 
   defp someday?(form), do: Phoenix.HTML.Form.normalize_value("checkbox", form[:someday].value)
+
+  # Mobile uses the bottom-sheet chrome that the mobile edit-duty modal uses.
+  defp modal_class(:mobile), do: "modal modal-bottom modal-open"
+  defp modal_class(_), do: "modal modal-open"
+
+  defp box_class(:mobile), do: "modal-box"
+  defp box_class(_), do: "modal-box max-w-xl"
 end

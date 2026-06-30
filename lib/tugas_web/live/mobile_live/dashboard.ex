@@ -162,6 +162,7 @@ defmodule TugasWeb.MobileLive.Dashboard do
           id="duty-form-modal"
           current_scope={@current_scope}
           from_todo_id={@create_duty_from_todo_id}
+          variant={:mobile}
         />
 
         <.todo_form_modal

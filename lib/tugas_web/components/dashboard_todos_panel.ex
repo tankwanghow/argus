@@ -51,7 +51,7 @@ defmodule TugasWeb.DashboardTodosPanel do
           aria-label="Toggle Todos"
           aria-expanded={to_string(!@collapsed?)}
         >
-          ▾
+          hide
         </button>
       </div>
 
