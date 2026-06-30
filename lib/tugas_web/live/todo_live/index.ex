@@ -56,7 +56,7 @@ defmodule TugasWeb.TodoLive.Index do
               />
               <div :if={not Todo.active?(todo)} class="w-4 shrink-0" aria-hidden="true" />
               <div class="flex-1 min-w-0 space-y-1">
-                <div class="flex flex-wrap items-center gap-2">
+                <div class="flex flex-wrap items-center gap-1">
                   <div class={[
                     "font-medium",
                     IndexHelpers.title_strike?(todo) && "line-through text-base-content/60"
