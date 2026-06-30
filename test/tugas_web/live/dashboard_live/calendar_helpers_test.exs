@@ -75,4 +75,52 @@ defmodule TugasWeb.DashboardLive.CalendarHelpersTest do
     assert length(grouped[~D[2026-06-10]]) == 2
     assert length(grouped[~D[2026-06-11]]) == 1
   end
+
+  describe "load_urgent_rows/3" do
+    import Tugas.DutiesFixtures
+    alias Tugas.Duties
+    alias Tugas.Duties.Urgency
+
+    test "includes overdue + due-soon ranked, excludes ok and dateless" do
+      scope = Tugas.EntitiesFixtures.manager_scope_fixture()
+      type = type_fixture(scope.entity, reminder_offsets: "7")
+      today = Urgency.today_for(scope.entity.timezone)
+
+      {:ok, overdue} =
+        Duties.create_duty(scope, %{
+          title: "Overdue",
+          duty_type_id: type.id,
+          due_by: Date.add(today, -2),
+          open_note: "n"
+        })
+
+      {:ok, due_soon} =
+        Duties.create_duty(scope, %{
+          title: "Due soon",
+          duty_type_id: type.id,
+          due_by: Date.add(today, 3),
+          open_note: "n"
+        })
+
+      {:ok, _ok} =
+        Duties.create_duty(scope, %{
+          title: "Not soon",
+          duty_type_id: type.id,
+          due_by: Date.add(today, 60),
+          open_note: "n"
+        })
+
+      {:ok, _someday} =
+        Duties.create_duty(scope, %{
+          title: "Someday",
+          duty_type_id: type.id,
+          someday: true,
+          open_note: "n"
+        })
+
+      rows = CalendarHelpers.load_urgent_rows(scope, today, false)
+
+      assert Enum.map(rows, & &1.duty.id) == [overdue.id, due_soon.id]
+    end
+  end
 end

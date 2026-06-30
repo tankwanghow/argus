@@ -8,6 +8,8 @@ defmodule TugasWeb.DashboardLive.CalendarHelpers do
 
   @max_chips_per_day 3
   @max_someday_chips 10
+  @urgent_window_days 365
+  @max_urgent_chips 10
 
   def max_chips_per_day, do: @max_chips_per_day
   def max_chips_per_day(:mobile), do: 3
@@ -18,6 +20,8 @@ defmodule TugasWeb.DashboardLive.CalendarHelpers do
   def max_someday_chips(:mobile), do: 6
   def max_someday_chips(:desktop), do: @max_someday_chips
   def max_someday_chips(_), do: @max_someday_chips
+
+  def max_urgent_chips, do: @max_urgent_chips
 
   def month_range(year, month) do
     start = Date.new!(year, month, 1)
@@ -107,6 +111,24 @@ defmodule TugasWeb.DashboardLive.CalendarHelpers do
     Index.build_calendar_rows(duties, today)
     |> Enum.sort_by(fn %{duty: duty} -> String.downcase(duty.title) end)
   end
+
+  def load_urgent_rows(%Scope{} = scope, today, mine?) do
+    status = Index.status_atom(mine?, :live)
+    horizon = Date.add(today, @urgent_window_days)
+
+    duties =
+      case Duties.list_calendar_duties(scope, status: status, due_before: horizon) do
+        :not_authorise -> []
+        list -> list
+      end
+
+    Index.build_calendar_rows(duties, today)
+    |> Enum.filter(fn %{urgency: u} -> u in [:overdue, :due_soon] end)
+    |> Enum.sort_by(fn %{duty: d, urgency: u} -> {urgent_rank(u), d.due_by} end)
+  end
+
+  defp urgent_rank(:overdue), do: 0
+  defp urgent_rank(:due_soon), do: 1
 
   def month_label(year, month) do
     {:ok, dt} = Date.new(year, month, 1)
