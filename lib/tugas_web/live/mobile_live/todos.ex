@@ -75,35 +75,16 @@ defmodule TugasWeb.MobileLive.Todos do
         </p>
       </div>
 
-      <div :if={@todo_form} id="m-todo-modal" class="modal modal-bottom modal-open">
-        <div class="modal-box">
-          <h3 class="font-bold text-lg">{@modal_title}</h3>
-          <.form
-            for={@todo_form}
-            id="m-todo-form"
-            phx-change="validate"
-            phx-submit="save"
-            class="mt-4 space-y-3"
-          >
-            <.input
-              field={@todo_form[:title]}
-              type="text"
-              label="Title"
-              required
-              phx-mounted={JS.focus()}
-            />
-            <div class="flex gap-2 pt-2">
-              <button type="button" class="btn flex-1" phx-click="dismiss_form">Cancel</button>
-              <.button class="btn btn-primary flex-1" phx-disable-with="Saving…">
-                {@submit_label}
-              </.button>
-            </div>
-          </.form>
-        </div>
-        <div class="modal-backdrop">
-          <button type="button" phx-click="dismiss_form">close</button>
-        </div>
-      </div>
+      <.todo_form_modal
+        :if={@todo_form}
+        form={@todo_form}
+        id="m-todo-modal"
+        form_id="m-todo-form"
+        title={@modal_title}
+        submit_label={@submit_label}
+        variant={:mobile}
+        on_cancel="dismiss_form"
+      />
 
       <div :if={@canceling_todo} id="m-todo-cancel-modal" class="modal modal-bottom modal-open">
         <div class="modal-box">

@@ -50,7 +50,9 @@ applies here too. Headlines:
   `DutyLive.CreateForm` (`load_form`/`validate`/`create`; `create/2` does not navigate) and notifies
   its host LiveView with `{:duty_created, duty, from_todo_id}` so the host closes the modal, flashes,
   and reloads (no redirect to the new duty). Hosts: the dashboards (a centered **+ Duty** button beside
-  Today, plus a **+ Todo** button opening a quick `new_todo_modal`) and the duties listing **+ New
+  Today, plus a **+ Todo** button opening the shared `TugasWeb.TodoFormModal.todo_form_modal/1`
+  — the same changeset-backed create/edit todo modal the Todos pages use, parameterized by ids +
+  change/submit/cancel event names) and the duties listing **+ New
   duty** button open it in place; the URL `/{m/}entities/:slug/duties/new` (`:new` live_action on the
   dashboards) also opens it (used by the mobile bottom-nav ✚ Duty tab and todo escalation's
   `?from_todo=`), gated by `Authorization.can?(:create_duty)`.

@@ -164,7 +164,16 @@ defmodule TugasWeb.MobileLive.Dashboard do
           from_todo_id={@create_duty_from_todo_id}
         />
 
-        <.new_todo_modal :if={@new_todo_open?} />
+        <.todo_form_modal
+          :if={@todo_form}
+          form={@todo_form}
+          id="new-todo-modal"
+          form_id="new-todo-form"
+          variant={:mobile}
+          on_change="validate_todo"
+          on_submit="save_todo"
+          on_cancel="close_new_todo"
+        />
       </div>
     </Layouts.mobile_app>
     """
@@ -228,8 +237,12 @@ defmodule TugasWeb.MobileLive.Dashboard do
     {:noreply, Dashboard.handle_close_new_todo(socket)}
   end
 
-  def handle_event("create_todo", %{"title" => title}, socket) do
-    {:noreply, Dashboard.handle_create_todo(socket, title)}
+  def handle_event("validate_todo", %{"todo" => params}, socket) do
+    {:noreply, Dashboard.handle_validate_todo(socket, params)}
+  end
+
+  def handle_event("save_todo", %{"todo" => params}, socket) do
+    {:noreply, Dashboard.handle_save_todo(socket, params)}
   end
 
   def handle_event("close_modal_on_escape", _params, socket) do

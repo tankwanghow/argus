@@ -131,7 +131,9 @@ defmodule TugasWeb.MobileLive.DashboardTest do
     manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     conn = mobile_conn(conn, manager)
 
-    for n <- 1..12 do
+    limit = TugasWeb.DashboardLive.IndexHelpers.open_preview_limit()
+
+    for n <- 1..(limit + 1) do
       {:ok, _} =
         Todos.create_todo(manager, %{title: "Todo #{String.pad_leading("#{n}", 2, "0")}"})
     end
@@ -139,7 +141,7 @@ defmodule TugasWeb.MobileLive.DashboardTest do
     {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}")
 
     open_ids_before = dashboard_open_todo_ids(view)
-    assert length(open_ids_before) == 11
+    assert length(open_ids_before) == limit
 
     to_complete_id = List.last(open_ids_before)
 
@@ -147,7 +149,7 @@ defmodule TugasWeb.MobileLive.DashboardTest do
     render_click(view, "finish_row_effect", %{"id" => to_complete_id})
 
     open_ids_after = dashboard_open_todo_ids(view)
-    assert length(open_ids_after) == 11
+    assert length(open_ids_after) == limit
     refute to_complete_id in open_ids_after
   end
 
@@ -281,7 +283,7 @@ defmodule TugasWeb.MobileLive.DashboardTest do
     type = type_fixture(manager.entity, reminder_offsets: "30")
     today = Urgency.today_for(manager.entity.timezone)
 
-    for n <- 1..10 do
+    for n <- 1..CalendarHelpers.max_urgent_chips() do
       {:ok, _} =
         Duties.create_duty(manager, %{
           title: "Urgent #{String.pad_leading("#{n}", 2, "0")}",

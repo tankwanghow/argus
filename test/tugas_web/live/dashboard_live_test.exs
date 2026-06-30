@@ -299,8 +299,10 @@ defmodule TugasWeb.DashboardLiveTest do
     manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     conn = log_in_user(conn, manager.user)
 
-    # Dashboard open preview shows 11 todos; create one extra to verify backfill.
-    for n <- 1..12 do
+    # Dashboard open preview shows `limit` todos; create one extra to verify backfill.
+    limit = TugasWeb.DashboardLive.IndexHelpers.open_preview_limit()
+
+    for n <- 1..(limit + 1) do
       {:ok, _} =
         Todos.create_todo(manager, %{title: "Todo #{String.pad_leading("#{n}", 2, "0")}"})
     end
@@ -308,7 +310,7 @@ defmodule TugasWeb.DashboardLiveTest do
     {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}")
 
     open_ids_before = dashboard_open_todo_ids(view)
-    assert length(open_ids_before) == 11
+    assert length(open_ids_before) == limit
 
     to_complete_id = List.last(open_ids_before)
 
@@ -316,7 +318,7 @@ defmodule TugasWeb.DashboardLiveTest do
     render_click(view, "finish_row_effect", %{"id" => to_complete_id})
 
     open_ids_after = dashboard_open_todo_ids(view)
-    assert length(open_ids_after) == 11
+    assert length(open_ids_after) == limit
     refute to_complete_id in open_ids_after
     assert has_element?(view, "#dashboard-completed-todo-#{to_complete_id}")
 
@@ -366,7 +368,7 @@ defmodule TugasWeb.DashboardLiveTest do
     conn = log_in_user(conn, manager.user)
     type = type_fixture(manager.entity)
 
-    for n <- 1..10 do
+    for n <- 1..CalendarHelpers.max_someday_chips(:desktop) do
       {:ok, _duty} =
         Duties.create_duty(manager, %{
           title: "Someday #{String.pad_leading("#{n}", 2, "0")}",
@@ -441,7 +443,7 @@ defmodule TugasWeb.DashboardLiveTest do
     type = type_fixture(manager.entity, reminder_offsets: "30")
     today = Urgency.today_for(manager.entity.timezone)
 
-    for n <- 1..10 do
+    for n <- 1..CalendarHelpers.max_urgent_chips() do
       {:ok, _} =
         Duties.create_duty(manager, %{
           title: "Urgent #{String.pad_leading("#{n}", 2, "0")}",
@@ -565,7 +567,7 @@ defmodule TugasWeb.DashboardLiveTest do
     view |> element("#dashboard-new-todo") |> render_click()
     assert has_element?(view, "#new-todo-modal")
 
-    view |> form("#new-todo-form", %{title: "Quick task"}) |> render_submit()
+    view |> form("#new-todo-form", %{todo: %{title: "Quick task"}}) |> render_submit()
 
     refute has_element?(view, "#new-todo-modal")
     assert render(view) =~ "Todo added."

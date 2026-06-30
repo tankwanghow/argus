@@ -7,9 +7,9 @@ defmodule TugasWeb.DashboardLive.CalendarHelpers do
   alias TugasWeb.DutyLive.IndexHelpers, as: Index
 
   @max_chips_per_day 3
-  @max_someday_chips 10
+  @max_someday_chips 12
   @urgent_window_days 365
-  @max_urgent_chips 10
+  @max_urgent_chips 14
 
   def max_chips_per_day, do: @max_chips_per_day
   def max_chips_per_day(:mobile), do: 3

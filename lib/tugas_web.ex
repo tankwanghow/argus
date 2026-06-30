@@ -95,7 +95,9 @@ defmodule TugasWeb do
       import TugasWeb.UrgencyBadge
 
       import TugasWeb.DutyCalendar,
-        only: [duty_calendar: 1, mobile_someday_panel: 1, urgent_panel: 1, new_todo_modal: 1]
+        only: [duty_calendar: 1, mobile_someday_panel: 1, urgent_panel: 1]
+
+      import TugasWeb.TodoFormModal, only: [todo_form_modal: 1]
 
       import TugasWeb.DutySeriesNav, only: [duty_series_nav: 1]
       import TugasWeb.DashboardTodosPanel, only: [dashboard_todos_panel: 1]

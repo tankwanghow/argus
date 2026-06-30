@@ -1,7 +1,7 @@
 defmodule TugasWeb.DashboardLive.IndexHelpers do
   @moduledoc false
 
-  import Phoenix.Component, only: [assign: 2, assign: 3]
+  import Phoenix.Component, only: [assign: 2, assign: 3, to_form: 2]
   import Phoenix.LiveView, only: [put_flash: 3]
 
   alias Tugas.Duties.Urgency
@@ -10,8 +10,8 @@ defmodule TugasWeb.DashboardLive.IndexHelpers do
   alias TugasWeb.DashboardLive.CalendarHelpers, as: Calendar
   alias TugasWeb.DutiesFilter
 
-  @open_preview_limit 11
-  @completed_preview_limit 5
+  @open_preview_limit 13
+  @completed_preview_limit 7
 
   def open_preview_limit, do: @open_preview_limit
   def completed_preview_limit, do: @completed_preview_limit
@@ -30,7 +30,7 @@ defmodule TugasWeb.DashboardLive.IndexHelpers do
       |> assign(:row_effects, %{})
       |> assign(:create_duty_open?, false)
       |> assign(:create_duty_from_todo_id, nil)
-      |> assign(:new_todo_open?, false)
+      |> assign(:todo_form, nil)
       |> DutiesFilter.assign_sid(session)
       |> DutiesFilter.assign_from_filters(filters)
       |> assign_calendar_month(filters, today)
@@ -121,24 +121,35 @@ defmodule TugasWeb.DashboardLive.IndexHelpers do
   defp duty_created_message(nil), do: "Duty created."
   defp duty_created_message(_from_todo_id), do: "Duty created and todo escalated."
 
-  def handle_open_new_todo(socket), do: assign(socket, :new_todo_open?, true)
-  def handle_close_new_todo(socket), do: assign(socket, :new_todo_open?, false)
+  def handle_open_new_todo(socket), do: assign(socket, :todo_form, new_todo_form())
+  def handle_close_new_todo(socket), do: assign(socket, :todo_form, nil)
 
-  def handle_create_todo(socket, title) do
-    case Todos.create_todo(socket.assigns.current_scope, %{title: title}) do
+  def handle_validate_todo(socket, params) do
+    changeset =
+      %Todo{}
+      |> Todos.change_todo(params)
+      |> Map.put(:action, :validate)
+
+    assign(socket, :todo_form, to_form(changeset, as: "todo"))
+  end
+
+  def handle_save_todo(socket, params) do
+    case Todos.create_todo(socket.assigns.current_scope, params) do
       {:ok, _todo} ->
         socket
-        |> assign(:new_todo_open?, false)
+        |> assign(:todo_form, nil)
         |> put_flash(:info, "Todo added.")
         |> load_todos()
 
-      {:error, %Ecto.Changeset{}} ->
-        put_flash(socket, :error, "Could not add the todo.")
+      {:error, %Ecto.Changeset{} = changeset} ->
+        assign(socket, :todo_form, to_form(changeset, as: "todo"))
 
       :not_authorise ->
         put_flash(socket, :error, "Not authorized.")
     end
   end
+
+  defp new_todo_form, do: to_form(Todos.change_todo(%Todo{}), as: "todo")
 
   def handle_toggle_todo_complete(socket, id) do
     scope = socket.assigns.current_scope
@@ -187,7 +198,7 @@ defmodule TugasWeb.DashboardLive.IndexHelpers do
       socket.assigns.create_duty_open? ->
         handle_close_create_duty(socket)
 
-      socket.assigns.new_todo_open? ->
+      socket.assigns.todo_form ->
         handle_close_new_todo(socket)
 
       true ->
