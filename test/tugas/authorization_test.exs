@@ -156,6 +156,84 @@ defmodule Tugas.AuthorizationTest do
     end
   end
 
+  describe "role ability matrix (pinned)" do
+    # Literal source-of-truth grid. Change a value here ONLY when the role rules
+    # change on purpose — an accidental drift in Tugas.Authorization fails this test.
+    @can2_matrix [
+      # action                     admin  manager  coordinator  member
+      {:manage_entity, %{admin: true, manager: false, coordinator: false, member: false}},
+      {:manage_types, %{admin: true, manager: true, coordinator: false, member: false}},
+      {:create_duty, %{admin: true, manager: true, coordinator: true, member: false}},
+      {:edit_duty, %{admin: true, manager: true, coordinator: true, member: false}},
+      {:skip, %{admin: true, manager: true, coordinator: false, member: false}},
+      {:end_series, %{admin: true, manager: true, coordinator: false, member: false}},
+      {:void_document, %{admin: true, manager: true, coordinator: false, member: false}},
+      {:mark_completed_in_error,
+       %{admin: true, manager: true, coordinator: false, member: false}},
+      {:view_todos, %{admin: true, manager: true, coordinator: true, member: true}},
+      {:create_todo, %{admin: true, manager: true, coordinator: true, member: true}},
+      {:edit_todo, %{admin: true, manager: true, coordinator: true, member: true}},
+      {:complete_todo, %{admin: true, manager: true, coordinator: true, member: true}},
+      {:delete_todo, %{admin: true, manager: true, coordinator: true, member: true}},
+      {:cancel_todo, %{admin: true, manager: true, coordinator: true, member: true}}
+    ]
+
+    test "can?/2 is exactly pinned for every role and action" do
+      scopes = %{
+        admin: entity_scope_fixture(),
+        manager: manager_scope_fixture(),
+        coordinator: coordinator_scope_fixture(),
+        member: member_scope_fixture()
+      }
+
+      for {action, expected} <- @can2_matrix, {role, want} <- expected do
+        got = Authorization.can?(scopes[role], action)
+
+        assert got == want,
+               "can?(#{role}, #{inspect(action)}) expected #{want}, got #{got}"
+      end
+    end
+
+    test "can?/3 duty work permissions are exactly pinned for every role" do
+      other = user_fixture()
+
+      scopes = %{
+        admin: entity_scope_fixture(),
+        manager: manager_scope_fixture(),
+        coordinator: coordinator_scope_fixture(),
+        member: member_scope_fixture()
+      }
+
+      # per role: {mine, unassigned, others} expected result for each duty action.
+      expected = %{
+        admin: %{mark_done: {true, true, true}, start_progress: {true, true, true}},
+        manager: %{mark_done: {true, true, true}, start_progress: {true, true, true}},
+        coordinator: %{mark_done: {true, false, false}, start_progress: {true, true, false}},
+        member: %{mark_done: {true, false, false}, start_progress: {true, true, false}}
+      }
+
+      for {role, scope} <- scopes do
+        duties = [
+          {:mine, %Duty{primary_assignee_id: scope.user.id, collaborators: []}},
+          {:unassigned, %Duty{primary_assignee_id: nil, collaborators: []}},
+          {:others, %Duty{primary_assignee_id: other.id, collaborators: []}}
+        ]
+
+        for action <- [:mark_done, :start_progress] do
+          {want_mine, want_unassigned, want_others} = expected[role][action]
+          wants = %{mine: want_mine, unassigned: want_unassigned, others: want_others}
+
+          for {shape, duty} <- duties do
+            got = Authorization.can?(scope, action, duty)
+
+            assert got == wants[shape],
+                   "can?(#{role}, #{inspect(action)}, #{shape}) expected #{wants[shape]}, got #{got}"
+          end
+        end
+      end
+    end
+  end
+
   defp collaborator_scope_fixture do
     admin_scope = entity_scope_fixture()
     collaborator = user_fixture()
