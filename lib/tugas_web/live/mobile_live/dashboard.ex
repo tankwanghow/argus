@@ -137,7 +137,6 @@ defmodule TugasWeb.MobileLive.Dashboard do
                 day_modal_date={@day_modal_date}
                 day_modal_rows={@day_modal_rows}
                 day_modal_holidays={@day_modal_holidays}
-                someday_modal_open?={@someday_modal_open?}
               />
             </div>
 
@@ -186,14 +185,6 @@ defmodule TugasWeb.MobileLive.Dashboard do
 
   def handle_event("close_day_modal", _params, socket) do
     {:noreply, Dashboard.handle_close_day_modal(socket)}
-  end
-
-  def handle_event("open_someday_modal", _params, socket) do
-    {:noreply, Dashboard.handle_open_someday_modal(socket)}
-  end
-
-  def handle_event("close_someday_modal", _params, socket) do
-    {:noreply, Dashboard.handle_close_someday_modal(socket)}
   end
 
   def handle_event("toggle_todo_complete", %{"id" => id}, socket) do

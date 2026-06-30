@@ -19,7 +19,6 @@ defmodule TugasWeb.DutyCalendar do
   attr :day_modal_date, :any, default: nil
   attr :day_modal_rows, :list, default: []
   attr :day_modal_holidays, :list, default: []
-  attr :someday_modal_open?, :boolean, default: false
   attr :hide_someday_strip?, :boolean, default: false
 
   def duty_calendar(assigns) do
@@ -68,14 +67,15 @@ defmodule TugasWeb.DutyCalendar do
           <% end %>
           <%= if length(@someday_rows) > @max_someday do %>
             <% extra = length(@someday_rows) - @max_someday %>
-            <button
-              type="button"
+            <.link
               id="someday-more"
-              phx-click="open_someday_modal"
+              navigate={
+                ~p"/entities/#{@slug}/duties?#{[lifecycle: "live", sort: "someday", q: "", mine: "false"]}"
+              }
               class="text-xs text-primary hover:underline px-0.5 shrink-0"
             >
               +{extra} more
-            </button>
+            </.link>
           <% end %>
         </div>
       </section>
@@ -85,13 +85,6 @@ defmodule TugasWeb.DutyCalendar do
         date={@day_modal_date}
         rows={@day_modal_rows}
         holidays={@day_modal_holidays}
-        slug={@slug}
-        variant={@variant}
-      />
-
-      <.someday_modal
-        :if={@someday_modal_open?}
-        rows={@someday_rows}
         slug={@slug}
         variant={@variant}
       />
@@ -128,7 +121,6 @@ defmodule TugasWeb.DutyCalendar do
   attr :rows, :list, required: true
   attr :slug, :string, required: true
   attr :variant, :atom, default: :desktop
-  attr :mine?, :boolean, default: false
 
   def urgent_panel(assigns) do
     assigns =
@@ -180,7 +172,7 @@ defmodule TugasWeb.DutyCalendar do
         <.link
           id="urgent-more"
           navigate={
-            ~p"/entities/#{@slug}/duties?#{[lifecycle: "live", sort: "urgency", q: "", mine: to_string(@mine?)]}"
+            ~p"/entities/#{@slug}/duties?#{[lifecycle: "live", sort: "urgency", q: "", mine: "false"]}"
           }
           class="shrink-0 text-xs text-primary hover:underline px-0.5 pt-1"
         >
@@ -348,40 +340,6 @@ defmodule TugasWeb.DutyCalendar do
         </span>
       </span>
     <% end %>
-    """
-  end
-
-  attr :rows, :list, required: true
-  attr :slug, :string, required: true
-  attr :variant, :atom, default: :desktop
-
-  defp someday_modal(assigns) do
-    ~H"""
-    <div id="someday-modal" class="modal modal-open">
-      <div class="modal-box max-w-md">
-        <h3 class="font-bold text-lg">Someday</h3>
-        <ul class="mt-3 space-y-2 max-h-[70vh] overflow-y-auto">
-          <li :for={row <- @rows}>
-            <.duty_chip
-              row={row}
-              slug={@slug}
-              variant={@variant}
-              id_prefix="someday-modal-duty-chip"
-              layout={:list}
-            />
-          </li>
-        </ul>
-        <div class="modal-action">
-          <button type="button" class="btn" phx-click="close_someday_modal">Close</button>
-        </div>
-      </div>
-      <button
-        class="modal-backdrop"
-        type="button"
-        phx-click="close_someday_modal"
-        aria-label="Close"
-      />
-    </div>
     """
   end
 

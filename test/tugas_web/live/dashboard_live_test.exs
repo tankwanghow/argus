@@ -365,7 +365,7 @@ defmodule TugasWeb.DashboardLiveTest do
     assert has_element?(view, "#dashboard-todo-#{todo.id}", "Restock pantry")
   end
 
-  test "someday overflow shows +N more and opens modal", %{conn: conn} do
+  test "someday overflow shows a +N more link to the prefiltered duties index", %{conn: conn} do
     manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     conn = log_in_user(conn, manager.user)
     type = type_fixture(manager.entity)
@@ -390,14 +390,16 @@ defmodule TugasWeb.DashboardLiveTest do
 
     {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}")
 
-    assert has_element?(view, "#someday-more", "+1 more")
+    assert has_element?(view, "a#someday-more", "+1 more")
     refute has_element?(view, "#someday-strip #duty-chip-#{hidden.id}")
 
-    view |> element("#someday-more") |> render_click()
-    assert has_element?(view, "#someday-modal #someday-modal-duty-chip-#{hidden.id}")
+    assert {:error, {:live_redirect, %{to: to}}} =
+             view |> element("a#someday-more") |> render_click()
 
-    hidden = Duties.get_duty!(manager, hidden.id)
-    assert has_element?(view, "#someday-modal-duty-chip-#{hidden.id}", hidden.duty_type.name)
+    assert to =~ "/entities/#{manager.entity.slug}/duties?"
+    assert to =~ "lifecycle=live"
+    assert to =~ "sort=someday"
+    assert to =~ "mine=false"
   end
 
   test "urgent duty appears in urgent panel; non-urgent and someday excluded", %{conn: conn} do

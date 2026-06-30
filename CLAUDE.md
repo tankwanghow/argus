@@ -315,9 +315,15 @@ dashboard is where overdue/due-soon work surfaces, computed at render time:
   swipe deck) lists live duties flagged for attention — `urgency in [:overdue, :due_soon]`,
   ranked overdue→due_soon then by `due_by`, via `CalendarHelpers.load_urgent_rows/3` (reuses
   `build_calendar_rows` + `Urgency.classify`, 1-year horizon, excludes dateless). Desktop caps
-  at 10 chips with a `+N more` **link to the duties index prefiltered to Live + Most urgent**
-  (`/duties?lifecycle=live&sort=urgency&q=&mine=…`, carrying the dashboard's current scope; applied
-  + persisted by `DutyLive.Index.handle_params`); mobile scrolls. The Someday strip is unchanged.
+  at 10 chips with a `+N more` **link to the duties index prefiltered to Team + Live + Most urgent**
+  (`/duties?lifecycle=live&sort=urgency&q=&mine=false`); mobile scrolls.
+- **Overflow "+N more" links carry a prefilter into the duties index, not a modal.** Both the
+  desktop **Urgent** column and the **Someday** strip render their `+N more` as a `<.link navigate>`
+  to `/entities/:slug/duties` with query params — Urgent → `lifecycle=live&sort=urgency&q=&mine=false`,
+  Someday → `lifecycle=live&sort=someday&q=&mine=false` (both force **Team**). `DutyLive.Index.handle_params`
+  applies `lifecycle`/`sort`/`q`/`mine` params over the loaded filters, reloads, and **persists** them
+  to the per-browser filter store (so the prefilter survives a remount). There are no urgent/someday
+  overflow modals.
 - **The list is server-paginated, never a full load.** `Duties.list_duties_page/2`
   filters (SQL `ILIKE` on title / joined type name / joined assignee email + the literal
   `"unassigned"`), sorts, and pages by **keyset cursor** (sort column + `id`, opaque
