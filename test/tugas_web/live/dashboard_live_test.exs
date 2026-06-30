@@ -437,7 +437,7 @@ defmodule TugasWeb.DashboardLiveTest do
     refute has_element?(view, "#urgent-panel #urgent-duty-chip-#{someday.id}")
   end
 
-  test "urgent overflow shows +N more, opens and closes modal", %{conn: conn} do
+  test "urgent overflow shows a +N more link to the prefiltered duties index", %{conn: conn} do
     manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     conn = log_in_user(conn, manager.user)
     type = type_fixture(manager.entity, reminder_offsets: "30")
@@ -463,14 +463,16 @@ defmodule TugasWeb.DashboardLiveTest do
 
     {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}")
 
-    assert has_element?(view, "#urgent-more", "+1 more")
+    assert has_element?(view, "a#urgent-more", "+1 more")
     refute has_element?(view, "#urgent-panel #urgent-duty-chip-#{hidden.id}")
 
-    view |> element("#urgent-more") |> render_click()
-    assert has_element?(view, "#urgent-modal #urgent-modal-duty-chip-#{hidden.id}")
+    assert {:error, {:live_redirect, %{to: to}}} =
+             view |> element("a#urgent-more") |> render_click()
 
-    view |> element("#urgent-modal button", "Close") |> render_click()
-    refute has_element?(view, "#urgent-modal")
+    assert to =~ "/entities/#{manager.entity.slug}/duties?"
+    assert to =~ "lifecycle=live"
+    assert to =~ "sort=urgency"
+    assert to =~ "mine=false"
   end
 
   test "day overflow opens modal with all duties", %{conn: conn} do

@@ -27,7 +27,6 @@ defmodule TugasWeb.DashboardLive.IndexHelpers do
       |> assign(:day_modal_rows, [])
       |> assign(:day_modal_holidays, [])
       |> assign(:someday_modal_open?, false)
-      |> assign(:urgent_modal_open?, false)
       |> assign(:row_effects, %{})
       |> DutiesFilter.assign_sid(session)
       |> DutiesFilter.assign_from_filters(filters)
@@ -108,16 +107,6 @@ defmodule TugasWeb.DashboardLive.IndexHelpers do
     assign(socket, :someday_modal_open?, false)
   end
 
-  def handle_open_urgent_modal(socket) do
-    socket
-    |> assign(:urgent_modal_open?, true)
-    |> assign(day_modal_date: nil, day_modal_rows: [])
-  end
-
-  def handle_close_urgent_modal(socket) do
-    assign(socket, :urgent_modal_open?, false)
-  end
-
   def handle_toggle_todo_complete(socket, id) do
     scope = socket.assigns.current_scope
 
@@ -164,9 +153,6 @@ defmodule TugasWeb.DashboardLive.IndexHelpers do
 
       socket.assigns.someday_modal_open? ->
         handle_close_someday_modal(socket)
-
-      socket.assigns.urgent_modal_open? ->
-        handle_close_urgent_modal(socket)
 
       true ->
         socket

@@ -315,7 +315,9 @@ dashboard is where overdue/due-soon work surfaces, computed at render time:
   swipe deck) lists live duties flagged for attention — `urgency in [:overdue, :due_soon]`,
   ranked overdue→due_soon then by `due_by`, via `CalendarHelpers.load_urgent_rows/3` (reuses
   `build_calendar_rows` + `Urgency.classify`, 1-year horizon, excludes dateless). Desktop caps
-  at 10 chips with a `+N more` → `urgent-modal`; mobile scrolls. The Someday strip is unchanged.
+  at 10 chips with a `+N more` **link to the duties index prefiltered to Live + Most urgent**
+  (`/duties?lifecycle=live&sort=urgency&q=&mine=…`, carrying the dashboard's current scope; applied
+  + persisted by `DutyLive.Index.handle_params`); mobile scrolls. The Someday strip is unchanged.
 - **The list is server-paginated, never a full load.** `Duties.list_duties_page/2`
   filters (SQL `ILIKE` on title / joined type name / joined assignee email + the literal
   `"unassigned"`), sorts, and pages by **keyset cursor** (sort column + `id`, opaque

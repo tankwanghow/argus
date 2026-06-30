@@ -67,6 +67,39 @@ defmodule TugasWeb.DutyLive.IndexTest do
     assert html =~ ~s(value="completed" selected)
   end
 
+  test "URL params prefilter the list to Live + Most urgent + empty search, overriding the store",
+       %{conn: conn} do
+    {scope, _} = manager_duty_scope_fixture()
+    sid = "sid-#{System.unique_integer([:positive])}"
+
+    # A different filter is already saved; the URL params must win.
+    Store.put(sid, %{
+      scope.entity.slug => %{
+        "mine" => "true",
+        "lifecycle" => "completed",
+        "query" => "old search",
+        "sort" => "title"
+      }
+    })
+
+    conn = conn |> log_in_user(scope.user) |> Plug.Conn.put_session(:filter_sid, sid)
+
+    {:ok, view, _html} =
+      live(conn, ~p"/entities/#{scope.entity.slug}/duties?lifecycle=live&sort=urgency&q=")
+
+    html = render(view)
+    assert html =~ ~s(value="live" selected)
+    assert html =~ ~s(value="urgency" selected)
+    assert has_element?(view, "#duty-search[value='']")
+    refute html =~ "old search"
+
+    # The override is persisted, so a remount keeps it.
+    {:ok, view, _html} = live(conn, ~p"/entities/#{scope.entity.slug}/duties")
+    html = render(view)
+    assert html =~ ~s(value="live" selected)
+    assert html =~ ~s(value="urgency" selected)
+  end
+
   test "restores duties filters from the store", %{conn: conn} do
     {scope, _} = manager_duty_scope_fixture()
     sid = "sid-#{System.unique_integer([:positive])}"

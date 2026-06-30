@@ -128,7 +128,7 @@ defmodule TugasWeb.DutyCalendar do
   attr :rows, :list, required: true
   attr :slug, :string, required: true
   attr :variant, :atom, default: :desktop
-  attr :modal_open?, :boolean, default: false
+  attr :mine?, :boolean, default: false
 
   def urgent_panel(assigns) do
     assigns =
@@ -177,17 +177,16 @@ defmodule TugasWeb.DutyCalendar do
 
       <%= if !@mobile? and length(@rows) > @max_urgent do %>
         <% extra = length(@rows) - @max_urgent %>
-        <button
-          type="button"
+        <.link
           id="urgent-more"
-          phx-click="open_urgent_modal"
+          navigate={
+            ~p"/entities/#{@slug}/duties?#{[lifecycle: "live", sort: "urgency", q: "", mine: to_string(@mine?)]}"
+          }
           class="shrink-0 text-xs text-primary hover:underline px-0.5 pt-1"
         >
           +{extra} more
-        </button>
+        </.link>
       <% end %>
-
-      <.urgent_modal :if={!@mobile? and @modal_open?} rows={@rows} slug={@slug} variant={@variant} />
     </section>
     """
   end
@@ -198,41 +197,8 @@ defmodule TugasWeb.DutyCalendar do
   defp urgent_panel_class(true), do: "h-full min-h-0 flex flex-col px-1"
 
   defp urgent_panel_class(false),
-    do: "flex h-full min-h-0 min-w-0 flex-col rounded-lg border border-base-300 bg-base-200/40 p-3"
-
-  attr :rows, :list, required: true
-  attr :slug, :string, required: true
-  attr :variant, :atom, default: :desktop
-
-  defp urgent_modal(assigns) do
-    ~H"""
-    <div id="urgent-modal" class="modal modal-open">
-      <div class="modal-box max-w-md">
-        <h3 class="font-bold text-lg">Urgent</h3>
-        <ul class="mt-3 space-y-2 max-h-[70vh] overflow-y-auto">
-          <li :for={row <- @rows}>
-            <.duty_chip
-              row={row}
-              slug={@slug}
-              variant={@variant}
-              id_prefix="urgent-modal-duty-chip"
-              layout={:list}
-            />
-          </li>
-        </ul>
-        <div class="modal-action">
-          <button type="button" class="btn" phx-click="close_urgent_modal">Close</button>
-        </div>
-      </div>
-      <button
-        class="modal-backdrop"
-        type="button"
-        phx-click="close_urgent_modal"
-        aria-label="Close"
-      />
-    </div>
-    """
-  end
+    do:
+      "flex h-full min-h-0 min-w-0 flex-col rounded-lg border border-base-300 bg-base-200/40 p-3"
 
   attr :mobile?, :boolean, required: true
 
