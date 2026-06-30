@@ -393,11 +393,13 @@ defmodule TugasWeb.MobileLive.DutyShow do
             class="mt-2"
           >
             <.char_count_input field={@edit_form[:title]} label="Title" max={60} required />
-            <div class="flex items-center gap-4">
-              <div class="fieldset">
+
+              <div class="flex text-sm gap-2 mt-2">
                 <label class="label mb-1" for="m-edit-duty-type">Type</label>
-                <p id="m-edit-duty-type" class="font-medium text-info">{@duty.duty_type.name}</p>
+                <div id="m-edit-duty-type" class="font-medium text-info">{@duty.duty_type.name}</div>
+                <div>reminder: {@duty.duty_type.reminder_offsets}d before</div>
               </div>
+              <div class="flex items-center gap-4">
               <div class="mt-6">
                 <.input field={@edit_form[:someday]} type="checkbox" label="No due date (Someday)" />
               </div>
