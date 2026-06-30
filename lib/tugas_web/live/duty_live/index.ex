@@ -175,10 +175,10 @@ defmodule TugasWeb.DutyLive.Index do
 
   @impl true
   def handle_params(params, _uri, socket) do
-    if Enum.any?(~w(lifecycle sort q mine), &Map.has_key?(params, &1)) do
+    if DutiesFilter.prefilter_params?(params) do
       {:noreply,
        socket
-       |> apply_param_filters(params)
+       |> DutiesFilter.apply_params(params)
        |> load_first_page()
        |> DutiesFilter.persist()}
     else
@@ -240,21 +240,6 @@ defmodule TugasWeb.DutyLive.Index do
   end
 
   def handle_event("close_modal_on_escape", _params, socket), do: {:noreply, socket}
-
-  defp apply_param_filters(socket, params) do
-    socket
-    |> maybe_assign_param(params, "mine", :mine?, &(&1 == "true"))
-    |> maybe_assign_param(params, "lifecycle", :lifecycle, &Index.parse_lifecycle/1)
-    |> maybe_assign_param(params, "sort", :sort, &Index.parse_sort/1)
-    |> maybe_assign_param(params, "q", :query, & &1)
-  end
-
-  defp maybe_assign_param(socket, params, key, assign_key, fun) do
-    case Map.fetch(params, key) do
-      {:ok, value} -> assign(socket, assign_key, fun.(value))
-      :error -> socket
-    end
-  end
 
   defp load_first_page(socket) do
     %{

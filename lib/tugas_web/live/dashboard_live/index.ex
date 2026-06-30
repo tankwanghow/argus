@@ -62,8 +62,12 @@ defmodule TugasWeb.DashboardLive.Index do
           </div>
         </div>
 
-        <div class="grid grid-cols-1 gap-6 lg:grid-cols-[15%_minmax(0,1fr)_15%]">
-          <.urgent_panel rows={@urgent_rows} slug={@current_scope.entity.slug} />
+        <div class={grid_cols_class(@collapsed)}>
+          <.urgent_panel
+            rows={@urgent_rows}
+            slug={@current_scope.entity.slug}
+            collapsed?={@collapsed.urgent}
+          />
 
           <div class="flex h-full min-h-0 min-w-0 flex-col">
             <.duty_calendar
@@ -74,6 +78,7 @@ defmodule TugasWeb.DashboardLive.Index do
               day_modal_date={@day_modal_date}
               day_modal_rows={@day_modal_rows}
               day_modal_holidays={@day_modal_holidays}
+              someday_collapsed?={@collapsed.someday}
             />
           </div>
 
@@ -82,6 +87,7 @@ defmodule TugasWeb.DashboardLive.Index do
             completed_todos={@completed_todos}
             slug={@current_scope.entity.slug}
             row_effects={@row_effects}
+            collapsed?={@collapsed.todos}
           />
         </div>
       </div>
@@ -117,6 +123,10 @@ defmodule TugasWeb.DashboardLive.Index do
     {:noreply, Dashboard.handle_close_day_modal(socket)}
   end
 
+  def handle_event("toggle_panel", %{"panel" => panel}, socket) do
+    {:noreply, Dashboard.handle_toggle_panel(socket, panel)}
+  end
+
   def handle_event("toggle_todo_complete", %{"id" => id}, socket) do
     {:noreply, Dashboard.handle_toggle_todo_complete(socket, id)}
   end
@@ -128,4 +138,18 @@ defmodule TugasWeb.DashboardLive.Index do
   def handle_event("close_modal_on_escape", _params, socket) do
     {:noreply, Dashboard.handle_close_modal_on_escape(socket)}
   end
+
+  # Collapsing Urgent (left) / Todos (right) shrinks that column to a thin rail so
+  # the calendar (the 1fr middle column) expands to take the freed width.
+  defp grid_cols_class(%{urgent: true, todos: true}),
+    do: "grid grid-cols-1 gap-2 lg:grid-cols-[2.5rem_minmax(0,1fr)_2.5rem]"
+
+  defp grid_cols_class(%{urgent: true}),
+    do: "grid grid-cols-1 gap-2 lg:grid-cols-[2.5rem_minmax(0,1fr)_15%]"
+
+  defp grid_cols_class(%{todos: true}),
+    do: "grid grid-cols-1 gap-2 lg:grid-cols-[15%_minmax(0,1fr)_2.5rem]"
+
+  defp grid_cols_class(_),
+    do: "grid grid-cols-1 gap-2 lg:grid-cols-[15%_minmax(0,1fr)_15%]"
 end

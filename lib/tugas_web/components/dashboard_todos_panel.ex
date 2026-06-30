@@ -15,20 +15,47 @@ defmodule TugasWeb.DashboardTodosPanel do
   attr :slug, :string, required: true
   attr :variant, :atom, default: :desktop
   attr :row_effects, :map, default: %{}
+  attr :collapsed?, :boolean, default: false
 
   def dashboard_todos_panel(assigns) do
     assigns = assign(assigns, :mobile?, assigns.variant == :mobile)
 
     ~H"""
-    <.panel_root mobile?={@mobile?}>
-      <div class="flex shrink-0 items-center gap-2 pb-2">
+    <.panel_root mobile?={@mobile?} collapsed?={@collapsed?}>
+      <button
+        :if={!@mobile? and @collapsed?}
+        type="button"
+        id="todos-collapse"
+        phx-click="toggle_panel"
+        phx-value-panel="todos"
+        class="flex h-full w-full flex-col items-center gap-2 text-base-content/60 hover:text-base-content"
+        aria-label="Expand Todos"
+        aria-expanded="false"
+      >
+        <span class="text-xs leading-none">«</span>
+        <span class="text-sm font-semibold [writing-mode:vertical-rl] rotate-180">Todos</span>
+      </button>
+
+      <div :if={@mobile? or !@collapsed?} class="flex shrink-0 items-center gap-2 pb-2">
         <h2 class="text-lg font-semibold">Todos</h2>
         <.link navigate={todos_index_path(@variant, @slug)} class="text-sm link link-primary">
           View all →
         </.link>
+        <button
+          :if={!@mobile?}
+          type="button"
+          id="todos-collapse"
+          phx-click="toggle_panel"
+          phx-value-panel="todos"
+          class="ml-auto text-xs leading-none text-base-content/60 hover:text-base-content"
+          aria-label="Toggle Todos"
+          aria-expanded={to_string(!@collapsed?)}
+        >
+          ▾
+        </button>
       </div>
 
-      <div class={panel_body_class(@mobile?)}>
+      <div :if={@mobile? or !@collapsed?} class={panel_body_class(@mobile?)}>
         <div class={open_section_class(@mobile?)}>
           <ul
             :if={@todos != []}
@@ -81,6 +108,7 @@ defmodule TugasWeb.DashboardTodosPanel do
   end
 
   attr :mobile?, :boolean, required: true
+  attr :collapsed?, :boolean, default: false
   slot :inner_block, required: true
 
   defp panel_root(%{mobile?: true} = assigns) do
@@ -96,14 +124,19 @@ defmodule TugasWeb.DashboardTodosPanel do
 
   defp panel_root(%{mobile?: false} = assigns) do
     ~H"""
-    <aside
-      id="dashboard-todos"
-      class="flex h-full min-h-0 min-w-0 flex-col rounded-lg border border-base-300 bg-base-200/40 p-3"
-    >
+    <aside id="dashboard-todos" class={todos_root_class(@collapsed?)}>
       {render_slot(@inner_block)}
     </aside>
     """
   end
+
+  defp todos_root_class(true),
+    do:
+      "flex h-full min-h-0 flex-col items-center rounded-lg border border-base-300 bg-base-200/40 p-1"
+
+  defp todos_root_class(false),
+    do:
+      "flex h-full min-h-0 min-w-0 flex-col rounded-lg border border-base-300 bg-base-200/40 p-3"
 
   attr :todo, Todo, required: true
   attr :slug, :string, required: true

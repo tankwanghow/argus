@@ -477,6 +477,61 @@ defmodule TugasWeb.DashboardLiveTest do
     assert to =~ "mine=false"
   end
 
+  test "urgent panel collapses and the state persists per browser", %{conn: conn} do
+    manager = Tugas.EntitiesFixtures.manager_scope_fixture()
+    sid = "sid-#{System.unique_integer([:positive])}"
+    conn = conn |> log_in_user(manager.user) |> Plug.Conn.put_session(:filter_sid, sid)
+    type = type_fixture(manager.entity, reminder_offsets: "7")
+    today = Urgency.today_for(manager.entity.timezone)
+
+    {:ok, urgent} =
+      Duties.create_duty(manager, %{
+        title: "Overdue",
+        duty_type_id: type.id,
+        due_by: Date.add(today, -1),
+        open_note: "open"
+      })
+
+    {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}")
+
+    assert has_element?(view, "#urgent-panel #urgent-duty-chip-#{urgent.id}")
+
+    view |> element("#urgent-collapse") |> render_click()
+    refute has_element?(view, "#urgent-panel #urgent-duty-chip-#{urgent.id}")
+    assert has_element?(view, "#urgent-collapse")
+
+    # Collapsed state is remembered for the browser session across remounts.
+    {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}")
+    refute has_element?(view, "#urgent-panel #urgent-duty-chip-#{urgent.id}")
+
+    view |> element("#urgent-collapse") |> render_click()
+    assert has_element?(view, "#urgent-panel #urgent-duty-chip-#{urgent.id}")
+  end
+
+  test "todos and someday panels collapse", %{conn: conn} do
+    manager = Tugas.EntitiesFixtures.manager_scope_fixture()
+    conn = log_in_user(conn, manager.user)
+    type = type_fixture(manager.entity)
+
+    {:ok, someday} =
+      Duties.create_duty(manager, %{
+        title: "No date",
+        duty_type_id: type.id,
+        someday: true,
+        open_note: "open"
+      })
+
+    {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}")
+
+    assert has_element?(view, "#dashboard-todos", "Recently completed")
+    view |> element("#todos-collapse") |> render_click()
+    refute has_element?(view, "#dashboard-todos", "Recently completed")
+
+    assert has_element?(view, "#someday-strip #duty-chip-#{someday.id}")
+    view |> element("#someday-collapse") |> render_click()
+    refute has_element?(view, "#someday-strip #duty-chip-#{someday.id}")
+  end
+
   test "day overflow opens modal with all duties", %{conn: conn} do
     manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     conn = log_in_user(conn, manager.user)

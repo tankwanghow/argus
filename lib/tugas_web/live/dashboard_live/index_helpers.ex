@@ -95,6 +95,16 @@ defmodule TugasWeb.DashboardLive.IndexHelpers do
     assign(socket, day_modal_date: nil, day_modal_rows: [], day_modal_holidays: [])
   end
 
+  def handle_toggle_panel(socket, panel) when panel in ~w(urgent todos someday) do
+    key = String.to_existing_atom(panel)
+
+    socket
+    |> assign(:collapsed, Map.update!(socket.assigns.collapsed, key, &(!&1)))
+    |> DutiesFilter.persist()
+  end
+
+  def handle_toggle_panel(socket, _panel), do: socket
+
   def handle_toggle_todo_complete(socket, id) do
     scope = socket.assigns.current_scope
 

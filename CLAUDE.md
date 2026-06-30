@@ -323,7 +323,16 @@ dashboard is where overdue/due-soon work surfaces, computed at render time:
   Someday → `lifecycle=live&sort=someday&q=&mine=false` (both force **Team**). `DutyLive.Index.handle_params`
   applies `lifecycle`/`sort`/`q`/`mine` params over the loaded filters, reloads, and **persists** them
   to the per-browser filter store (so the prefilter survives a remount). There are no urgent/someday
-  overflow modals.
+  overflow modals. On mobile the Urgent/Someday swipe panels show the **same** capped list + `+N more`
+  link (to `/m/:slug/duties?…`), capped via `max_urgent_chips`/`max_someday_chips(:mobile)`.
+- **Desktop dashboard panels collapse to give the calendar their space.** Urgent (left) and Todos
+  (right) collapse to a thin **vertical rail** (`writing-mode:vertical-rl` label + expand button); the
+  Someday strip collapses to a thin **bottom bar**. `DashboardLive.Index.grid_cols_class/1` swaps the
+  3-col grid template so a collapsed side column shrinks to `2.5rem` and the `1fr` calendar widens;
+  collapsing Someday lets the `flex-1` calendar grow taller. Each panel header has a `▾/▸` toggle
+  (`toggle_panel` event, `phx-value-panel` = `urgent|todos|someday`); collapse state is a `@collapsed`
+  map **persisted per-browser** in the filter store (alongside the filters/month), so it survives
+  navigation and reload.
 - **The list is server-paginated, never a full load.** `Duties.list_duties_page/2`
   filters (SQL `ILIKE` on title / joined type name / joined assignee email + the literal
   `"unassigned"`), sorts, and pages by **keyset cursor** (sort column + `id`, opaque

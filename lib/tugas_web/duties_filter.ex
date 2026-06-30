@@ -29,6 +29,28 @@ defmodule TugasWeb.DutiesFilter do
     |> Phoenix.Component.assign(:lifecycle, filters.lifecycle)
     |> Phoenix.Component.assign(:query, filters.query)
     |> Phoenix.Component.assign(:sort, filters.sort)
+    |> Phoenix.Component.assign(:collapsed, filters.collapsed)
+  end
+
+  @prefilter_keys ~w(lifecycle sort q mine)
+
+  @doc "True when the params carry any prefilter key from a dashboard \"+N more\" link."
+  def prefilter_params?(params), do: Enum.any?(@prefilter_keys, &Map.has_key?(params, &1))
+
+  @doc "Apply lifecycle/sort/q/mine URL params over the current filter assigns."
+  def apply_params(socket, params) do
+    socket
+    |> maybe_assign_param(params, "mine", :mine?, &(&1 == "true"))
+    |> maybe_assign_param(params, "lifecycle", :lifecycle, &Index.parse_lifecycle/1)
+    |> maybe_assign_param(params, "sort", :sort, &Index.parse_sort/1)
+    |> maybe_assign_param(params, "q", :query, & &1)
+  end
+
+  defp maybe_assign_param(socket, params, key, assign_key, fun) do
+    case Map.fetch(params, key) do
+      {:ok, value} -> Phoenix.Component.assign(socket, assign_key, fun.(value))
+      :error -> socket
+    end
   end
 
   def load(session, %Scope{entity: %{slug: slug}} = scope) do
@@ -71,6 +93,13 @@ defmodule TugasWeb.DutiesFilter do
         params
       end
 
+    params =
+      if Map.has_key?(socket.assigns, :collapsed) do
+        Map.put(params, "collapsed", stringify_collapsed(socket.assigns.collapsed))
+      else
+        params
+      end
+
     session_entry(params)
   end
 
@@ -82,6 +111,20 @@ defmodule TugasWeb.DutiesFilter do
       "sort" => param_sort(params["sort"])
     }
     |> maybe_put_calendar_month(params)
+    |> maybe_put_collapsed(params)
+  end
+
+  defp maybe_put_collapsed(entry, %{"collapsed" => %{} = collapsed}),
+    do: Map.put(entry, "collapsed", collapsed)
+
+  defp maybe_put_collapsed(entry, _), do: entry
+
+  defp stringify_collapsed(collapsed) do
+    %{
+      "urgent" => !!Map.get(collapsed, :urgent),
+      "todos" => !!Map.get(collapsed, :todos),
+      "someday" => !!Map.get(collapsed, :someday)
+    }
   end
 
   defp merge_saved(%{"mine" => mine, "lifecycle" => lifecycle, "query" => query} = saved, scope) do
@@ -93,7 +136,8 @@ defmodule TugasWeb.DutiesFilter do
       query: query || "",
       sort: parse_sort(Map.get(saved, "sort")),
       year: parse_year(Map.get(saved, "year")),
-      month: parse_month(Map.get(saved, "month"))
+      month: parse_month(Map.get(saved, "month")),
+      collapsed: parse_collapsed(Map.get(saved, "collapsed"))
     }
   end
 
@@ -106,9 +150,26 @@ defmodule TugasWeb.DutiesFilter do
       query: "",
       sort: :due_asc,
       year: nil,
-      month: nil
+      month: nil,
+      collapsed: default_collapsed()
     }
   end
+
+  defp default_collapsed, do: %{urgent: false, todos: false, someday: false}
+
+  defp parse_collapsed(%{} = collapsed) do
+    %{
+      urgent: parse_bool(Map.get(collapsed, "urgent")),
+      todos: parse_bool(Map.get(collapsed, "todos")),
+      someday: parse_bool(Map.get(collapsed, "someday"))
+    }
+  end
+
+  defp parse_collapsed(_), do: default_collapsed()
+
+  defp parse_bool(true), do: true
+  defp parse_bool("true"), do: true
+  defp parse_bool(_), do: false
 
   defp parse_mine(value, default) do
     case parse_mine(value) do

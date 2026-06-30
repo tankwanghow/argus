@@ -111,6 +111,19 @@ defmodule TugasWeb.MobileLive.DutyIndex do
   end
 
   @impl true
+  def handle_params(params, _uri, socket) do
+    if DutiesFilter.prefilter_params?(params) do
+      {:noreply,
+       socket
+       |> DutiesFilter.apply_params(params)
+       |> load_first_page()
+       |> DutiesFilter.persist()}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl true
   def handle_event("set_scope", %{"mine" => mine}, socket) do
     {:noreply,
      socket |> assign(:mine?, mine == "true") |> load_first_page() |> DutiesFilter.persist()}

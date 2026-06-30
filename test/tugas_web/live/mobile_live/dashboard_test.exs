@@ -176,36 +176,42 @@ defmodule TugasWeb.MobileLive.DashboardTest do
     assert render(view) =~ "Four"
   end
 
-  test "someday panel lists all duties without overflow chip", %{conn: conn} do
+  test "someday panel caps the list and links overflow to the prefiltered duties index",
+       %{conn: conn} do
     manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     conn = mobile_conn(conn, manager)
     type = type_fixture(manager.entity)
 
-    duties =
-      for n <- 1..7 do
-        {:ok, duty} =
-          Duties.create_duty(manager, %{
-            title: "Someday #{n}",
-            duty_type_id: type.id,
-            someday: true,
-            open_note: "open"
-          })
+    for n <- 1..6 do
+      {:ok, _duty} =
+        Duties.create_duty(manager, %{
+          title: "Someday #{n}",
+          duty_type_id: type.id,
+          someday: true,
+          open_note: "open"
+        })
+    end
 
-        duty
-      end
+    {:ok, hidden} =
+      Duties.create_duty(manager, %{
+        title: "Someday hidden",
+        duty_type_id: type.id,
+        someday: true,
+        open_note: "open"
+      })
 
     {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}")
 
-    refute has_element?(view, "#someday-more")
-    refute has_element?(view, "#someday-strip")
+    assert has_element?(view, "a#someday-more", "+1 more")
+    refute has_element?(view, "#m-dashboard-someday #someday-panel-duty-chip-#{hidden.id}")
 
-    for duty <- duties do
-      assert has_element?(
-               view,
-               "#m-dashboard-someday #someday-panel-duty-chip-#{duty.id}",
-               duty.title
-             )
-    end
+    assert {:error, {:live_redirect, %{to: to}}} =
+             view |> element("a#someday-more") |> render_click()
+
+    assert to =~ "/m/#{manager.entity.slug}/duties?"
+    assert to =~ "lifecycle=live"
+    assert to =~ "sort=someday"
+    assert to =~ "mine=false"
   end
 
   test "calendar month persists when returning to the dashboard", %{conn: conn} do
@@ -266,6 +272,45 @@ defmodule TugasWeb.MobileLive.DashboardTest do
     assert has_element?(view, "[data-dashboard-go='2']", "calendar")
     assert has_element?(view, "[data-dashboard-panel='1'] #m-dashboard-urgent")
     assert has_element?(view, "#m-dashboard-urgent #urgent-panel-duty-chip-#{urgent.id}")
+  end
+
+  test "urgent panel caps the list and links overflow to the prefiltered duties index",
+       %{conn: conn} do
+    manager = Tugas.EntitiesFixtures.manager_scope_fixture()
+    conn = mobile_conn(conn, manager)
+    type = type_fixture(manager.entity, reminder_offsets: "30")
+    today = Urgency.today_for(manager.entity.timezone)
+
+    for n <- 1..10 do
+      {:ok, _} =
+        Duties.create_duty(manager, %{
+          title: "Urgent #{String.pad_leading("#{n}", 2, "0")}",
+          duty_type_id: type.id,
+          due_by: Date.add(today, n),
+          open_note: "open"
+        })
+    end
+
+    {:ok, hidden} =
+      Duties.create_duty(manager, %{
+        title: "Urgent hidden",
+        duty_type_id: type.id,
+        due_by: Date.add(today, 20),
+        open_note: "open"
+      })
+
+    {:ok, view, _html} = live(conn, ~p"/m/#{manager.entity.slug}")
+
+    assert has_element?(view, "a#urgent-more", "+1 more")
+    refute has_element?(view, "#m-dashboard-urgent #urgent-panel-duty-chip-#{hidden.id}")
+
+    assert {:error, {:live_redirect, %{to: to}}} =
+             view |> element("a#urgent-more") |> render_click()
+
+    assert to =~ "/m/#{manager.entity.slug}/duties?"
+    assert to =~ "lifecycle=live"
+    assert to =~ "sort=urgency"
+    assert to =~ "mine=false"
   end
 
   test "calendar body grid uses equal-height rows for the month", %{conn: conn} do

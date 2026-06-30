@@ -20,6 +20,7 @@ defmodule TugasWeb.DutyCalendar do
   attr :day_modal_rows, :list, default: []
   attr :day_modal_holidays, :list, default: []
   attr :hide_someday_strip?, :boolean, default: false
+  attr :someday_collapsed?, :boolean, default: false
 
   def duty_calendar(assigns) do
     assigns =
@@ -54,8 +55,11 @@ defmodule TugasWeb.DutyCalendar do
         id="someday-strip"
         class="shrink-0 rounded-lg border border-base-300 bg-base-200/40 p-3 space-y-2"
       >
-        <h3 class="text-sm font-semibold text-base-content/70">Someday</h3>
-        <div class={someday_chips_class(@mobile?)}>
+        <div class="flex items-center justify-between">
+          <h3 class="text-sm font-semibold text-base-content/70">Someday</h3>
+          <.collapse_toggle panel="someday" collapsed?={@someday_collapsed?} label="Someday" />
+        </div>
+        <div :if={!@someday_collapsed?} class={someday_chips_class(@mobile?)}>
           <%= for {row, idx} <- Enum.with_index(@someday_rows) do %>
             <.duty_chip
               :if={idx < @max_someday}
@@ -70,7 +74,7 @@ defmodule TugasWeb.DutyCalendar do
             <.link
               id="someday-more"
               navigate={
-                ~p"/entities/#{@slug}/duties?#{[lifecycle: "live", sort: "someday", q: "", mine: "false"]}"
+                duties_path(@variant, @slug, lifecycle: "live", sort: "someday", q: "", mine: "false")
               }
               class="text-xs text-primary hover:underline px-0.5 shrink-0"
             >
@@ -97,6 +101,8 @@ defmodule TugasWeb.DutyCalendar do
   attr :variant, :atom, default: :mobile
 
   def mobile_someday_panel(assigns) do
+    assigns = assign(assigns, :max_someday, CalendarHelpers.max_someday_chips(:mobile))
+
     ~H"""
     <section id="m-dashboard-someday" class="h-full min-h-0 flex flex-col px-1">
       <h2 class="shrink-0 text-lg font-semibold text-base-content/80 pb-2">Someday</h2>
@@ -104,7 +110,7 @@ defmodule TugasWeb.DutyCalendar do
         No someday duties.
       </p>
       <ul :if={@rows != []} class="min-h-0 flex-1 space-y-2 overflow-y-auto">
-        <li :for={row <- @rows}>
+        <li :for={row <- Enum.take(@rows, @max_someday)}>
           <.duty_chip
             row={row}
             slug={@slug}
@@ -112,6 +118,17 @@ defmodule TugasWeb.DutyCalendar do
             id_prefix="someday-panel-duty-chip"
             layout={:list}
           />
+        </li>
+        <li :if={length(@rows) > @max_someday}>
+          <.link
+            id="someday-more"
+            navigate={
+              duties_path(:mobile, @slug, lifecycle: "live", sort: "someday", q: "", mine: "false")
+            }
+            class="text-xs text-primary hover:underline px-0.5"
+          >
+            +{length(@rows) - @max_someday} more
+          </.link>
         </li>
       </ul>
     </section>
@@ -121,6 +138,7 @@ defmodule TugasWeb.DutyCalendar do
   attr :rows, :list, required: true
   attr :slug, :string, required: true
   attr :variant, :atom, default: :desktop
+  attr :collapsed?, :boolean, default: false
 
   def urgent_panel(assigns) do
     assigns =
@@ -129,56 +147,45 @@ defmodule TugasWeb.DutyCalendar do
       |> assign(:max_urgent, CalendarHelpers.max_urgent_chips())
 
     ~H"""
-    <section id={urgent_panel_id(@mobile?)} class={urgent_panel_class(@mobile?)}>
-      <h2 :if={@mobile?} class="shrink-0 text-lg font-semibold text-base-content/80 pb-2">
-        Urgent
-      </h2>
-      <h3 :if={!@mobile?} class="shrink-0 text-sm font-semibold text-base-content/70 pb-2">
-        Urgent
-      </h3>
+    <section id={urgent_panel_id(@mobile?)} class={urgent_panel_class(@mobile?, @collapsed?)}>
+      <.collapsed_rail :if={!@mobile? and @collapsed?} panel="urgent" label="Urgent" side={:left} />
 
-      <p :if={@rows == []} class="text-sm text-base-content/60">
-        Nothing overdue or due soon.
-      </p>
+      <.panel_header
+        :if={@mobile? or !@collapsed?}
+        title="Urgent"
+        mobile?={@mobile?}
+        panel="urgent"
+        collapsed?={@collapsed?}
+      />
 
-      <ul :if={@rows != [] and @mobile?} class="min-h-0 flex-1 space-y-2 overflow-y-auto">
-        <li :for={row <- @rows}>
-          <.duty_chip
-            row={row}
-            slug={@slug}
-            variant={@variant}
-            id_prefix="urgent-panel-duty-chip"
-            layout={:list}
-          />
-        </li>
-      </ul>
+      <div :if={@mobile? or !@collapsed?} class="flex min-h-0 flex-1 flex-col">
+        <p :if={@rows == []} class="text-sm text-base-content/60">
+          Nothing overdue or due soon.
+        </p>
 
-      <ul :if={@rows != [] and !@mobile?} class="min-h-0 flex-1 space-y-2 overflow-y-auto">
-        <%= for {row, idx} <- Enum.with_index(@rows) do %>
-          <li :if={idx < @max_urgent}>
+        <ul :if={@rows != []} class="min-h-0 flex-1 space-y-2 overflow-y-auto">
+          <li :for={row <- Enum.take(@rows, @max_urgent)}>
             <.duty_chip
               row={row}
               slug={@slug}
               variant={@variant}
-              id_prefix="urgent-duty-chip"
+              id_prefix={urgent_chip_prefix(@mobile?)}
               layout={:list}
             />
           </li>
-        <% end %>
-      </ul>
+        </ul>
 
-      <%= if !@mobile? and length(@rows) > @max_urgent do %>
-        <% extra = length(@rows) - @max_urgent %>
         <.link
+          :if={length(@rows) > @max_urgent}
           id="urgent-more"
           navigate={
-            ~p"/entities/#{@slug}/duties?#{[lifecycle: "live", sort: "urgency", q: "", mine: "false"]}"
+            duties_path(@variant, @slug, lifecycle: "live", sort: "urgency", q: "", mine: "false")
           }
           class="shrink-0 text-xs text-primary hover:underline px-0.5 pt-1"
         >
-          +{extra} more
+          +{length(@rows) - @max_urgent} more
         </.link>
-      <% end %>
+      </div>
     </section>
     """
   end
@@ -186,11 +193,84 @@ defmodule TugasWeb.DutyCalendar do
   defp urgent_panel_id(true), do: "m-dashboard-urgent"
   defp urgent_panel_id(false), do: "urgent-panel"
 
-  defp urgent_panel_class(true), do: "h-full min-h-0 flex flex-col px-1"
+  defp urgent_chip_prefix(true), do: "urgent-panel-duty-chip"
+  defp urgent_chip_prefix(false), do: "urgent-duty-chip"
 
-  defp urgent_panel_class(false),
+  defp urgent_panel_class(true, _collapsed?), do: "h-full min-h-0 flex flex-col px-1"
+
+  defp urgent_panel_class(false, true),
+    do:
+      "flex h-full min-h-0 flex-col items-center rounded-lg border border-base-300 bg-base-200/40 p-1"
+
+  defp urgent_panel_class(false, false),
     do:
       "flex h-full min-h-0 min-w-0 flex-col rounded-lg border border-base-300 bg-base-200/40 p-3"
+
+  defp duties_path(:mobile, slug, params), do: ~p"/m/#{slug}/duties?#{params}"
+  defp duties_path(_variant, slug, params), do: ~p"/entities/#{slug}/duties?#{params}"
+
+  attr :title, :string, required: true
+  attr :mobile?, :boolean, required: true
+  attr :panel, :string, required: true
+  attr :collapsed?, :boolean, default: false
+
+  defp panel_header(%{mobile?: true} = assigns) do
+    ~H"""
+    <h2 class="shrink-0 text-lg font-semibold text-base-content/80 pb-2">{@title}</h2>
+    """
+  end
+
+  defp panel_header(%{mobile?: false} = assigns) do
+    ~H"""
+    <div class="flex shrink-0 items-center justify-between pb-2">
+      <h3 class="text-sm font-semibold text-base-content/70">{@title}</h3>
+      <.collapse_toggle panel={@panel} collapsed?={@collapsed?} label={@title} />
+    </div>
+    """
+  end
+
+  attr :panel, :string, required: true
+  attr :label, :string, required: true
+  attr :side, :atom, default: :left
+
+  defp collapsed_rail(assigns) do
+    ~H"""
+    <button
+      type="button"
+      id={"#{@panel}-collapse"}
+      phx-click="toggle_panel"
+      phx-value-panel={@panel}
+      class="flex h-full w-full flex-col items-center gap-2 text-base-content/60 hover:text-base-content"
+      aria-label={"Expand #{@label}"}
+      aria-expanded="false"
+    >
+      <span class="text-xs leading-none">{if @side == :left, do: "»", else: "«"}</span>
+      <span class="text-sm font-semibold [writing-mode:vertical-rl] rotate-180">
+        {@label}
+      </span>
+    </button>
+    """
+  end
+
+  attr :panel, :string, required: true
+  attr :collapsed?, :boolean, required: true
+  attr :label, :string, required: true
+
+  defp collapse_toggle(assigns) do
+    ~H"""
+    <button
+      type="button"
+      id={"#{@panel}-collapse"}
+      phx-click="toggle_panel"
+      phx-value-panel={@panel}
+      class="text-xs leading-none text-base-content/60 hover:text-base-content"
+      aria-label={"Toggle #{@label}"}
+      aria-expanded={to_string(!@collapsed?)}
+    >
+      {if @collapsed?, do: "▸", else: "▾"}
+    </button>
+    """
+  end
 
   attr :mobile?, :boolean, required: true
 
