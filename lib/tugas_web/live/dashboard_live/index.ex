@@ -62,7 +62,13 @@ defmodule TugasWeb.DashboardLive.Index do
           </div>
         </div>
 
-        <div class="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_15%]">
+        <div class="grid grid-cols-1 gap-6 lg:grid-cols-[15%_minmax(0,1fr)_15%]">
+          <.urgent_panel
+            rows={@urgent_rows}
+            slug={@current_scope.entity.slug}
+            modal_open?={@urgent_modal_open?}
+          />
+
           <div class="flex h-full min-h-0 min-w-0 flex-col">
             <.duty_calendar
               grid={@grid}
@@ -122,6 +128,14 @@ defmodule TugasWeb.DashboardLive.Index do
 
   def handle_event("close_someday_modal", _params, socket) do
     {:noreply, Dashboard.handle_close_someday_modal(socket)}
+  end
+
+  def handle_event("open_urgent_modal", _params, socket) do
+    {:noreply, Dashboard.handle_open_urgent_modal(socket)}
+  end
+
+  def handle_event("close_urgent_modal", _params, socket) do
+    {:noreply, Dashboard.handle_close_urgent_modal(socket)}
   end
 
   def handle_event("toggle_todo_complete", %{"id" => id}, socket) do

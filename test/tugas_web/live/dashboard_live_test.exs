@@ -400,6 +400,79 @@ defmodule TugasWeb.DashboardLiveTest do
     assert has_element?(view, "#someday-modal-duty-chip-#{hidden.id}", hidden.duty_type.name)
   end
 
+  test "urgent duty appears in urgent panel; non-urgent and someday excluded", %{conn: conn} do
+    manager = Tugas.EntitiesFixtures.manager_scope_fixture()
+    conn = log_in_user(conn, manager.user)
+    type = type_fixture(manager.entity, reminder_offsets: "7")
+    today = Urgency.today_for(manager.entity.timezone)
+
+    {:ok, urgent} =
+      Duties.create_duty(manager, %{
+        title: "Overdue task",
+        duty_type_id: type.id,
+        due_by: Date.add(today, -2),
+        open_note: "open"
+      })
+
+    {:ok, calm} =
+      Duties.create_duty(manager, %{
+        title: "Far off",
+        duty_type_id: type.id,
+        due_by: Date.add(today, 60),
+        open_note: "open"
+      })
+
+    {:ok, someday} =
+      Duties.create_duty(manager, %{
+        title: "No date",
+        duty_type_id: type.id,
+        someday: true,
+        open_note: "open"
+      })
+
+    {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}")
+
+    assert has_element?(view, "#urgent-panel #urgent-duty-chip-#{urgent.id}")
+    refute has_element?(view, "#urgent-panel #urgent-duty-chip-#{calm.id}")
+    refute has_element?(view, "#urgent-panel #urgent-duty-chip-#{someday.id}")
+  end
+
+  test "urgent overflow shows +N more, opens and closes modal", %{conn: conn} do
+    manager = Tugas.EntitiesFixtures.manager_scope_fixture()
+    conn = log_in_user(conn, manager.user)
+    type = type_fixture(manager.entity, reminder_offsets: "30")
+    today = Urgency.today_for(manager.entity.timezone)
+
+    for n <- 1..10 do
+      {:ok, _} =
+        Duties.create_duty(manager, %{
+          title: "Urgent #{String.pad_leading("#{n}", 2, "0")}",
+          duty_type_id: type.id,
+          due_by: Date.add(today, n),
+          open_note: "open"
+        })
+    end
+
+    {:ok, hidden} =
+      Duties.create_duty(manager, %{
+        title: "Urgent hidden",
+        duty_type_id: type.id,
+        due_by: Date.add(today, 20),
+        open_note: "open"
+      })
+
+    {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}")
+
+    assert has_element?(view, "#urgent-more", "+1 more")
+    refute has_element?(view, "#urgent-panel #urgent-duty-chip-#{hidden.id}")
+
+    view |> element("#urgent-more") |> render_click()
+    assert has_element?(view, "#urgent-modal #urgent-modal-duty-chip-#{hidden.id}")
+
+    view |> element("#urgent-modal button", "Close") |> render_click()
+    refute has_element?(view, "#urgent-modal")
+  end
+
   test "day overflow opens modal with all duties", %{conn: conn} do
     manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     conn = log_in_user(conn, manager.user)

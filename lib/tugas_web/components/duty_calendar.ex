@@ -125,6 +125,115 @@ defmodule TugasWeb.DutyCalendar do
     """
   end
 
+  attr :rows, :list, required: true
+  attr :slug, :string, required: true
+  attr :variant, :atom, default: :desktop
+  attr :modal_open?, :boolean, default: false
+
+  def urgent_panel(assigns) do
+    assigns =
+      assigns
+      |> assign(:mobile?, assigns.variant == :mobile)
+      |> assign(:max_urgent, CalendarHelpers.max_urgent_chips())
+
+    ~H"""
+    <section id={urgent_panel_id(@mobile?)} class={urgent_panel_class(@mobile?)}>
+      <h2 :if={@mobile?} class="shrink-0 text-lg font-semibold text-base-content/80 pb-2">
+        Urgent
+      </h2>
+      <h3 :if={!@mobile?} class="shrink-0 text-sm font-semibold text-base-content/70 pb-2">
+        Urgent
+      </h3>
+
+      <p :if={@rows == []} class="text-sm text-base-content/60">
+        Nothing overdue or due soon.
+      </p>
+
+      <ul :if={@rows != [] and @mobile?} class="min-h-0 flex-1 space-y-2 overflow-y-auto">
+        <li :for={row <- @rows}>
+          <.duty_chip
+            row={row}
+            slug={@slug}
+            variant={@variant}
+            id_prefix="urgent-panel-duty-chip"
+            layout={:list}
+          />
+        </li>
+      </ul>
+
+      <ul :if={@rows != [] and !@mobile?} class="min-h-0 flex-1 space-y-2 overflow-y-auto">
+        <%= for {row, idx} <- Enum.with_index(@rows) do %>
+          <li :if={idx < @max_urgent}>
+            <.duty_chip
+              row={row}
+              slug={@slug}
+              variant={@variant}
+              id_prefix="urgent-duty-chip"
+              layout={:list}
+            />
+          </li>
+        <% end %>
+      </ul>
+
+      <%= if !@mobile? and length(@rows) > @max_urgent do %>
+        <% extra = length(@rows) - @max_urgent %>
+        <button
+          type="button"
+          id="urgent-more"
+          phx-click="open_urgent_modal"
+          class="shrink-0 text-xs text-primary hover:underline px-0.5 pt-1"
+        >
+          +{extra} more
+        </button>
+      <% end %>
+
+      <.urgent_modal :if={!@mobile? and @modal_open?} rows={@rows} slug={@slug} variant={@variant} />
+    </section>
+    """
+  end
+
+  defp urgent_panel_id(true), do: "m-dashboard-urgent"
+  defp urgent_panel_id(false), do: "urgent-panel"
+
+  defp urgent_panel_class(true), do: "h-full min-h-0 flex flex-col px-1"
+
+  defp urgent_panel_class(false),
+    do: "flex h-full min-h-0 min-w-0 flex-col rounded-lg border border-base-300 bg-base-200/40 p-3"
+
+  attr :rows, :list, required: true
+  attr :slug, :string, required: true
+  attr :variant, :atom, default: :desktop
+
+  defp urgent_modal(assigns) do
+    ~H"""
+    <div id="urgent-modal" class="modal modal-open">
+      <div class="modal-box max-w-md">
+        <h3 class="font-bold text-lg">Urgent</h3>
+        <ul class="mt-3 space-y-2 max-h-[70vh] overflow-y-auto">
+          <li :for={row <- @rows}>
+            <.duty_chip
+              row={row}
+              slug={@slug}
+              variant={@variant}
+              id_prefix="urgent-modal-duty-chip"
+              layout={:list}
+            />
+          </li>
+        </ul>
+        <div class="modal-action">
+          <button type="button" class="btn" phx-click="close_urgent_modal">Close</button>
+        </div>
+      </div>
+      <button
+        class="modal-backdrop"
+        type="button"
+        phx-click="close_urgent_modal"
+        aria-label="Close"
+      />
+    </div>
+    """
+  end
+
   attr :mobile?, :boolean, required: true
 
   defp weekday_headers(assigns) do
