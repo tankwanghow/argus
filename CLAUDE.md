@@ -53,11 +53,15 @@ applies here too. Headlines:
   button beside Today, plus a **+ Todo** button opening the shared
   `TugasWeb.TodoFormModal.todo_form_modal/1` — the same changeset-backed create/edit todo modal the
   Todos pages use, parameterized by ids + change/submit/cancel event names) and the duties listing
-  **+ New duty** button open it in place. On **mobile** there are no create buttons in the dashboard
-  top toolbar — the bottom-nav `:calendar` set carries the create shortcuts (**✚ Todo · 📑 Todos ·
-  ✚ Duty · 💼 Duties · ☰ More**). The URL `/{m/}entities/:slug/duties/new` (`:new` live_action on the
-  dashboards) opens the modal (used by the mobile bottom-nav ✚ Duty tab and todo escalation's
-  `?from_todo=`), gated by `Authorization.can?(:create_duty)`; the ✚ Todo tab navigates to
+  **+ New duty** button open it in place. The **mobile** duties index (`MobileLive.DutyIndex`) also
+  hosts the modal in place — its bottom-nav ✚ Duty is the `:idx_new_duty` tab, a `phx-click=open_create_duty`
+  button (not a link), so creating a duty keeps the user on the listing. On **mobile** there are no
+  create buttons in the dashboard top toolbar — the bottom-nav `:calendar` (dashboard) set carries the
+  create shortcuts (**✚ Todo · 📑 Todos · ✚ Duty · 💼 Duties · ☰ More**). On the dashboard the ✚ Duty
+  tab (`:new_duty`) navigates to the URL `/{m/}entities/:slug/duties/new` (`:new` live_action on the
+  dashboards) which opens the modal over the dashboard (also used by todo escalation's `?from_todo=`),
+  gated by `Authorization.can?(:create_duty)`; the dashboard's ✚ Todo tab (`:dash_new_todo`) opens the
+  in-place todo modal via `phx-click=open_new_todo`, while the **todos** page's ✚ Todo navigates to
   `/m/:slug/todos/new`.
   **There is no separate duty index page** — the **dashboard is the duty list** on both
   UIs (`DashboardLive.Index` at `/entities/:slug`, `MobileLive.Dashboard` at `/m/:slug`). It's a
