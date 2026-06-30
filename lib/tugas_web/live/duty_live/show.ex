@@ -381,7 +381,7 @@ defmodule TugasWeb.DutyLive.Show do
       </div>
 
       <div :if={@show_edit_modal} id="edit-modal" class="modal modal-open">
-        <div class="modal-box">
+        <div class="modal-box max-w-xl">
           <h3 class="font-bold text-lg">Edit duty</h3>
           <.form
             for={@edit_form}
@@ -391,19 +391,23 @@ defmodule TugasWeb.DutyLive.Show do
             class="mt-2"
           >
             <.char_count_input field={@edit_form[:title]} label="Title" max={60} required />
-            <div class="fieldset mb-2">
-              <label class="label mb-1" for="edit-duty-type">Type</label>
-              <p id="edit-duty-type" class="font-medium text-info">{@duty.duty_type.name}</p>
+            <div class="flex items-center gap-4">
+              <div class="fieldset">
+                <label class="label mb-1" for="edit-duty-type">Type</label>
+                <p id="edit-duty-type" class="font-medium text-info">{@duty.duty_type.name}</p>
+              </div>
+              <div class="mt-6">
+                <.input field={@edit_form[:someday]} type="checkbox" label="No due date (Someday)" />
+              </div>
+              <.input
+                :if={!someday?(@edit_form)}
+                field={@edit_form[:due_by]}
+                type="date"
+                label="Due by"
+                required
+              />
             </div>
-            <.input field={@edit_form[:someday]} type="checkbox" label="No due date (Someday)" />
-            <.input
-              :if={!someday?(@edit_form)}
-              field={@edit_form[:due_by]}
-              type="date"
-              label="Due by"
-              required
-            />
-            <div class="fieldset mb-2">
+            <div class="fieldset">
               <.input
                 field={@edit_form[:primary_assignee_id]}
                 type="select"
@@ -411,12 +415,12 @@ defmodule TugasWeb.DutyLive.Show do
                 options={@member_options}
                 prompt="Unassigned"
               />
-              <label class="label mb-1 mt-2" for="edit-collaborator-ids">Also collaborating</label>
+              <label class="label" for="edit-collaborator-ids">Also collaborating (optional)</label>
               <select
                 id="edit-collaborator-ids"
                 name="duty[collaborator_ids][]"
                 multiple
-                class="select w-full h-32"
+                class="select w-full h-24"
               >
                 <option
                   :for={{label, id} <- @member_options}
@@ -426,7 +430,7 @@ defmodule TugasWeb.DutyLive.Show do
                   {label}
                 </option>
               </select>
-              <p class="text-xs text-base-content/50 mt-1">
+              <p class="text-xs text-base-content/50">
                 Hold ⌘/Ctrl to select more than one. Deselect all to remove additional collaborators.
               </p>
             </div>
