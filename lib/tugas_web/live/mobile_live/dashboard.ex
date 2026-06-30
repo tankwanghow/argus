@@ -1,8 +1,10 @@
 defmodule TugasWeb.MobileLive.Dashboard do
   use TugasWeb, :live_view
 
+  alias Tugas.Authorization
   alias TugasWeb.DashboardLive.CalendarHelpers, as: Calendar
   alias TugasWeb.DashboardLive.IndexHelpers, as: Dashboard
+  alias TugasWeb.DutyLive.FormComponent
 
   @impl true
   def render(assigns) do
@@ -10,7 +12,7 @@ defmodule TugasWeb.MobileLive.Dashboard do
     <Layouts.mobile_app flash={@flash} current_scope={@current_scope} nav_context={:calendar}>
       <div class="flex h-[calc(100dvh-3.5rem-env(safe-area-inset-bottom,0px))] min-h-0 flex-col">
         <div class="sticky top-0 z-30 shrink-0 px-4 pt-3 bg-base-100/95 backdrop-blur space-y-1">
-          <div id="dashboard-toolbar" class="flex items-center justify-between gap-1">
+          <div id="dashboard-toolbar" class="flex flex-wrap items-center justify-center gap-1">
             <button
               id="dashboard-prev-month"
               type="button"
@@ -37,6 +39,23 @@ defmodule TugasWeb.MobileLive.Dashboard do
               phx-click="today"
             >
               Today
+            </button>
+            <button
+              :if={Authorization.can?(@current_scope, :create_duty)}
+              id="dashboard-new-duty"
+              type="button"
+              class="btn btn-primary btn-sm"
+              phx-click="open_create_duty"
+            >
+              + Duty
+            </button>
+            <button
+              id="dashboard-new-todo"
+              type="button"
+              class="btn btn-secondary btn-sm"
+              phx-click="open_new_todo"
+            >
+              + Todo
             </button>
           </div>
         </div>
@@ -136,6 +155,16 @@ defmodule TugasWeb.MobileLive.Dashboard do
             </div>
           </div>
         </div>
+
+        <.live_component
+          :if={@create_duty_open?}
+          module={FormComponent}
+          id="duty-form-modal"
+          current_scope={@current_scope}
+          from_todo_id={@create_duty_from_todo_id}
+        />
+
+        <.new_todo_modal :if={@new_todo_open?} />
       </div>
     </Layouts.mobile_app>
     """
@@ -173,7 +202,32 @@ defmodule TugasWeb.MobileLive.Dashboard do
     {:noreply, Dashboard.handle_finish_row_effect(socket, id)}
   end
 
+  def handle_event("open_create_duty", _params, socket) do
+    {:noreply, Dashboard.handle_open_create_duty(socket)}
+  end
+
+  def handle_event("close_create_duty", _params, socket) do
+    {:noreply, Dashboard.handle_close_create_duty(socket)}
+  end
+
+  def handle_event("open_new_todo", _params, socket) do
+    {:noreply, Dashboard.handle_open_new_todo(socket)}
+  end
+
+  def handle_event("close_new_todo", _params, socket) do
+    {:noreply, Dashboard.handle_close_new_todo(socket)}
+  end
+
+  def handle_event("create_todo", %{"title" => title}, socket) do
+    {:noreply, Dashboard.handle_create_todo(socket, title)}
+  end
+
   def handle_event("close_modal_on_escape", _params, socket) do
     {:noreply, Dashboard.handle_close_modal_on_escape(socket)}
+  end
+
+  @impl true
+  def handle_info({:duty_created, duty, from_todo_id}, socket) do
+    {:noreply, Dashboard.handle_duty_created(socket, duty, from_todo_id)}
   end
 end

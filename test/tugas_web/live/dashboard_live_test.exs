@@ -528,6 +528,50 @@ defmodule TugasWeb.DashboardLiveTest do
     refute has_element?(view, "#someday-strip #duty-chip-#{someday.id}")
   end
 
+  test "New Duty button opens the create-duty modal and creates a duty", %{conn: conn} do
+    manager = Tugas.EntitiesFixtures.manager_scope_fixture()
+    conn = log_in_user(conn, manager.user)
+    type = type_fixture(manager.entity)
+    today = Urgency.today_for(manager.entity.timezone)
+
+    {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}")
+
+    refute has_element?(view, "#duty-form-modal")
+    view |> element("#dashboard-new-duty") |> render_click()
+    assert has_element?(view, "#duty-form-modal")
+
+    view
+    |> form("#duty-create-form",
+      duty: %{
+        title: "Modal duty",
+        duty_type_id: type.id,
+        due_by: Date.to_iso8601(Date.add(today, 3)),
+        open_note: "via modal"
+      }
+    )
+    |> render_submit()
+
+    refute has_element?(view, "#duty-form-modal")
+    assert render(view) =~ "Duty created."
+  end
+
+  test "New Todo button opens a modal and creates a todo", %{conn: conn} do
+    manager = Tugas.EntitiesFixtures.manager_scope_fixture()
+    conn = log_in_user(conn, manager.user)
+
+    {:ok, view, _html} = live(conn, ~p"/entities/#{manager.entity.slug}")
+
+    refute has_element?(view, "#new-todo-modal")
+    view |> element("#dashboard-new-todo") |> render_click()
+    assert has_element?(view, "#new-todo-modal")
+
+    view |> form("#new-todo-form", %{title: "Quick task"}) |> render_submit()
+
+    refute has_element?(view, "#new-todo-modal")
+    assert render(view) =~ "Todo added."
+    assert has_element?(view, "#dashboard-todos", "Quick task")
+  end
+
   test "day overflow opens modal with all duties", %{conn: conn} do
     manager = Tugas.EntitiesFixtures.manager_scope_fixture()
     conn = log_in_user(conn, manager.user)

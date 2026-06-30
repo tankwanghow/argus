@@ -1,15 +1,17 @@
 defmodule TugasWeb.DashboardLive.Index do
   use TugasWeb, :live_view
 
+  alias Tugas.Authorization
   alias TugasWeb.DashboardLive.CalendarHelpers, as: Calendar
   alias TugasWeb.DashboardLive.IndexHelpers, as: Dashboard
+  alias TugasWeb.DutyLive.FormComponent
 
   @impl true
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope} container_class="max-w-7xl">
       <div id="dashboard" class="tugas-page space-y-4">
-        <div class="flex flex-wrap items-center gap-2">
+        <div class="flex flex-wrap items-center justify-center gap-2">
           <div class="flex items-center gap-1">
             <button
               id="dashboard-prev-month"
@@ -37,6 +39,23 @@ defmodule TugasWeb.DashboardLive.Index do
               phx-click="today"
             >
               Today
+            </button>
+            <button
+              :if={Authorization.can?(@current_scope, :create_duty)}
+              id="dashboard-new-duty"
+              type="button"
+              class="btn btn-primary"
+              phx-click="open_create_duty"
+            >
+              + Duty
+            </button>
+            <button
+              id="dashboard-new-todo"
+              type="button"
+              class="btn btn-secondary"
+              phx-click="open_new_todo"
+            >
+              + Todo
             </button>
           </div>
         </div>
@@ -69,6 +88,16 @@ defmodule TugasWeb.DashboardLive.Index do
             collapsed?={@collapsed.todos}
           />
         </div>
+
+        <.live_component
+          :if={@create_duty_open?}
+          module={FormComponent}
+          id="duty-form-modal"
+          current_scope={@current_scope}
+          from_todo_id={@create_duty_from_todo_id}
+        />
+
+        <.new_todo_modal :if={@new_todo_open?} />
       </div>
     </Layouts.app>
     """
@@ -102,6 +131,26 @@ defmodule TugasWeb.DashboardLive.Index do
     {:noreply, Dashboard.handle_toggle_panel(socket, panel)}
   end
 
+  def handle_event("open_create_duty", _params, socket) do
+    {:noreply, Dashboard.handle_open_create_duty(socket)}
+  end
+
+  def handle_event("close_create_duty", _params, socket) do
+    {:noreply, Dashboard.handle_close_create_duty(socket)}
+  end
+
+  def handle_event("open_new_todo", _params, socket) do
+    {:noreply, Dashboard.handle_open_new_todo(socket)}
+  end
+
+  def handle_event("close_new_todo", _params, socket) do
+    {:noreply, Dashboard.handle_close_new_todo(socket)}
+  end
+
+  def handle_event("create_todo", %{"title" => title}, socket) do
+    {:noreply, Dashboard.handle_create_todo(socket, title)}
+  end
+
   def handle_event("toggle_todo_complete", %{"id" => id}, socket) do
     {:noreply, Dashboard.handle_toggle_todo_complete(socket, id)}
   end
@@ -112,6 +161,11 @@ defmodule TugasWeb.DashboardLive.Index do
 
   def handle_event("close_modal_on_escape", _params, socket) do
     {:noreply, Dashboard.handle_close_modal_on_escape(socket)}
+  end
+
+  @impl true
+  def handle_info({:duty_created, duty, from_todo_id}, socket) do
+    {:noreply, Dashboard.handle_duty_created(socket, duty, from_todo_id)}
   end
 
   # Collapsing Urgent (left) / Todos (right) shrinks that column to a thin rail so

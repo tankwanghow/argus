@@ -68,6 +68,31 @@ defmodule TugasWeb.DutyLive.CreateForm do
     end
   end
 
+  @doc """
+  Creates the duty without navigation/flash — for the modal `FormComponent`.
+
+  Returns `{:ok, socket, duty}` on success (escalation recorded if applicable),
+  `{:error, socket}` with the changeset re-assigned to `:form`, or
+  `{:error, socket, message}` for a non-changeset failure to surface inline.
+  """
+  def create(socket, params) do
+    scope = socket.assigns.current_scope
+
+    case Duties.create_duty(scope, map_create_params(params)) do
+      {:ok, duty} ->
+        {:ok, maybe_record_escalation(socket, scope, duty), duty}
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        {:error, assign_form(socket, changeset)}
+
+      {:error, :note_required} ->
+        {:error, socket, "An open note is required."}
+
+      :not_authorise ->
+        {:error, socket, "Not authorized."}
+    end
+  end
+
   defp assign_form(socket, %Ecto.Changeset{} = changeset) do
     assign(socket, :form, to_form(changeset, as: "duty"))
   end
@@ -94,18 +119,11 @@ defmodule TugasWeb.DutyLive.CreateForm do
     case socket.assigns[:from_todo_id] do
       todo_id when is_binary(todo_id) ->
         case Todos.get_todo_for_escalation(scope, todo_id) do
-          {:ok, todo} ->
-            case Todos.record_escalation(scope, todo, duty) do
-              {:ok, _} ->
-                socket
-
-              _ ->
-                put_flash(socket, :warning, "Duty created, but the todo could not be linked.")
-            end
-
-          _ ->
-            socket
+          {:ok, todo} -> Todos.record_escalation(scope, todo, duty)
+          _ -> :ok
         end
+
+        socket
 
       _ ->
         socket

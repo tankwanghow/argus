@@ -96,6 +96,32 @@ defmodule TugasWeb.DutyCalendar do
     """
   end
 
+  def new_todo_modal(assigns) do
+    ~H"""
+    <div id="new-todo-modal" class="modal modal-open">
+      <div class="modal-box max-w-md">
+        <h3 class="text-lg font-bold mb-2">New todo</h3>
+        <form id="new-todo-form" phx-submit="create_todo">
+          <input
+            type="text"
+            name="title"
+            placeholder="What needs doing?"
+            class="input w-full"
+            maxlength="200"
+            autocomplete="off"
+            required
+          />
+          <div class="modal-action">
+            <button type="button" class="btn" phx-click="close_new_todo">Cancel</button>
+            <button type="submit" class="btn btn-primary">Add todo</button>
+          </div>
+        </form>
+      </div>
+      <button class="modal-backdrop" type="button" phx-click="close_new_todo" aria-label="Close" />
+    </div>
+    """
+  end
+
   attr :rows, :list, required: true
   attr :slug, :string, required: true
   attr :variant, :atom, default: :mobile

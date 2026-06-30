@@ -2,6 +2,7 @@ defmodule TugasWeb.DashboardLive.IndexHelpers do
   @moduledoc false
 
   import Phoenix.Component, only: [assign: 2, assign: 3]
+  import Phoenix.LiveView, only: [put_flash: 3]
 
   alias Tugas.Duties.Urgency
   alias Tugas.Todos
@@ -27,6 +28,9 @@ defmodule TugasWeb.DashboardLive.IndexHelpers do
       |> assign(:day_modal_rows, [])
       |> assign(:day_modal_holidays, [])
       |> assign(:row_effects, %{})
+      |> assign(:create_duty_open?, false)
+      |> assign(:create_duty_from_todo_id, nil)
+      |> assign(:new_todo_open?, false)
       |> DutiesFilter.assign_sid(session)
       |> DutiesFilter.assign_from_filters(filters)
       |> assign_calendar_month(filters, today)
@@ -98,6 +102,44 @@ defmodule TugasWeb.DashboardLive.IndexHelpers do
 
   def handle_toggle_panel(socket, _panel), do: socket
 
+  def handle_open_create_duty(socket, params \\ %{}) do
+    assign(socket,
+      create_duty_open?: true,
+      create_duty_from_todo_id: params["from_todo"]
+    )
+  end
+
+  def handle_close_create_duty(socket), do: assign(socket, :create_duty_open?, false)
+
+  def handle_duty_created(socket, _duty, from_todo_id) do
+    socket
+    |> assign(:create_duty_open?, false)
+    |> put_flash(:info, duty_created_message(from_todo_id))
+    |> load_dashboard()
+  end
+
+  defp duty_created_message(nil), do: "Duty created."
+  defp duty_created_message(_from_todo_id), do: "Duty created and todo escalated."
+
+  def handle_open_new_todo(socket), do: assign(socket, :new_todo_open?, true)
+  def handle_close_new_todo(socket), do: assign(socket, :new_todo_open?, false)
+
+  def handle_create_todo(socket, title) do
+    case Todos.create_todo(socket.assigns.current_scope, %{title: title}) do
+      {:ok, _todo} ->
+        socket
+        |> assign(:new_todo_open?, false)
+        |> put_flash(:info, "Todo added.")
+        |> load_todos()
+
+      {:error, %Ecto.Changeset{}} ->
+        put_flash(socket, :error, "Could not add the todo.")
+
+      :not_authorise ->
+        put_flash(socket, :error, "Not authorized.")
+    end
+  end
+
   def handle_toggle_todo_complete(socket, id) do
     scope = socket.assigns.current_scope
 
@@ -141,6 +183,12 @@ defmodule TugasWeb.DashboardLive.IndexHelpers do
     cond do
       socket.assigns.day_modal_date ->
         handle_close_day_modal(socket)
+
+      socket.assigns.create_duty_open? ->
+        handle_close_create_duty(socket)
+
+      socket.assigns.new_todo_open? ->
+        handle_close_new_todo(socket)
 
       true ->
         socket
