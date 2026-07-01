@@ -172,7 +172,7 @@ defmodule TugasWeb.DutyCalendar do
           Nothing overdue or due soon.
         </p>
 
-        <ul :if={@rows != []} class="min-h-0 flex-1 space-y-2 overflow-y-auto">
+        <ul :if={@rows != []} class="min-h-0 flex-1 space-y-1 overflow-y-auto">
           <li :for={row <- Enum.take(@rows, @max_urgent)}>
             <.duty_chip
               row={row}
@@ -393,7 +393,7 @@ defmodule TugasWeb.DutyCalendar do
         <span
           id={"calendar-day-more-#{@cell.date}"}
           class={[
-            "px-0.5 text-base-content/60",
+            "text-base-content/60",
             @mobile? && "text-[10px]",
             !@mobile? && "text-xs"
           ]}
@@ -521,15 +521,15 @@ defmodule TugasWeb.DutyCalendar do
     do: "tugas-duty-chip-hover px-3 py-3 min-h-12 rounded-lg border border-base-300 bg-base-100"
 
   defp chip_surface_class(_, :calendar),
-    do: "px-1.5 py-0.5 rounded pointer-events-none"
+    do: "px-0.5 rounded pointer-events-none"
 
   defp chip_surface_class(_, :someday),
-    do: "tugas-duty-chip-hover px-1.5 py-0.5 rounded border border-base-300 bg-base-100"
+    do: "tugas-duty-chip-hover px-0.5 py-0.5 rounded border border-base-300 bg-base-100"
 
   defp chip_surface_class(_, :list),
     do: "tugas-duty-chip-hover px-3 py-2 rounded-lg border border-base-300 bg-base-100"
 
-  defp chip_surface_class(_, _), do: "px-1.5 py-0.5 rounded hover:bg-base-200"
+  defp chip_surface_class(_, _), do: "px-0.5 rounded hover:bg-base-200"
 
   defp chip_title_class(:mobile, :list), do: "font-medium block"
   defp chip_title_class(_, :calendar), do: "font-medium block overflow-hidden whitespace-nowrap"
